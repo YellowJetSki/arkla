@@ -28,6 +28,10 @@ import BioTab from './tabs/BioTab';
 import PartyLootTab from './tabs/PartyLootTab';
 import JournalTab from './tabs/JournalTab';
 
+// NEW BATTLEMAP IMPORTS
+import BattleMapLayer from './battlemap/BattleMapLayer';
+import StickyBattleNav from './battlemap/StickyBattleNav';
+
 const XP_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000];
 
 const THEMES = {
@@ -69,6 +73,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [isImageOpen, setIsImageOpen] = useState(false); 
   const [activeLoot, setActiveLoot] = useState(null); 
   
+  // NEW BATTLEMAP LAYER STATE
+  const [isBattleMapOpen, setIsBattleMapOpen] = useState(false);
+
   const [saveToast, setSaveToast] = useState(''); 
   const [loadingText, setLoadingText] = useState("Consulting the pirate council...");
 
@@ -208,7 +215,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     await updateField('inspiration', !char.inspiration); 
   };
 
-  // RESTORED: The missing handleLongRest function!
   const handleLongRest = () => {
     if (!char) return;
     setIsLongRestOpen(true);
@@ -278,7 +284,25 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
   return (
     <CardWrapper>
-      <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} pb-24`}>
+      <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} pb-24 relative`}>
+        
+        {/* NEW: LIVE BATTLE MAP LAYER & PERSISTENT NAV */}
+        {!isDM && (
+          <>
+            <BattleMapLayer 
+              char={char} 
+              charId={currentUser.charId} 
+              isOpen={isBattleMapOpen} 
+              onClose={() => setIsBattleMapOpen(false)} 
+            />
+            <StickyBattleNav 
+              onToggleMap={setIsBattleMapOpen} 
+              isMapOpen={isBattleMapOpen} 
+              activeTheme={activeTheme} 
+            />
+          </>
+        )}
+
         {!isDM && char && char.hasCompletedTutorial !== true && (
           <OnboardingWizard charName={char.name} onComplete={handleCompleteOnboarding} />
         )}
@@ -484,7 +508,15 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           <div className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-xl pt-2 pb-4 -mx-3 px-3 md:-mx-8 md:px-8 border-b border-slate-800 shadow-md mb-6">
             <div className="bg-slate-900 p-1.5 rounded-xl border border-slate-800 relative">
               <ScrollableRow className="gap-2">
-                {[{ id: 'combat', icon: Swords, label: 'Combat' }, { id: 'spells', icon: Flame, label: 'Spells' }, { id: 'features', icon: Sparkles, label: 'Features' }, { id: 'inventory', icon: Backpack, label: 'Inventory' }, { id: 'partyLoot', icon: Gem, label: 'Party Loot' }, { id: 'bio', icon: BookOpen, label: 'Bio' }, { id: 'journal', icon: PenTool, label: 'Journal' }].map(tab => (
+                {[
+                  { id: 'combat', icon: Swords, label: 'Combat' }, 
+                  { id: 'spells', icon: Flame, label: 'Spells' }, 
+                  { id: 'features', icon: Sparkles, label: 'Features' }, 
+                  { id: 'inventory', icon: Backpack, label: 'Inventory' }, 
+                  { id: 'partyLoot', icon: Gem, label: 'Party Loot' }, 
+                  { id: 'bio', icon: BookOpen, label: 'Bio' }, 
+                  { id: 'journal', icon: PenTool, label: 'Journal' }
+                ].map(tab => (
                   <button 
                     key={tab.id} id={`tab-btn-${tab.id}`} onClick={() => setActiveTab(tab.id)} 
                     className={`flex flex-col items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium text-sm whitespace-nowrap transition-all flex-1 min-w-[100px] snap-center relative ${activeTab === tab.id ? `${activeTheme.bg} text-white shadow-md` : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
