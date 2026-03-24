@@ -1,0 +1,32 @@
+mutation CreateSeedData @transaction @auth(level: USER, insecureReason: "Seed data is for development and testing, so it can be exposed to authenticated users.") {
+  product_insertMany(data: [
+    {
+      id: "prod-001",
+      name: "Super Widget",
+      description: "A very useful widget for everyday tasks.",
+      price: 19.99,
+      category: "Widgets"
+    },
+    {
+      id: "prod-002",
+      name: "Mega Gadget",
+      description: "Enhance your digital life with this amazing gadget.",
+      price: 99.99,
+      category: "Electronics"
+    }
+  ])
+  account_insertMany(data: [
+    {
+      id: "acc-001",
+      username: "testuser1",
+      email: "testuser1@example.com",
+      status: "active"
+    },
+    {
+      id: "acc-002",
+      username: "testuser2",
+      email: "testuser2@example.com",
+      status: "inactive"
+    }
+  ])
+}

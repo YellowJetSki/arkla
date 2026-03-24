@@ -1,0 +1,44 @@
+query AllCampaigns @auth(level: PUBLIC, insecureReason: "This operation is safe to expose to the public") {
+  campaigns {
+    id
+    name
+    description
+    createdAt
+    user {
+      displayName
+    }
+  }
+}
+
+query UserCampaigns($userId: UUID!) @auth(level: USER, insecureReason: "This operation is safe to expose to all logged in users.") {
+  campaigns(where: {userId: {eq: $userId}}) {
+    id
+    name
+    createdAt
+  }
+}
+
+mutation CreateCampaign($name: String!, $description: String, $setting: String) @auth(level: USER) {
+  campaign_insert(data: {
+    name: $name,
+    description: $description,
+    setting: $setting,
+    userId_expr: "auth.uid",
+    createdAt_expr: "request.time"
+  }) {
+    id
+  }
+}
+
+mutation UpdateCampaign($id: UUID!, $name: String, $description: String, $setting: String) @auth(level: USER) {
+  campaign_update(
+    key: {id: $id},
+    data: {
+      name: $name,
+      description: $description,
+      setting: $setting
+    }
+  ) {
+    id
+  }
+}

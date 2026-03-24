@@ -1,0 +1,147 @@
+import { useState } from 'react';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { Save, X, AlertTriangle } from 'lucide-react';
+
+export default function DMEditSheet({ char, charId, onCancel }) {
+  // Clone character data into local state for editing
+  const [formData, setFormData] = useState({
+    name: char.name,
+    class: char.class,
+    race: char.race,
+    level: char.level,
+    ac: char.ac,
+    speed: char.speed,
+    initiative: char.initiative,
+    maxHp: char.maxHp,
+    stats: { ...char.stats }
+  });
+
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleStatChange = (stat, value) => {
+    setFormData(prev => ({
+      ...prev,
+      stats: { ...prev.stats, [stat]: Number(value) }
+    }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const charRef = doc(db, 'characters', charId);
+      await updateDoc(charRef, {
+        name: formData.name,
+        class: formData.class,
+        race: formData.race,
+        level: Number(formData.level),
+        ac: Number(formData.ac),
+        speed: Number(formData.speed),
+        initiative: Number(formData.initiative),
+        maxHp: Number(formData.maxHp),
+        stats: formData.stats
+      });
+      onCancel(); // Close editor on success
+    } catch (error) {
+      console.error("Error saving character:", error);
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="absolute inset-0 bg-slate-900 z-50 p-6 overflow-y-auto custom-scrollbar flex flex-col">
+      <div className="flex justify-between items-center border-b border-slate-700 pb-4 mb-6 shrink-0">
+        <h2 className="text-xl font-bold text-amber-400 flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5" /> Deep Edit Mode
+        </h2>
+        <button onClick={onCancel} className="text-slate-400 hover:text-white transition-colors bg-slate-800 p-2 rounded-lg">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="space-y-6 flex-1">
+        {/* Core Identity */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Character Name</label>
+            <input type="text" value={formData.name} onChange={e => handleChange('name', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Level</label>
+            <input type="number" value={formData.level} onChange={e => handleChange('level', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Class</label>
+            <input type="text" value={formData.class} onChange={e => handleChange('class', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Race</label>
+            <input type="text" value={formData.race} onChange={e => handleChange('race', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
+          </div>
+        </div>
+
+        {/* Combat Vitals */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Max HP</label>
+            <input type="number" value={formData.maxHp} onChange={e => handleChange('maxHp', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Armor Class</label>
+            <input type="number" value={formData.ac} onChange={e => handleChange('ac', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Initiative Mod</label>
+            <input type="number" value={formData.initiative} onChange={e => handleChange('initiative', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Speed</label>
+            <input type="number" value={formData.speed} onChange={e => handleChange('speed', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
+          </div>
+        </div>
+
+        {/* Base Stats */}
+        <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+          <label className="block text-xs font-bold text-slate-400 uppercase mb-3">Base Ability Scores</label>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+            {Object.keys(formData.stats).map(stat => (
+              <div key={stat} className="bg-slate-900 border border-slate-600 rounded p-2 text-center">
+                <span className="text-[10px] text-slate-500 font-bold block mb-1">{stat}</span>
+                <input 
+                  type="number" 
+                  value={formData.stats[stat]} 
+                  onChange={e => handleStatChange(stat, e.target.value)} 
+                  className="w-full bg-transparent text-center text-white font-bold text-xl focus:outline-none" 
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Save / Confirmation Action Footer */}
+      <div className="mt-8 shrink-0 bg-slate-900/80 p-4 rounded-xl border border-slate-700 flex justify-end items-center gap-4">
+        {isConfirming ? (
+          <>
+            <span className="text-amber-400 font-bold text-sm">Apply permanent changes to database?</span>
+            <button onClick={() => setIsConfirming(false)} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={isSaving} className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 shadow-[0_0_15px_rgba(217,119,6,0.4)]">
+              {isSaving ? 'Saving...' : <><Save className="w-4 h-4" /> Confirm Save</>}
+            </button>
+          </>
+        ) : (
+          <button onClick={() => setIsConfirming(true)} className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg">
+            <Save className="w-4 h-4" /> Review & Save
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
