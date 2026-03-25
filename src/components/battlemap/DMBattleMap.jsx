@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 
@@ -11,7 +11,7 @@ const LOCAL_MAPS = [
 ];
 
 export default function DMBattleMap() {
-  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null });
+  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null });
   const [tokens, setTokens] = useState({});
   const [selectedTokenId, setSelectedTokenId] = useState(null);
   
@@ -23,23 +23,30 @@ export default function DMBattleMap() {
   const [isSavingMap, setIsSavingMap] = useState(false);
   
   const [tempImageUrl, setTempImageUrl] = useState('');
-  const [tempGridScale, setTempGridScale] = useState(30); // 30px Calibration
+  const [tempGridScale, setTempGridScale] = useState(30); 
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
     const unsub = onSnapshot(mapRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        
+        const rawCols = Number(data.cols);
+        const rawRows = Number(data.rows);
+        const safeCols = Math.min(100, Math.max(1, isNaN(rawCols) ? 20 : rawCols));
+        const safeRows = Math.min(100, Math.max(1, isNaN(rawRows) ? 15 : rawRows));
+
         setMapData({
           imageUrl: data.imageUrl || '',
-          cols: data.cols || 20,
-          rows: data.rows || 15,
+          cols: safeCols,
+          rows: safeRows,
           isPublished: data.isPublished || false,
-          activeTokenId: data.activeTokenId || null
+          activeTokenId: data.activeTokenId || null,
+          ping: data.ping || null
         });
         setTokens(data.tokens || {});
       } else {
-        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null });
+        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null, ping: null });
       }
     });
     return () => unsub();
@@ -47,23 +54,25 @@ export default function DMBattleMap() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const sessionSnap = await getDoc(doc(db, 'campaign', 'main_session'));
-      if (sessionSnap.exists()) {
-        const playerIds = sessionSnap.data().unlockedCharacters || [];
-        
-        // THE CRASH FIX (Restored): Strips out corrupted ghost IDs before asking Firebase for them
-        const validIds = playerIds.filter(id => id);
-        
-        if (validIds.length > 0) {
-          const playerDocs = await Promise.all(validIds.map(id => getDoc(doc(db, 'characters', id))));
-          setActivePlayers(playerDocs.filter(d => d.exists()).map(d => ({ id: d.id, ...d.data() })));
-        } else {
-          setActivePlayers([]);
+      try {
+        const sessionSnap = await getDoc(doc(db, 'campaign', 'main_session'));
+        if (sessionSnap.exists()) {
+          const playerIds = sessionSnap.data().unlockedCharacters || [];
+          const validIds = playerIds.filter(id => id && typeof id === 'string');
+          
+          if (validIds.length > 0) {
+            const playerDocs = await Promise.all(validIds.map(id => getDoc(doc(db, 'characters', id))));
+            setActivePlayers(playerDocs.filter(d => d.exists()).map(d => ({ id: d.id, ...d.data() })));
+          } else {
+            setActivePlayers([]);
+          }
         }
+        
+        const enemySnap = await getDocs(collection(db, 'active_enemies'));
+        setActiveEnemies(enemySnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (error) {
+        console.error("Safely aborted fetch due to database error:", error);
       }
-      
-      const enemySnap = await getDocs(collection(db, 'active_enemies'));
-      setActiveEnemies(enemySnap.docs.map(d => ({ id: d.id, ...d.data() })));
     };
     fetchData();
   }, []);
@@ -121,6 +130,18 @@ export default function DMBattleMap() {
       tokens: presetData.tokens,
       isPublished: false 
     });
+    
+    const presetEnemies = Object.values(presetData.tokens || {}).filter(t => t.type === 'enemy');
+    for (const enemy of presetEnemies) {
+       await setDoc(doc(db, 'active_enemies', enemy.id), {
+          name: enemy.name,
+          hp: enemy.hp || 10,
+          currentHp: enemy.hp || 10,
+          ac: 10, 
+          speed: enemy.speed || 30
+       }, { merge: true });
+    }
+
     setSelectedTokenId(null);
   };
 
@@ -133,21 +154,33 @@ export default function DMBattleMap() {
 
   const stageToken = async (actor, type) => {
     if (tokens[actor.id]) return; 
-    const newToken = { id: actor.id, name: actor.name || 'Unknown', type: type, img: actor.img || '', speed: actor.speed || 30, conditions: actor.conditions || [], x: 0, y: 0, size: getCreatureSize(actor.name), isHidden: false };
+    const newToken = { 
+      id: actor.id, 
+      name: actor.name || 'Unknown', 
+      type: type, 
+      img: actor.img || '', 
+      speed: actor.speed || 30, 
+      conditions: actor.conditions || [], 
+      x: 0, 
+      y: 0, 
+      size: getCreatureSize(actor.name), 
+      isHidden: false, 
+      hp: actor.currentHp ?? actor.hp ?? 0,
+      maxHp: actor.maxHp ?? actor.hp ?? 1
+    };
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: { ...tokens, [actor.id]: newToken } }, { merge: true });
   };
 
-  // THE MACRO FIX (Restored): Drops all active characters onto the board instantly
   const stageAllActive = async () => {
     const newTokens = { ...tokens };
     let pX = 0;
     let eX = 0;
     
     unstagedPlayers.forEach(p => {
-      newTokens[p.id] = { id: p.id, name: p.name || 'Unknown', type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false };
+      newTokens[p.id] = { id: p.id, name: p.name || 'Unknown', type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1 };
     });
     unstagedEnemies.forEach(e => {
-      newTokens[e.id] = { id: e.id, name: e.name || 'Unknown', type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false };
+      newTokens[e.id] = { id: e.id, name: e.name || 'Unknown', type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1 };
     });
     
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: newTokens }, { merge: true });
@@ -156,7 +189,7 @@ export default function DMBattleMap() {
   const removeToken = async (tokenId) => {
     const updatedTokens = { ...tokens };
     delete updatedTokens[tokenId];
-    await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
     if (selectedTokenId === tokenId) setSelectedTokenId(null);
   };
 
@@ -183,11 +216,66 @@ export default function DMBattleMap() {
     }
   };
 
+  const handleUpdateTokenHp = async (newHp) => {
+    if (!selectedTokenId || !tokens[selectedTokenId]) return;
+    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], hp: newHp } };
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    
+    const type = tokens[selectedTokenId].type;
+    const collectionName = type === 'player' ? 'characters' : 'active_enemies';
+    try {
+      if (type === 'enemy') {
+        await updateDoc(doc(db, collectionName, selectedTokenId), { currentHp: newHp });
+      } else {
+        await updateDoc(doc(db, collectionName, selectedTokenId), { hp: newHp });
+      }
+    } catch (e) {
+      console.error("Failed to sync HP to entity", e);
+    }
+  };
+
+  const handleToggleTokenSize = async () => {
+    if (!selectedTokenId || !tokens[selectedTokenId]) return;
+    const currentSize = tokens[selectedTokenId].size || 1;
+    const newSize = currentSize >= 3 ? 1 : currentSize + 1; 
+    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], size: newSize } };
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+  };
+
+  const toggleCondition = async (cond) => {
+    if (!selectedTokenId || !tokens[selectedTokenId]) return;
+    const t = tokens[selectedTokenId];
+    const currentConds = t.conditions || [];
+    const newConds = currentConds.includes(cond) 
+      ? currentConds.filter(c => c !== cond) 
+      : [...currentConds, cond];
+      
+    const updatedTokens = { ...tokens, [selectedTokenId]: { ...t, conditions: newConds } };
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    
+    const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
+    await updateDoc(doc(db, collectionName, selectedTokenId), { conditions: newConds });
+  };
+
   const handleTileClick = async (x, y) => {
     if (!selectedTokenId || !tokens[selectedTokenId]) return;
     const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], x, y } };
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
     setSelectedTokenId(null); 
+  };
+
+  // NEW QoL: Native Drag-and-Drop
+  const handleTokenDrop = async (tokenId, x, y) => {
+    if (!tokenId || !tokens[tokenId]) return;
+    const updatedTokens = { ...tokens, [tokenId]: { ...tokens[tokenId], x, y } };
+    await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
+  };
+
+  // NEW QoL: Global Ping
+  const handlePing = async (x, y) => {
+    await updateDoc(doc(db, 'campaign', 'battlemap'), {
+      ping: { x, y, timestamp: Date.now() }
+    });
   };
 
   const unstagedPlayers = activePlayers.filter(p => !tokens[p.id]);
@@ -304,17 +392,48 @@ export default function DMBattleMap() {
         <div className="flex items-center gap-2 flex-wrap flex-1">
           
           {selectedTokenId && tokens[selectedTokenId] ? (
-            <div className="flex items-center gap-2 bg-indigo-900/50 px-3 py-1.5 rounded-lg border border-indigo-400/50 shadow-inner animate-in zoom-in-95 w-full md:w-auto">
-              <span className="text-xs font-bold text-white mr-auto md:mr-0">Selected: {tokens[selectedTokenId].name}</span>
+            <div className="flex items-center gap-2 bg-indigo-900/50 px-3 py-1.5 rounded-lg border border-indigo-400/50 shadow-inner animate-in zoom-in-95 w-full md:w-auto overflow-x-auto custom-scrollbar">
+              <span className="text-xs font-bold text-white mr-auto md:mr-0 whitespace-nowrap">Selected: {tokens[selectedTokenId].name}</span>
               
-              <button onClick={handleUpdateTokenImage} className="text-emerald-400 hover:text-emerald-300 ml-2 border-l border-indigo-500/30 pl-2" title="Set Custom Image URL"><ImageIcon className="w-4 h-4"/></button>
+              <div className="flex items-center gap-1 border-l border-indigo-500/30 pl-2 ml-1" title="Edit HP">
+                <Heart className="w-3 h-3 text-red-400" />
+                <input 
+                  type="number" 
+                  value={tokens[selectedTokenId].hp || 0}
+                  onChange={(e) => handleUpdateTokenHp(Number(e.target.value))}
+                  className="w-12 bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-white text-xs font-bold focus:outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+
+              <button onClick={handleToggleTokenSize} className="text-indigo-300 hover:text-white ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0" title="Cycle Token Size (1x1, 2x2, 3x3)">
+                <Maximize className="w-3 h-3" />
+                <span className="text-[10px] font-bold">{tokens[selectedTokenId].size || 1}x</span>
+              </button>
+
+              <button onClick={handleUpdateTokenImage} className="text-emerald-400 hover:text-emerald-300 ml-2 border-l border-indigo-500/30 pl-2 shrink-0" title="Set Custom Image URL"><ImageIcon className="w-4 h-4"/></button>
               
-              <button onClick={handleToggleHidden} className="text-slate-400 hover:text-white ml-2 border-l border-indigo-500/30 pl-2" title={tokens[selectedTokenId].isHidden ? "Reveal Token" : "Hide Token"}>
+              <button onClick={handleToggleHidden} className="text-slate-400 hover:text-white ml-2 border-l border-indigo-500/30 pl-2 shrink-0" title={tokens[selectedTokenId].isHidden ? "Reveal Token" : "Hide Token"}>
                 {tokens[selectedTokenId].isHidden ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4" />}
               </button>
 
-              <button onClick={() => removeToken(selectedTokenId)} className="text-red-400 hover:text-red-300 ml-2 border-l border-indigo-500/30 pl-2" title="Remove from board"><Trash2 className="w-4 h-4"/></button>
-              <button onClick={() => setSelectedTokenId(null)} className="text-slate-400 hover:text-white ml-2 bg-slate-950 p-1 rounded" title="Deselect"><X className="w-3 h-3"/></button>
+              <button onClick={() => removeToken(selectedTokenId)} className="text-red-400 hover:text-red-300 ml-2 border-l border-indigo-500/30 pl-2 shrink-0" title="Remove from board"><Trash2 className="w-4 h-4"/></button>
+              
+              <select 
+                className="bg-slate-950 text-fuchsia-400 border border-fuchsia-500/40 rounded px-2 py-1 text-xs font-bold focus:outline-none ml-2 border-l border-indigo-500/30 shrink-0"
+                onChange={(e) => {
+                  if(e.target.value) {
+                    toggleCondition(e.target.value);
+                    e.target.value = ""; 
+                  }
+                }}
+              >
+                <option value="">+ Cond</option>
+                {['Blinded', 'Charmed', 'Deafened', 'Exhaustion', 'Frightened', 'Grappled', 'Incapacitated', 'Invisible', 'Paralyzed', 'Petrified', 'Poisoned', 'Prone', 'Restrained', 'Stunned', 'Unconscious'].map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+
+              <button onClick={() => setSelectedTokenId(null)} className="text-slate-400 hover:text-white ml-2 bg-slate-950 p-1 rounded shrink-0" title="Deselect"><X className="w-3 h-3"/></button>
             </div>
           ) : (
             <>
@@ -324,7 +443,6 @@ export default function DMBattleMap() {
                 <>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 hidden xl:block">Stage:</span>
                   
-                  {/* THE MACRO IS BACK */}
                   <button onClick={stageAllActive} className="text-xs bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 px-2 py-1 rounded hover:bg-emerald-600 transition-colors mr-2 flex items-center gap-1">
                     <Users className="w-3 h-3"/> Deploy All
                   </button>
@@ -351,6 +469,8 @@ export default function DMBattleMap() {
         onTokenClick={(id) => setSelectedTokenId(selectedTokenId === id ? null : id)}
         selectedTokenId={selectedTokenId}
         isDM={true} 
+        onTokenDrop={handleTokenDrop}
+        onPing={handlePing}
       />
     </div>
   );

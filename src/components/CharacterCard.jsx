@@ -8,6 +8,7 @@ import {
 
 import { PREMADE_CHARACTERS } from '../data/campaignData';
 import StatGrid from './shared/StatGrid';
+import QuickTraits from './shared/QuickTraits'; 
 import CollapsibleSection from './shared/CollapsibleSection';
 import ImageModal from './shared/ImageModal'; 
 import GlobalLoader from './shared/GlobalLoader';
@@ -228,9 +229,24 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     }
   };
 
+  const handleSpendHitDie = async () => {
+    const currentHD = char.hitDice?.current ?? char.level;
+    const maxHD = char.hitDice?.max ?? char.level;
+    
+    if (currentHD > 0) {
+      const amount = window.prompt(`Spending 1 Hit Die (${currentHD}/${maxHD} remaining).\nHow much HP did you heal?`);
+      const healAmt = parseInt(amount, 10);
+      if (!isNaN(healAmt) && healAmt > 0) {
+        await adjustHp(healAmt);
+        await updateField('hitDice', { current: currentHD - 1, max: maxHD });
+      }
+    } else {
+      alert("You have no Hit Dice remaining! Take a Long Rest to recover them.");
+    }
+  };
+
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
   
-  // THE NEW LOADER
   if (!char) return <CardWrapper><GlobalLoader /></CardWrapper>;
 
   const activeConditions = char.conditions || [];
@@ -389,10 +405,11 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
                 {/* Right Side: Rests & Hit Dice */}
                 <div className="flex gap-2 h-full">
-                  <div className="flex-1 bg-slate-900 border border-slate-700 rounded-xl flex items-center justify-center flex-col shadow-inner px-2 py-1">
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Hit Dice</span>
+                  <button onClick={handleSpendHitDie} className="flex-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl flex items-center justify-center flex-col shadow-inner px-2 py-1 transition-colors cursor-pointer group">
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5 group-hover:text-slate-300 transition-colors">Hit Dice</span>
                     <span className="text-sm font-black text-emerald-400">{char.hitDice?.current ?? char.level}/{char.hitDice?.max ?? char.level}</span>
-                  </div>
+                  </button>
+
                   <button onClick={() => setIsShortRestOpen(true)} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 flex flex-col items-center justify-center transition-colors shadow-sm py-1">
                     <Tent className="w-4 h-4 text-emerald-400 mb-0.5" />
                     <span className="text-[10px] font-bold uppercase">Short Rest</span>
@@ -426,11 +443,14 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             </div>
           </div>
 
-          <div className="mb-6"><StatGrid char={char} activeTheme={activeTheme} /></div>
+          <div className="mb-6">
+            <StatGrid char={char} activeTheme={activeTheme} />
+            <QuickTraits features={char.features} />
+          </div>
 
-          {/* COMPACT STICKY TAB NAVIGATION */}
+          {/* NEW QoL: Native Swipeable Sticky Tabs */}
           <div className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-xl pt-1 pb-3 -mx-3 px-3 md:-mx-8 md:px-8 border-b border-slate-800 shadow-md mb-6">
-            <div className="bg-slate-900 p-1.5 rounded-xl border border-slate-800 flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-1 sm:gap-2 justify-between">
+            <div className="bg-slate-900 p-1.5 rounded-xl border border-slate-800 flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-1 sm:gap-2 justify-between snap-x snap-mandatory">
               {[
                 { id: 'combat', icon: Swords, label: 'Combat' }, 
                 { id: 'spells', icon: Flame, label: 'Spells' }, 
@@ -443,7 +463,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
               ].map(tab => (
                 <button 
                   key={tab.id} id={`tab-btn-${tab.id}`} onClick={() => setActiveTab(tab.id)} 
-                  className={`flex-1 min-w-[50px] sm:min-w-[70px] flex items-center justify-center gap-2 px-2 py-2.5 rounded-lg font-medium text-xs md:text-sm whitespace-nowrap transition-all relative ${activeTab === tab.id ? `${activeTheme.bg} text-white shadow-md` : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+                  className={`snap-center flex-1 min-w-[50px] sm:min-w-[70px] flex items-center justify-center gap-2 px-2 py-2.5 rounded-lg font-medium text-xs md:text-sm whitespace-nowrap transition-all relative ${activeTab === tab.id ? `${activeTheme.bg} text-white shadow-md` : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
                 >
                   <tab.icon className="w-4 h-4" /> 
                   <span className="hidden sm:inline">{tab.label}</span>

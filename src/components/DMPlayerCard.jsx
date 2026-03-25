@@ -9,9 +9,12 @@ export default function DMPlayerCard({ charId }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [kickConfirm, setKickConfirm] = useState(false); 
   const [showSummary, setShowSummary] = useState(false);
+  
+  // NEW: State for expanding spells and features
+  const [activeSpell, setActiveSpell] = useState(null);
+  const [activeFeature, setActiveFeature] = useState(null);
 
   useEffect(() => {
-    // BUGFIX: Abort immediately if React tries to mount a ghost component with a null ID
     if (!charId) return;
 
     const charRef = doc(db, 'characters', charId);
@@ -41,6 +44,12 @@ export default function DMPlayerCard({ charId }) {
 
   const bonusActions = (char.features || []).filter(f => f.desc.toLowerCase().includes('bonus action'));
   const reactions = (char.features || []).filter(f => f.desc.toLowerCase().includes('reaction'));
+  
+  // Extract features that are likely passive traits / senses
+  const passives = (char.features || []).filter(f => 
+    !f.desc.toLowerCase().includes('bonus action') && 
+    !f.desc.toLowerCase().includes('reaction')
+  );
 
   return (
     <>
@@ -138,16 +147,49 @@ export default function DMPlayerCard({ charId }) {
               </div>
             )}
 
+            {/* NEW: Passives and Senses Tracker */}
+            {passives.length > 0 && (
+              <div className="mb-3">
+                <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Eye className="w-3 h-3" /> Passives & Senses</h4>
+                <div className="flex flex-wrap gap-1">
+                  {passives.map((feat, i) => (
+                    <button 
+                      key={i} 
+                      onClick={() => setActiveFeature(activeFeature === i ? null : i)} 
+                      className={`text-[10px] ${activeFeature === i ? 'bg-emerald-600 text-white' : 'bg-emerald-950/40 text-emerald-300'} border border-emerald-900/50 px-1.5 py-0.5 rounded truncate max-w-[120px] transition-colors`}
+                    >
+                      {feat.name}
+                    </button>
+                  ))}
+                </div>
+                {activeFeature !== null && (
+                  <div className="mt-1.5 bg-emerald-950/40 border border-emerald-500/30 p-2 rounded text-xs text-emerald-200 animate-in fade-in slide-in-from-top-1 whitespace-pre-wrap">
+                    {passives[activeFeature].desc}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* UPGRADED: Interactive Magic Arsenal */}
             {char.spells && char.spells.length > 0 && (
               <div>
                 <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Sparkles className="w-3 h-3" /> Magic Arsenal</h4>
                 <div className="flex flex-wrap gap-1">
                   {char.spells.map((spell, i) => (
-                    <span key={i} className="text-[10px] bg-indigo-950/40 text-indigo-300 border border-indigo-900/50 px-1.5 py-0.5 rounded truncate max-w-[120px]">
+                    <button 
+                      key={i} 
+                      onClick={() => setActiveSpell(activeSpell === i ? null : i)} 
+                      className={`text-[10px] ${activeSpell === i ? 'bg-indigo-600 text-white' : 'bg-indigo-950/40 text-indigo-300'} border border-indigo-900/50 px-1.5 py-0.5 rounded truncate max-w-[120px] transition-colors`}
+                    >
                       {spell.name}
-                    </span>
+                    </button>
                   ))}
                 </div>
+                {activeSpell !== null && (
+                  <div className="mt-1.5 bg-indigo-950/40 border border-indigo-500/30 p-2 rounded text-xs text-indigo-200 animate-in fade-in slide-in-from-top-1 whitespace-pre-wrap">
+                    {char.spells[activeSpell].desc}
+                  </div>
+                )}
               </div>
             )}
           </div>

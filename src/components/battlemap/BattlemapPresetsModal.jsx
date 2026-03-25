@@ -49,6 +49,13 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
     setPresets(updatedPresets);
   };
 
+  const handleDeploy = (name, data) => {
+    if (window.confirm(`Deploying "${name}" will wipe the current board and replace it with this preset. Proceed?`)) {
+      onRestorePreset(data);
+      onClose();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden">
@@ -98,7 +105,7 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
                     </div>
                     <div className="flex items-center gap-2">
                       <button 
-                        onClick={() => { onRestorePreset(data); onClose(); }} 
+                        onClick={() => handleDeploy(name, data)} 
                         className="bg-emerald-900/40 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded-md text-xs font-bold transition-colors flex items-center gap-1 border border-emerald-900/50 hover:border-transparent"
                       >
                         <Upload className="w-3 h-3" /> Deploy

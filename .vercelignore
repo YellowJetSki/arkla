@@ -1,0 +1,15 @@
+# Git
+.git
+.github
+
+# Firebase Backend Files (These are deployed via Firebase CLI, not Vercel)
+dataconnect/
+firestore.indexes.json
+firestore.rules
+firebase.json
+.firebaserc
+
+# Documentation & Local Env
+README.md
+.env
+.env.local

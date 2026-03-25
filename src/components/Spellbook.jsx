@@ -1,15 +1,20 @@
 import { useState } from 'react';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Shield, Settings, BrainCircuit, Hammer, X } from 'lucide-react';
+import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Shield, Settings, BrainCircuit, Hammer, X, Filter } from 'lucide-react';
 import CollapsibleSection from './shared/CollapsibleSection';
 import SpellDiscovery from './SpellDiscovery';
+
+const SPELL_FILTERS = ['All', 'Cantrips', 'Leveled', 'Concentration', 'Action', 'Bonus', 'Reaction'];
 
 export default function Spellbook({ char, charId, isDM }) {
   const [showSearch, setShowSearch] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false); 
   const [isForgingSpell, setIsForgingSpell] = useState(false);
   const [customSpell, setCustomSpell] = useState({ name: '', level: 0, castTime: '1 Action', desc: '' });
+  
+  // NEW: Smart Spell Filtering State
+  const [activeFilter, setActiveFilter] = useState('All');
 
   const spellSlots = char.spellSlots || {};
   const spells = char.spells || [];
@@ -81,7 +86,19 @@ export default function Spellbook({ char, charId, isDM }) {
     await updateDoc(doc(db, 'characters', charId), { spellSlots: updatedSlots });
   };
 
-  const groupedSpells = spells.reduce((acc, spell) => {
+  // NEW: Filtering Engine
+  const filteredSpells = spells.filter(spell => {
+    if (activeFilter === 'All') return true;
+    if (activeFilter === 'Cantrips') return spell.level === 0;
+    if (activeFilter === 'Leveled') return spell.level > 0;
+    if (activeFilter === 'Concentration') return spell.desc.toLowerCase().includes('concentration');
+    if (activeFilter === 'Action') return (spell.castTime || '').toLowerCase().includes('1 action');
+    if (activeFilter === 'Bonus') return (spell.castTime || '').toLowerCase().includes('bonus action');
+    if (activeFilter === 'Reaction') return (spell.castTime || '').toLowerCase().includes('reaction');
+    return true;
+  });
+
+  const groupedSpells = filteredSpells.reduce((acc, spell) => {
     const lvl = spell.level === 0 ? 'Cantrips' : `Level ${spell.level}`;
     if (!acc[lvl]) acc[lvl] = [];
     acc[lvl].push(spell);
@@ -179,6 +196,22 @@ export default function Spellbook({ char, charId, isDM }) {
           )}
         </div>
 
+        {/* NEW: Smart Spell Filter Bar */}
+        {spells.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+            <Filter className="w-4 h-4 text-slate-500 shrink-0 my-auto mr-1" />
+            {SPELL_FILTERS.map(filter => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors border ${activeFilter === filter ? 'bg-fuchsia-600 text-white border-fuchsia-500' : 'bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-slate-200'}`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* DM ONLY: CUSTOM SPELL FORGE */}
         {isDM && isForgingSpell && (
           <form onSubmit={handleForgeCustomSpell} className="bg-slate-900/80 p-4 md:p-5 rounded-xl border border-fuchsia-500/30 shadow-inner mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
@@ -217,10 +250,12 @@ export default function Spellbook({ char, charId, isDM }) {
         {showSearch && !isDM && <SpellDiscovery onAddSpell={addSpellToGrimoire} />}
 
         {Object.keys(groupedSpells).length === 0 ? (
-          <div className="bg-slate-800 border border-slate-700 border-dashed rounded-xl p-8 text-center text-slate-500">Your Book of Magic is empty. {isDM ? 'Forge spells here.' : 'Use Discover Spells to find new magic.'}</div>
+          <div className="bg-slate-800 border border-slate-700 border-dashed rounded-xl p-8 text-center text-slate-500">
+            {spells.length === 0 ? (isDM ? 'Forge spells here.' : 'Use Discover Spells to find new magic.') : 'No spells match this filter.'}
+          </div>
         ) : (
           Object.entries(groupedSpells).map(([levelName, levelSpells]) => (
-            <CollapsibleSection key={levelName} title={`${levelName} (${levelSpells.length})`} icon={Sparkles} defaultOpen={levelName === 'Cantrips'}>
+            <CollapsibleSection key={levelName} title={`${levelName} (${levelSpells.length})`} icon={Sparkles} defaultOpen={levelName === 'Cantrips' || activeFilter !== 'All'}>
               <div className="grid grid-cols-1 gap-3">
                 {levelSpells.map((spell, idx) => {
                   const hasSlotAvailable = spell.level > 0 && (spellSlots[spell.level]?.current || 0) > 0;

@@ -4,7 +4,7 @@ import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Skull, RefreshCw, Book, PackagePlus, Users, 
   ShieldAlert, Eraser, Calculator, Flame, HardDriveDownload, 
-  HardDriveUpload, Image as ImageIcon 
+  HardDriveUpload, Image as ImageIcon, CheckSquare, Square, PenTool, X, Sparkles
 } from 'lucide-react';
 
 import DMPlayerCard from './DMPlayerCard';
@@ -21,14 +21,30 @@ export default function DMDashboard({ onLogout }) {
   const [unlockedCharacters, setUnlockedCharacters] = useState([]);
   const [activeEnemies, setActiveEnemies] = useState([]);
   
+  const [selectedEnemies, setSelectedEnemies] = useState([]);
+  
   const [activeManager, setActiveManager] = useState(null); 
   const [isBattleMode, setIsBattleMode] = useState(false); 
   
+  const [showScratchpad, setShowScratchpad] = useState(false);
+  const [scratchpad, setScratchpad] = useState(() => localStorage.getItem('dm_scratchpad') || '');
+
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'confirm', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
+  // NEW QoL: DM Global Toast Notification State
+  const [toast, setToast] = useState('');
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
+
   const [massMathAmount, setMassMathAmount] = useState('');
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem('dm_scratchpad', scratchpad);
+  }, [scratchpad]);
 
   useEffect(() => {
     const sessionRef = doc(db, 'campaign', 'main_session');
@@ -50,6 +66,18 @@ export default function DMDashboard({ onLogout }) {
     };
   }, []);
 
+  const toggleEnemySelection = (id) => {
+    setSelectedEnemies(prev => prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]);
+  };
+
+  const selectAllEnemies = () => {
+    if (selectedEnemies.length === activeEnemies.length) {
+      setSelectedEnemies([]); 
+    } else {
+      setSelectedEnemies(activeEnemies.map(e => e.id)); 
+    }
+  };
+
   const confirmResetSession = () => {
     setDialog({
       isOpen: true,
@@ -59,19 +87,16 @@ export default function DMDashboard({ onLogout }) {
       onConfirm: async () => {
         try {
           const batch = writeBatch(db);
-          
-          // Clear enemies
           const enemyDocs = await getDocs(collection(db, 'active_enemies'));
           enemyDocs.forEach((docSnap) => batch.delete(docSnap.ref));
-          
-          // Nuke the map
           batch.set(doc(db, 'campaign', 'battlemap'), {
             imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null
           });
-          
           await batch.commit();
+          setSelectedEnemies([]);
           setIsBattleMode(false);
           closeDialog();
+          showToast('Board & Enemies Wiped');
         } catch (error) {
           console.error("Error wiping board:", error);
         }
@@ -98,6 +123,7 @@ export default function DMDashboard({ onLogout }) {
           });
           await batch.commit();
           closeDialog();
+          showToast('All Conditions Swept');
         } catch (error) {
           console.error("Error sweeping conditions:", error);
         }
@@ -111,14 +137,21 @@ export default function DMDashboard({ onLogout }) {
 
     try {
       const batch = writeBatch(db);
-      activeEnemies.forEach(enemy => {
+      const targets = selectedEnemies.length > 0 
+        ? activeEnemies.filter(e => selectedEnemies.includes(e.id))
+        : activeEnemies;
+
+      targets.forEach(enemy => {
         const ref = doc(db, 'active_enemies', enemy.id);
         const current = enemy.currentHp ?? enemy.hp;
         const newHp = isDamage ? Math.max(0, current - amt) : Math.min(enemy.hp, current + amt);
         batch.update(ref, { currentHp: newHp });
       });
+      
       await batch.commit();
       setMassMathAmount('');
+      setSelectedEnemies([]); 
+      showToast(isDamage ? `Applied ${amt} Mass Damage` : `Applied ${amt} Mass Healing`);
     } catch (error) {
       console.error("Mass Math Error:", error);
     }
@@ -141,6 +174,7 @@ export default function DMDashboard({ onLogout }) {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      showToast('Campaign Exported Successfully');
     } catch (error) { console.error("Export failed:", error); }
   };
 
@@ -164,6 +198,7 @@ export default function DMDashboard({ onLogout }) {
             Object.entries(importedData.campaign).forEach(([id, data]) => batch.set(doc(db, 'campaign', id), data));
             await batch.commit();
             closeDialog();
+            showToast('Campaign Restored Successfully!');
           }
         });
       } catch (err) { console.error(err); }
@@ -175,6 +210,28 @@ export default function DMDashboard({ onLogout }) {
   return (
     <>
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
+
+      {/* NEW QoL: Global DM Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-2xl border border-indigo-900/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2">
+          <Sparkles className="w-4 h-4" /> {toast}
+        </div>
+      )}
+
+      {showScratchpad && (
+        <div className="fixed bottom-6 right-6 w-80 bg-[#fef3c7] rounded-xl shadow-2xl z-[9999] border border-amber-300 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
+          <div className="bg-amber-200 px-4 py-2.5 flex justify-between items-center border-b border-amber-300 shadow-sm cursor-default">
+            <span className="text-amber-900 font-bold text-xs flex items-center gap-1.5 tracking-wider uppercase"><PenTool className="w-3 h-3"/> DM Scratchpad</span>
+            <button onClick={() => setShowScratchpad(false)} className="text-amber-700 hover:text-red-600 transition-colors"><X className="w-4 h-4"/></button>
+          </div>
+          <textarea 
+            value={scratchpad}
+            onChange={(e) => setScratchpad(e.target.value)}
+            placeholder="Jot down quick notes, hidden HP, DC checks..."
+            className="w-full h-64 p-4 bg-[#fef3c7] text-amber-950 text-sm focus:outline-none resize-none font-medium custom-scrollbar leading-relaxed"
+          />
+        </div>
+      )}
 
       <div className="max-w-[1600px] mx-auto p-4 md:p-8 pb-24 min-h-[100dvh] flex flex-col gap-8">
         
@@ -190,7 +247,12 @@ export default function DMDashboard({ onLogout }) {
           </div>
           
           <div className="flex flex-wrap items-center justify-center gap-3 w-full xl:w-auto">
-            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-700 shadow-inner mr-2">
+            
+            <button onClick={() => setShowScratchpad(!showScratchpad)} className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${showScratchpad ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'}`}>
+              <PenTool className="w-4 h-4" /> Notes
+            </button>
+
+            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-700 shadow-inner mr-2 ml-2">
               <button onClick={handleExportCampaign} className="hover:bg-slate-800 text-slate-400 hover:text-emerald-400 px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5"><HardDriveDownload className="w-4 h-4" /> Backup</button>
               <button onClick={() => fileInputRef.current?.click()} className="hover:bg-slate-800 text-slate-400 hover:text-red-400 px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5"><HardDriveUpload className="w-4 h-4" /> Restore</button>
               <input type="file" accept=".json" ref={fileInputRef} onChange={handleImportCampaign} className="hidden" />
@@ -262,10 +324,19 @@ export default function DMDashboard({ onLogout }) {
             </h2>
             {activeEnemies.length > 0 && (
               <div className="flex gap-2 items-center bg-slate-900 p-1.5 rounded-lg border border-slate-700">
+                <button 
+                  onClick={selectAllEnemies}
+                  className={`px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${selectedEnemies.length > 0 ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                >
+                  {selectedEnemies.length > 0 ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
+                  {selectedEnemies.length > 0 ? `${selectedEnemies.length} Sel` : 'All'}
+                </button>
+                <div className="w-px h-4 bg-slate-700 mx-1"></div>
+
                 <Calculator className="w-4 h-4 text-slate-500 ml-1 shrink-0" />
                 <input type="number" value={massMathAmount} onChange={(e) => setMassMathAmount(e.target.value)} placeholder="Amt..." className="w-20 bg-slate-950 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:outline-none" />
-                <button onClick={() => handleMassMath(true)} disabled={!massMathAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"><Flame className="w-3 h-3"/> Dmg All</button>
-                <button onClick={() => handleMassMath(false)} disabled={!massMathAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors">Heal All</button>
+                <button onClick={() => handleMassMath(true)} disabled={!massMathAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"><Flame className="w-3 h-3"/> Dmg</button>
+                <button onClick={() => handleMassMath(false)} disabled={!massMathAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors">Heal</button>
               </div>
             )}
           </div>
@@ -273,7 +344,14 @@ export default function DMDashboard({ onLogout }) {
             <div className="bg-slate-800/50 border border-slate-700 border-dashed rounded-xl p-8 text-center text-slate-500">The board is clear.</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {activeEnemies.map(enemy => <DMEnemyCard key={enemy.id} enemy={enemy} />)}
+              {activeEnemies.map(enemy => (
+                <DMEnemyCard 
+                  key={enemy.id} 
+                  enemy={enemy} 
+                  isSelected={selectedEnemies.includes(enemy.id)}
+                  onToggleSelect={() => toggleEnemySelection(enemy.id)}
+                />
+              ))}
             </div>
           )}
         </div>
