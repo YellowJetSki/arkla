@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, arrayUnion, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize, Ruler, CircleDashed, ArrowUpCircle, BrainCircuit, PenTool, Eraser } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize, Ruler, CircleDashed, ArrowUpCircle, BrainCircuit, PenTool, Eraser, Triangle, Circle } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 
@@ -17,9 +17,10 @@ export default function DMBattleMap() {
   
   const [showRulerFor, setShowRulerFor] = useState(null);
   
-  // REQ 1: Drawing State
+  // Drawing & Template State
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [drawingColor, setDrawingColor] = useState('#ef4444');
+  const [drawingShape, setDrawingShape] = useState('freehand'); // 'freehand', 'line', 'circle', 'cone'
   
   const [activePlayers, setActivePlayers] = useState([]);
   const [activeEnemies, setActiveEnemies] = useState([]);
@@ -31,10 +32,6 @@ export default function DMBattleMap() {
   const [tempImageUrl, setTempImageUrl] = useState('');
   const [tempGridScale, setTempGridScale] = useState(30); 
   const [tempGridColor, setTempGridColor] = useState('rgba(255,255,255,0.35)');
-
-  // REQ 4 & 5: Buffer state for HP input to prevent accidental 0 overwrites
-  const [editingHp, setEditingHp] = useState("");
-  const [isEditingHpFocus, setIsEditingHpFocus] = useState(false);
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
@@ -73,7 +70,6 @@ export default function DMBattleMap() {
           const validIds = playerIds.filter(id => id && typeof id === 'string');
           
           if (validIds.length > 0) {
-            // Setup live listeners for players so HP syncs!
             const unsubPlayers = onSnapshot(collection(db, 'characters'), (snap) => {
                const players = snap.docs.filter(d => validIds.includes(d.id)).map(d => ({ id: d.id, ...d.data() }));
                setActivePlayers(players);
@@ -150,11 +146,9 @@ export default function DMBattleMap() {
     try {
       const batch = writeBatch(db);
       
-      // 1. Wipe current active_enemies to prevent duplicates from lingering
       const enemyDocs = await getDocs(collection(db, 'active_enemies'));
       enemyDocs.forEach((docSnap) => batch.delete(docSnap.ref));
 
-      // 2. Stage the battlemap
       const mapRef = doc(db, 'campaign', 'battlemap');
       batch.set(mapRef, {
         ...presetData.mapData,
@@ -162,7 +156,6 @@ export default function DMBattleMap() {
         isPublished: false 
       });
 
-      // 3. Add the preset enemies back into the active_enemies collection with ALL their details
       const presetEnemies = Object.values(presetData.tokens || {}).filter(t => t.type === 'enemy');
       for (const enemy of presetEnemies) {
          const enemyRef = doc(db, 'active_enemies', enemy.id);
@@ -208,6 +201,7 @@ export default function DMBattleMap() {
       isHidden: false, 
       hp: actor.currentHp ?? actor.hp ?? 0,
       maxHp: actor.maxHp ?? actor.hp ?? 1,
+      tempHp: actor.tempHp || 0,
       aura: 0,
       elevation: 0, 
       isConcentrating: actor.isConcentrating || false
@@ -221,10 +215,10 @@ export default function DMBattleMap() {
     let eX = 0;
     
     unstagedPlayers.forEach(p => {
-      newTokens[p.id] = { id: p.id, name: p.name || 'Unknown', type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
+      newTokens[p.id] = { id: p.id, name: p.name || 'Unknown', type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
     });
     unstagedEnemies.forEach(e => {
-      newTokens[e.id] = { id: e.id, name: e.name || 'Unknown', type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
+      newTokens[e.id] = { id: e.id, name: e.name || 'Unknown', type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
     });
     
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: newTokens }, { merge: true });
@@ -237,94 +231,100 @@ export default function DMBattleMap() {
     if (selectedTokenId === tokenId) setSelectedTokenId(null);
   };
 
-  const handleToggleHidden = async () => {
-    if (!selectedTokenId || !tokens[selectedTokenId]) return;
-    const isCurrentlyHidden = tokens[selectedTokenId].isHidden || false;
-    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], isHidden: !isCurrentlyHidden } };
+  const handleToggleHidden = async (tokenId) => {
+    const targetId = tokenId || selectedTokenId;
+    if (!targetId || !tokens[targetId]) return;
+    const isCurrentlyHidden = tokens[targetId].isHidden || false;
+    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], isHidden: !isCurrentlyHidden } };
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
   };
 
-  const handleUpdateTokenImage = async () => {
-    if (!selectedTokenId || !tokens[selectedTokenId]) return;
+  const handleUpdateTokenImage = async (tokenId) => {
+    const targetId = tokenId || selectedTokenId;
+    if (!targetId || !tokens[targetId]) return;
     const url = window.prompt("Paste a custom Image URL for this token:");
     if (!url) return;
 
     try {
-      const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], img: url } };
+      const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], img: url } };
       await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
-      const type = tokens[selectedTokenId].type;
+      const type = tokens[targetId].type;
       const collectionName = type === 'player' ? 'characters' : 'active_enemies';
-      await updateDoc(doc(db, collectionName, selectedTokenId), { img: url });
+      await updateDoc(doc(db, collectionName, targetId), { img: url });
     } catch (error) {
       console.error("Failed to update token image", error);
     }
   };
 
-  // REQ 4 & 5: Live Sync HP function that saves safely to the DB
-  const handleUpdateTokenHpLive = async (newHpVal) => {
+  const handleUpdateTokenHpLive = async (tokenId, newHpVal) => {
     const parsedHp = parseInt(newHpVal, 10);
-    if (isNaN(parsedHp) || !selectedTokenId || !tokens[selectedTokenId]) return;
+    if (isNaN(parsedHp) || !tokenId || !tokens[tokenId]) return;
     
-    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], hp: parsedHp } };
+    const updatedTokens = { ...tokens, [tokenId]: { ...tokens[tokenId], hp: parsedHp } };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
     
-    const type = tokens[selectedTokenId].type;
+    const type = tokens[tokenId].type;
     const collectionName = type === 'player' ? 'characters' : 'active_enemies';
     try {
       if (type === 'enemy') {
-        await updateDoc(doc(db, collectionName, selectedTokenId), { currentHp: parsedHp, hp: parsedHp });
+        await updateDoc(doc(db, collectionName, tokenId), { currentHp: parsedHp, hp: parsedHp });
       } else {
-        await updateDoc(doc(db, collectionName, selectedTokenId), { hp: parsedHp });
+        await updateDoc(doc(db, collectionName, tokenId), { hp: parsedHp });
       }
     } catch (e) {
       console.error("Failed to sync HP to entity", e);
     }
   };
 
-  const handleToggleTokenSize = async () => {
-    if (!selectedTokenId || !tokens[selectedTokenId]) return;
-    const currentSize = tokens[selectedTokenId].size || 1;
+  const handleToggleTokenSize = async (tokenId) => {
+    const targetId = tokenId || selectedTokenId;
+    if (!targetId || !tokens[targetId]) return;
+    const currentSize = tokens[targetId].size || 1;
     const newSize = currentSize >= 4 ? 1 : currentSize + 1; 
-    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], size: newSize } };
+    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], size: newSize } };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
   };
 
-  const handleToggleAura = async () => {
-    if (!selectedTokenId || !tokens[selectedTokenId]) return;
-    const currentAura = tokens[selectedTokenId].aura || 0;
+  const handleToggleAura = async (tokenId) => {
+    const targetId = tokenId || selectedTokenId;
+    if (!targetId || !tokens[targetId]) return;
+    const currentAura = tokens[targetId].aura || 0;
     const newAura = currentAura === 0 ? 10 : currentAura === 10 ? 15 : currentAura === 15 ? 30 : 0; 
-    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], aura: newAura } };
+    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], aura: newAura } };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
   };
 
-  const handleToggleElevation = async () => {
-    if (!selectedTokenId || !tokens[selectedTokenId]) return;
-    const current = tokens[selectedTokenId].elevation || 0;
+  const handleToggleElevation = async (tokenId) => {
+    const targetId = tokenId || selectedTokenId;
+    if (!targetId || !tokens[targetId]) return;
+    const current = tokens[targetId].elevation || 0;
     const newElev = current === 0 ? 10 : current === 10 ? 20 : current === 20 ? 30 : current === 30 ? 60 : 0;
-    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], elevation: newElev } };
+    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], elevation: newElev } };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
   };
 
-  const handleToggleConcentration = async () => {
-    if (!selectedTokenId || !tokens[selectedTokenId]) return;
-    const current = tokens[selectedTokenId].isConcentrating || false;
-    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], isConcentrating: !current } };
+  const handleToggleConcentration = async (tokenId) => {
+    const targetId = tokenId || selectedTokenId;
+    if (!targetId || !tokens[targetId]) return;
+    const current = tokens[targetId].isConcentrating || false;
+    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], isConcentrating: !current } };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
   };
 
-  const toggleCondition = async (cond) => {
-    if (!selectedTokenId || !tokens[selectedTokenId]) return;
-    const t = tokens[selectedTokenId];
+  const toggleCondition = async (tokenId, cond) => {
+    const targetId = tokenId || selectedTokenId;
+    if (!targetId || !tokens[targetId]) return;
+    const t = tokens[targetId];
     const currentConds = t.conditions || [];
     const newConds = currentConds.includes(cond) 
       ? currentConds.filter(c => c !== cond) 
       : [...currentConds, cond];
       
-    const updatedTokens = { ...tokens, [selectedTokenId]: { ...t, conditions: newConds } };
+    const updatedTokens = { ...tokens, [targetId]: { ...t, conditions: newConds } };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
     
     const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
-    await updateDoc(doc(db, collectionName, selectedTokenId), { conditions: newConds });
+    await updateDoc(doc(db, collectionName, targetId), { conditions: newConds });
   };
 
   const handleTileClick = async (x, y) => {
@@ -340,15 +340,14 @@ export default function DMBattleMap() {
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
   };
 
-  const handlePing = async (x, y) => {
+  const handlePing = async (x, y, type = 'default') => {
     await updateDoc(doc(db, 'campaign', 'battlemap'), {
-      ping: { x, y, timestamp: Date.now() }
+      ping: { x, y, type, timestamp: Date.now() }
     });
   };
 
-  // REQ 1: Save Drawing Line
   const handleDrawEnd = async (lineData) => {
-    const newLine = { ...lineData, id: Date.now() };
+    const newLine = { ...lineData, id: Date.now(), shape: drawingShape };
     await updateDoc(doc(db, 'campaign', 'battlemap'), {
       drawings: arrayUnion(newLine)
     });
@@ -377,10 +376,6 @@ export default function DMBattleMap() {
     window.open(displayUrl, '_blank');
   };
 
-  // Live HP Resolution
-  const activeTokenEntity = selectedTokenId ? (tokens[selectedTokenId]?.type === 'player' ? activePlayers.find(p => p.id === selectedTokenId) : activeEnemies.find(e => e.id === selectedTokenId)) : null;
-  const liveDisplayHp = activeTokenEntity ? (activeTokenEntity.currentHp ?? activeTokenEntity.hp ?? 0) : (tokens[selectedTokenId]?.hp || 0);
-
   return (
     <div className="space-y-4">
       <BattlemapPresetsModal 
@@ -392,21 +387,30 @@ export default function DMBattleMap() {
       />
 
       <div className="bg-slate-900 border border-indigo-500/50 rounded-xl p-4 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2">
+        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0">
           <Map className="w-5 h-5" /> Battlefield
         </h2>
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+        
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar">
           
-          {/* REQ 1: Drawing Controls */}
-          <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-700 shadow-inner mr-2">
+          {/* Drawing & Template Controls */}
+          <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-700 shadow-inner mr-2 shrink-0">
             <button 
               onClick={() => setIsDrawingMode(!isDrawingMode)}
               className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${isDrawingMode ? 'bg-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-red-400 hover:bg-slate-800'}`}
             >
               <PenTool className="w-3 h-3" /> Pen
             </button>
+            
             {isDrawingMode && (
-              <div className="flex gap-1 px-2 border-l border-slate-700 ml-1 pl-2">
+              <div className="flex items-center gap-1 px-2 border-l border-slate-700 ml-1 pl-2">
+                <button onClick={() => setDrawingShape('freehand')} className={`p-1 rounded ${drawingShape === 'freehand' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`} title="Freehand"><PenTool className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('line')} className={`p-1 rounded ${drawingShape === 'line' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`} title="Line/Wall"><div className="w-3 h-0.5 bg-current rotate-45" /></button>
+                <button onClick={() => setDrawingShape('circle')} className={`p-1 rounded ${drawingShape === 'circle' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`} title="Sphere/Radius"><Circle className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('cone')} className={`p-1 rounded ${drawingShape === 'cone' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`} title="Cone"><Triangle className="w-3 h-3" /></button>
+                
+                <div className="w-px h-4 bg-slate-700 mx-1"></div>
+                
                 {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
                   <button key={c} onClick={() => setDrawingColor(c)} className={`w-4 h-4 rounded-full border-2 transition-transform ${drawingColor === c ? 'scale-125 border-white' : 'border-transparent opacity-70'}`} style={{ backgroundColor: c }} />
                 ))}
@@ -419,7 +423,7 @@ export default function DMBattleMap() {
 
           <button 
             onClick={launchDisplayTab}
-            className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors"
+            className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shrink-0"
             title="Cast to a second monitor"
           >
             <MonitorPlay className="w-3 h-3" /> Cast Display
@@ -427,18 +431,18 @@ export default function DMBattleMap() {
 
           <button 
             onClick={() => setIsPresetsOpen(true)}
-            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors"
+            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shrink-0"
           >
             <Save className="w-3 h-3" /> Presets
           </button>
 
-          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors">
+          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shrink-0">
             <Settings className="w-3 h-3" /> Config
           </button>
           
           <button 
             onClick={togglePublish} 
-            className={`px-4 py-1.5 rounded-lg font-black text-[10px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mapData.isPublished ? 'bg-emerald-600 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-800 text-slate-400 border border-slate-600 hover:text-white'}`}
+            className={`px-4 py-1.5 rounded-lg font-black text-[10px] md:text-xs flex items-center gap-2 transition-all shadow-md shrink-0 ${mapData.isPublished ? 'bg-emerald-600 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-800 text-slate-400 border border-slate-600 hover:text-white'}`}
           >
             {mapData.isPublished ? <><Send className="w-3 h-3"/> LIVE</> : <><EyeOff className="w-3 h-3"/> HIDDEN</>}
           </button>
@@ -507,114 +511,31 @@ export default function DMBattleMap() {
         </div>
       )}
 
-      <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2 flex-wrap flex-1">
+      {/* Staging Area for Unplaced Tokens */}
+      {hasUnstagedActors && (
+        <div className="bg-slate-800/80 p-2 md:p-3 rounded-xl border border-slate-700 border-dashed flex items-center flex-wrap gap-2">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 hidden xl:block">Stage Actors:</span>
           
-          {selectedTokenId && tokens[selectedTokenId] ? (
-            <div className="flex items-center gap-2 bg-indigo-900/50 px-3 py-1.5 rounded-lg border border-indigo-400/50 shadow-inner animate-in zoom-in-95 w-full md:w-auto overflow-x-auto custom-scrollbar">
-              <span className="text-xs font-bold text-white mr-auto md:mr-0 whitespace-nowrap">Selected: {tokens[selectedTokenId].name}</span>
-              
-              {/* REQ 4 & 5: Buffered HP Input using live sync */}
-              <div className="flex items-center gap-1 border-l border-indigo-500/30 pl-2 ml-1" title="Edit HP">
-                <Heart className="w-3 h-3 text-red-400" />
-                <input 
-                  type="number" 
-                  value={isEditingHpFocus ? editingHp : liveDisplayHp}
-                  onFocus={() => { setEditingHp(liveDisplayHp); setIsEditingHpFocus(true); }}
-                  onChange={(e) => setEditingHp(e.target.value)}
-                  onBlur={() => {
-                    setIsEditingHpFocus(false);
-                    if (editingHp !== "" && parseInt(editingHp, 10) !== liveDisplayHp) {
-                      handleUpdateTokenHpLive(editingHp);
-                    }
-                  }}
-                  onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
-                  className="w-12 bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-white text-xs font-bold focus:outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                />
-              </div>
+          <button onClick={stageAllActive} className="text-[10px] md:text-xs bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 px-2 py-1 rounded hover:bg-emerald-600 transition-colors mr-2 flex items-center gap-1">
+            <Users className="w-3 h-3"/> Deploy All
+          </button>
 
-              <button onClick={handleToggleTokenSize} className="text-indigo-300 hover:text-white ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0" title="Cycle Token Size (1x1, 2x2, 3x3, 4x4)">
-                <Maximize className="w-3 h-3" />
-                <span className="text-[10px] font-bold">{tokens[selectedTokenId].size || 1}x</span>
-              </button>
+          <div className="w-px h-4 bg-slate-700 mx-1"></div>
 
-              <button onClick={handleToggleAura} className="text-sky-300 hover:text-white ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0" title="Cycle Aura Radius (10ft, 15ft, 30ft)">
-                <CircleDashed className="w-3 h-3" />
-                {tokens[selectedTokenId].aura > 0 && <span className="text-[10px] font-bold">{tokens[selectedTokenId].aura}ft</span>}
-              </button>
-
-              <button onClick={handleToggleElevation} className="text-emerald-300 hover:text-white ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0" title="Cycle Elevation (+10ft, +20ft, etc.)">
-                <ArrowUpCircle className="w-3 h-3" />
-                {tokens[selectedTokenId].elevation > 0 && <span className="text-[10px] font-bold">+{tokens[selectedTokenId].elevation}</span>}
-              </button>
-
-              <button onClick={handleToggleConcentration} className={`ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0 transition-colors ${tokens[selectedTokenId].isConcentrating ? 'text-amber-400' : 'text-slate-400 hover:text-amber-300'}`} title="Toggle Spell Concentration">
-                <BrainCircuit className="w-3 h-3" />
-              </button>
-
-              <button 
-                onClick={() => setShowRulerFor(showRulerFor === selectedTokenId ? null : selectedTokenId)} 
-                className={`ml-2 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0 transition-colors ${showRulerFor === selectedTokenId ? 'text-emerald-400' : 'text-slate-400 hover:text-emerald-300'}`} 
-                title="Toggle Movement Radius Ruler"
-              >
-                <Ruler className="w-3 h-3" />
-              </button>
-
-              <button onClick={handleUpdateTokenImage} className="text-emerald-400 hover:text-emerald-300 ml-2 border-l border-indigo-500/30 pl-2 shrink-0" title="Set Custom Image URL"><ImageIcon className="w-4 h-4"/></button>
-              
-              <button onClick={handleToggleHidden} className="text-slate-400 hover:text-white ml-2 border-l border-indigo-500/30 pl-2 shrink-0" title={tokens[selectedTokenId].isHidden ? "Reveal Token" : "Hide Token"}>
-                {tokens[selectedTokenId].isHidden ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4" />}
-              </button>
-
-              <button onClick={() => removeToken(selectedTokenId)} className="text-red-400 hover:text-red-300 ml-2 border-l border-indigo-500/30 pl-2 shrink-0" title="Remove from board"><Trash2 className="w-4 h-4"/></button>
-              
-              <select 
-                className="bg-slate-950 text-fuchsia-400 border border-fuchsia-500/40 rounded px-2 py-1 text-xs font-bold focus:outline-none ml-2 border-l border-indigo-500/30 shrink-0"
-                onChange={(e) => {
-                  if(e.target.value) {
-                    toggleCondition(e.target.value);
-                    e.target.value = ""; 
-                  }
-                }}
-              >
-                <option value="">+ Cond</option>
-                {['Blinded', 'Charmed', 'Deafened', 'Exhaustion', 'Frightened', 'Grappled', 'Incapacitated', 'Invisible', 'Paralyzed', 'Petrified', 'Poisoned', 'Prone', 'Restrained', 'Stunned', 'Unconscious'].map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-
-              <button onClick={() => setSelectedTokenId(null)} className="text-slate-400 hover:text-white ml-2 bg-slate-950 p-1 rounded shrink-0" title="Deselect"><X className="w-3 h-3"/></button>
-            </div>
-          ) : (
-            <>
-              {!hasUnstagedActors ? (
-                <span className="text-xs font-bold text-slate-500 italic flex items-center gap-2 px-2"><Map className="w-4 h-4"/> All active actors deployed.</span>
-              ) : (
-                <>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 hidden xl:block">Stage:</span>
-                  
-                  <button onClick={stageAllActive} className="text-[10px] md:text-xs bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 px-2 py-1 rounded hover:bg-emerald-600 transition-colors mr-2 flex items-center gap-1">
-                    <Users className="w-3 h-3"/> Deploy All
-                  </button>
-
-                  <div className="w-px h-4 bg-slate-700 mx-1"></div>
-
-                  {unstagedPlayers.map(p => (
-                    <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs bg-indigo-900/40 border border-indigo-500/50 text-indigo-200 px-2 py-1 rounded hover:bg-indigo-600 transition-colors">+ {(p.name || 'Unknown').split(' ')[0]}</button>
-                  ))}
-                  {unstagedEnemies.map(e => (
-                    <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs bg-red-900/40 border border-red-500/50 text-red-200 px-2 py-1 rounded hover:bg-red-600 transition-colors">+ {(e.name || 'Unknown').substring(0,8)}</button>
-                  ))}
-                </>
-              )}
-            </>
-          )}
+          {unstagedPlayers.map(p => (
+            <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs bg-indigo-900/40 border border-indigo-500/50 text-indigo-200 px-2 py-1 rounded hover:bg-indigo-600 transition-colors">+ {(p.name || 'Unknown').split(' ')[0]}</button>
+          ))}
+          {unstagedEnemies.map(e => (
+            <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs bg-red-900/40 border border-red-500/50 text-red-200 px-2 py-1 rounded hover:bg-red-600 transition-colors">+ {(e.name || 'Unknown').substring(0,8)}</button>
+          ))}
         </div>
-      </div>
+      )}
 
       <MapGrid 
         mapData={mapData} 
         tokens={tokens} 
+        activePlayers={activePlayers}
+        activeEnemies={activeEnemies}
         onTileClick={handleTileClick} 
         onTokenClick={(id) => setSelectedTokenId(selectedTokenId === id ? null : id)}
         selectedTokenId={selectedTokenId}
@@ -622,9 +543,22 @@ export default function DMBattleMap() {
         onTokenDrop={handleTokenDrop}
         onPing={handlePing}
         showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null}
+        onToggleRuler={(id) => setShowRulerFor(showRulerFor === id ? null : id)}
         isDrawingMode={isDrawingMode}
         drawingColor={drawingColor}
+        drawingShape={drawingShape}
         onDrawEnd={handleDrawEnd}
+        // HUD Handlers passed down
+        onUpdateHpLive={handleUpdateTokenHpLive}
+        onToggleSize={handleToggleTokenSize}
+        onToggleAura={handleToggleAura}
+        onToggleElevation={handleToggleElevation}
+        onToggleConcentration={handleToggleConcentration}
+        onToggleCondition={toggleCondition}
+        onUpdateImage={handleUpdateTokenImage}
+        onToggleHidden={handleToggleHidden}
+        onRemoveToken={removeToken}
+        onDeselect={() => setSelectedTokenId(null)}
       />
     </div>
   );

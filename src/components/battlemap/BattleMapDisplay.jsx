@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { LogOut } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -7,6 +7,8 @@ import MapGrid from './MapGrid';
 export default function BattleMapDisplay({ onLogout }) {
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
   const [tokens, setTokens] = useState({});
+  const [activePlayers, setActivePlayers] = useState([]);
+  const [activeEnemies, setActiveEnemies] = useState([]);
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
@@ -27,6 +29,24 @@ export default function BattleMapDisplay({ onLogout }) {
       }
     });
     return () => unsub();
+  }, []);
+
+  // Fetch real-time actor data to calculate Bloodied and Temp HP states for the display
+  useEffect(() => {
+    const unsubPlayers = onSnapshot(collection(db, 'characters'), (snap) => {
+       const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+       setActivePlayers(players);
+    });
+    
+    const unsubEnemies = onSnapshot(collection(db, 'active_enemies'), (snap) => {
+       const enemies = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+       setActiveEnemies(enemies);
+    });
+
+    return () => {
+      unsubPlayers();
+      unsubEnemies();
+    };
   }, []);
 
   if (!mapData.isPublished) {
@@ -51,11 +71,12 @@ export default function BattleMapDisplay({ onLogout }) {
   }
 
   return (
-    // Changed to pure black to ensure the vignette blends perfectly into the TV bezels
     <div className="fixed inset-0 bg-black z-[99999] flex items-center justify-center overflow-hidden">
       <MapGrid 
         mapData={mapData} 
         tokens={tokens} 
+        activePlayers={activePlayers}
+        activeEnemies={activeEnemies}
         onTileClick={() => {}} 
         onTokenClick={() => {}}
         selectedTokenId={null}

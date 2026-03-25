@@ -2,10 +2,11 @@ import {
   User, ZoomIn, ZoomOut, Target, 
   EyeOff, Heart, EarOff, Flame, Ghost, Link, 
   Ban, Cloud, Lock, Mountain, Skull, ArrowDown, 
-  Stars, Moon, AlertCircle, BrainCircuit
+  Stars, Moon, AlertCircle, BrainCircuit, Maximize, Ruler, CircleDashed, ArrowUpCircle, Image as ImageIcon, Trash2, X, Activity, Eye
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import MapDrawings from './MapDrawings';
+import TokenContextMenu from './TokenContextMenu';
 
 const CONDITION_ICONS = {
   'Blinded': { icon: EyeOff, color: 'bg-slate-700 text-slate-300 border-slate-500' },
@@ -54,17 +55,22 @@ const TokenImage = ({ token, isEnemy }) => {
 export default function MapGrid({ 
   mapData, 
   tokens, 
+  activePlayers = [],
+  activeEnemies = [],
   onTileClick,
   onTokenClick, 
   selectedTokenId, 
   isDM,
   showMovementRangeFor = null,
+  onToggleRuler,
   isDisplayMode = false,
   onTokenDrop, 
   onPing,
   isDrawingMode = false, 
   drawingColor = '#ef4444',
-  onDrawEnd
+  drawingShape = 'freehand',
+  onDrawEnd,
+  onUpdateHpLive, onToggleSize, onToggleAura, onToggleElevation, onToggleConcentration, onToggleCondition, onUpdateImage, onToggleHidden, onRemoveToken, onDeselect
 }) {
   
   const rawCols = Number(mapData?.cols);
@@ -76,47 +82,24 @@ export default function MapGrid({
   const currentCellSize = 30 * zoom;
   const scrollRef = useRef(null);
 
+  // Ping Menu State
+  const [pingMenu, setPingMenu] = useState(null);
+  
+  // Drag-to-Measure State
+  const [dragMeasure, setDragMeasure] = useState(null);
+
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (isDisplayMode) {
-      const calculateOptimalZoom = () => {
-        const mapPixelWidth = cols * 30; 
-        const mapPixelHeight = rows * 30; 
-        const padding = 40; 
-        
-        const zoomX = (window.innerWidth - padding) / mapPixelWidth;
-        const zoomY = (window.innerHeight - padding) / mapPixelHeight;
-        
-        const baseZoom = Math.min(zoomX, zoomY);
-
-        if (mapData?.activeTokenId) {
-          setZoom(Math.max(baseZoom * 1.8, 1.5)); 
-        } else {
-          setZoom(baseZoom); 
-        }
-      };
-
-      calculateOptimalZoom();
-      window.addEventListener('resize', calculateOptimalZoom);
-      return () => window.removeEventListener('resize', calculateOptimalZoom);
-    }
-  }, [isDisplayMode, cols, rows, mapData?.activeTokenId]);
-
   const centerOnMap = () => {
     if (scrollRef.current) {
       const container = scrollRef.current;
       const targetX = (cols * currentCellSize) / 2;
       const targetY = (rows * currentCellSize) / 2;
-      container.scrollTo({
-        left: targetX - (container.clientWidth / 2),
-        top: targetY - (container.clientHeight / 2),
-        behavior: 'smooth'
-      });
+      container.scrollTo({ left: targetX - (container.clientWidth / 2), top: targetY - (container.clientHeight / 2), behavior: 'smooth' });
     }
   };
 
@@ -129,51 +112,82 @@ export default function MapGrid({
     const targetX = (token.x * currentCellSize) + ((currentCellSize * tSize) / 2);
     const targetY = (token.y * currentCellSize) + ((currentCellSize * tSize) / 2);
     
-    container.scrollTo({
-      left: targetX - (container.clientWidth / 2),
-      top: targetY - (container.clientHeight / 2),
-      behavior: 'smooth'
-    });
+    container.scrollTo({ left: targetX - (container.clientWidth / 2), top: targetY - (container.clientHeight / 2), behavior: 'smooth' });
   };
 
   useEffect(() => {
     if (isDisplayMode) {
-      const timeout = setTimeout(() => {
-        if (mapData?.activeTokenId && tokens[mapData.activeTokenId]) {
-          centerOnToken(mapData.activeTokenId);
+      const calculateOptimalZoom = () => {
+        const mapPixelWidth = cols * 30; 
+        const mapPixelHeight = rows * 30; 
+        const padding = 40; 
+        const zoomX = (window.innerWidth - padding) / mapPixelWidth;
+        const zoomY = (window.innerHeight - padding) / mapPixelHeight;
+        const baseZoom = Math.min(zoomX, zoomY);
+        if (mapData?.activeTokenId) {
+          setZoom(Math.max(baseZoom * 1.8, 1.5)); 
         } else {
-          centerOnMap();
+          setZoom(baseZoom); 
         }
-      }, 500); 
-      return () => clearTimeout(timeout);
+      };
+      calculateOptimalZoom();
+      window.addEventListener('resize', calculateOptimalZoom);
+      return () => window.removeEventListener('resize', calculateOptimalZoom);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDisplayMode, mapData?.activeTokenId, zoom, tokens, cols, rows, currentCellSize]);
+  }, [isDisplayMode, cols, rows, mapData?.activeTokenId]);
 
+  // Initiative Auto-Focus
   useEffect(() => {
-    if (!isDisplayMode && !isDM && selectedTokenId && tokens[selectedTokenId]) {
-      setTimeout(() => centerOnToken(selectedTokenId), 100);
+    if (mapData?.activeTokenId && tokens[mapData.activeTokenId]) {
+      setTimeout(() => centerOnToken(mapData.activeTokenId), 500);
+    } else if (isDisplayMode) {
+      setTimeout(() => centerOnMap(), 500);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDM, isDisplayMode, selectedTokenId, tokens[selectedTokenId] !== undefined]);
+  }, [mapData?.activeTokenId, isDisplayMode]);
 
-  const tiles = [];
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) tiles.push({ x, y });
-  }
+  const handleContextMenuPing = (e, x, y) => {
+    e.preventDefault();
+    if (isDisplayMode || isDrawingMode) return;
+    setPingMenu({ x, y, clientX: e.clientX, clientY: e.clientY });
+  };
+
+  const executePing = (type) => {
+    if (pingMenu && onPing) {
+      onPing(pingMenu.x, pingMenu.y, type);
+    }
+    setPingMenu(null);
+  };
 
   const activeToken = mapData?.activeTokenId ? tokens[mapData.activeTokenId] : null;
   const gridColor = mapData?.gridColor || 'rgba(255,255,255,0.35)';
 
+  const getPingColor = (type) => {
+    switch(type) {
+      case 'move': return 'text-emerald-400 border-emerald-400 bg-emerald-500/30';
+      case 'attack': return 'text-red-400 border-red-400 bg-red-500/30';
+      case 'look': return 'text-amber-400 border-amber-400 bg-amber-500/30';
+      default: return 'text-sky-400 border-white bg-sky-500/30';
+    }
+  };
+
   return (
-    <div className={`relative w-full flex flex-col overflow-hidden ${isDisplayMode ? 'h-[100dvh] rounded-none border-0 bg-black' : 'max-h-[70vh] rounded-xl border border-slate-700 bg-slate-950 shadow-inner'}`}>
+    <div className={`relative w-full flex flex-col overflow-hidden ${isDisplayMode ? 'h-[100dvh] rounded-none border-0 bg-black' : 'h-[75vh] md:max-h-[70vh] rounded-xl border border-slate-700 bg-slate-950 shadow-inner'}`} onClick={() => setPingMenu(null)}>
       
       {!isDisplayMode && (
-        <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-lg border border-slate-700 shadow-lg">
+        <div className="absolute top-4 right-4 z-[90] flex flex-col gap-2 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-lg border border-slate-700 shadow-lg">
           <button onClick={() => setZoom(prev => Math.min(prev + 0.25, 3))} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Zoom In"><ZoomIn className="w-5 h-5"/></button>
           <button onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
           <div className="w-full h-px bg-slate-700 my-0.5"></div>
-          <button onClick={() => centerOnToken(selectedTokenId)} className="p-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/50 rounded transition-colors" title="Center on Me"><Target className="w-5 h-5"/></button>
+          <button onClick={() => centerOnToken(selectedTokenId || mapData?.activeTokenId)} className="p-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/50 rounded transition-colors" title="Center on Active Turn/Me"><Target className="w-5 h-5"/></button>
+        </div>
+      )}
+
+      {pingMenu && (
+        <div className="fixed z-[99999] bg-slate-900 border border-slate-700 rounded-xl p-2 shadow-2xl flex gap-2 animate-in zoom-in-95" style={{ top: pingMenu.clientY, left: pingMenu.clientX }}>
+           <button onClick={() => executePing('move')} className="flex flex-col items-center gap-1 p-2 hover:bg-slate-800 rounded text-emerald-400"><ArrowDown className="w-5 h-5" /><span className="text-[10px] font-bold">Move</span></button>
+           <button onClick={() => executePing('attack')} className="flex flex-col items-center gap-1 p-2 hover:bg-slate-800 rounded text-red-400"><Target className="w-5 h-5" /><span className="text-[10px] font-bold">Attack</span></button>
+           <button onClick={() => executePing('look')} className="flex flex-col items-center gap-1 p-2 hover:bg-slate-800 rounded text-amber-400"><Eye className="w-5 h-5" /><span className="text-[10px] font-bold">Look</span></button>
         </div>
       )}
 
@@ -184,9 +198,7 @@ export default function MapGrid({
           </div>
           <div className="flex flex-col pr-4">
             <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-0.5">Current Turn</span>
-            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none">
-              {activeToken.name}
-            </h1>
+            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none">{activeToken.name}</h1>
           </div>
         </div>
       )}
@@ -195,106 +207,78 @@ export default function MapGrid({
         <div className="absolute inset-0 z-[100] pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.8)_85%,_rgba(0,0,0,1)_100%)]"></div>
       )}
 
-      <div 
-        ref={scrollRef} 
-        className={`${isDisplayMode ? 'overflow-hidden flex-1 w-full' : 'overflow-auto flex-1 custom-scrollbar'} relative`}
-      >
+      <div ref={scrollRef} className={`${isDisplayMode ? 'overflow-hidden flex-1 w-full' : 'overflow-auto flex-1 custom-scrollbar'} relative`}>
         <div 
           className="relative transition-all duration-700 origin-top-left ease-in-out"
-          style={{ 
-            width: cols * currentCellSize, 
-            height: rows * currentCellSize,
-            backgroundImage: mapData?.imageUrl ? `url(${mapData.imageUrl})` : 'none',
-            backgroundSize: 'contain',
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'top left',
-            imageRendering: 'crisp-edges' 
-          }}
+          style={{ width: cols * currentCellSize, height: rows * currentCellSize, backgroundImage: mapData?.imageUrl ? `url(${mapData.imageUrl})` : 'none', backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'top left', imageRendering: 'crisp-edges' }}
         >
           {!isDisplayMode && gridColor !== 'transparent' && (
             <div className="absolute inset-0 pointer-events-none z-0 transition-all duration-500" style={{ backgroundImage: `linear-gradient(to right, ${gridColor} 1px, transparent 1px), linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)`, backgroundSize: `${currentCellSize}px ${currentCellSize}px` }}></div>
           )}
 
-          {/* REQ 1: SVG Drawing Overlay */}
-          <MapDrawings 
-            drawings={mapData?.drawings || []}
-            isDrawingMode={isDrawingMode && !isDisplayMode}
-            onDrawEnd={onDrawEnd}
-            currentCellSize={currentCellSize}
-            cols={cols}
-            rows={rows}
-            drawingColor={drawingColor}
-          />
+          <MapDrawings drawings={mapData?.drawings || []} isDrawingMode={isDrawingMode && !isDisplayMode} drawingShape={drawingShape} onDrawEnd={onDrawEnd} currentCellSize={currentCellSize} cols={cols} rows={rows} drawingColor={drawingColor} />
 
           {mapData?.ping && (now - mapData.ping.timestamp < 3500) && (
-            <div 
-              className="absolute z-50 pointer-events-none"
-              style={{
-                width: currentCellSize,
-                height: currentCellSize,
-                transform: `translate(${mapData.ping.x * currentCellSize}px, ${mapData.ping.y * currentCellSize}px)`
-              }}
-            >
-              <div className="absolute inset-0 rounded-full border-[4px] border-sky-400 animate-ping opacity-75"></div>
-              <div className="absolute inset-0 rounded-full border-[2px] border-white bg-sky-500/30 flex items-center justify-center">
-                <Target className="w-1/2 h-1/2 text-white drop-shadow-md animate-pulse" />
+            <div className="absolute z-50 pointer-events-none" style={{ width: currentCellSize, height: currentCellSize, transform: `translate(${mapData.ping.x * currentCellSize}px, ${mapData.ping.y * currentCellSize}px)` }}>
+              <div className={`absolute inset-0 rounded-full border-[4px] animate-ping opacity-75 ${getPingColor(mapData.ping.type).split(' ')[1]}`}></div>
+              <div className={`absolute inset-0 rounded-full border-[2px] flex items-center justify-center ${getPingColor(mapData.ping.type)}`}>
+                <Target className="w-1/2 h-1/2 drop-shadow-md animate-pulse" />
               </div>
             </div>
           )}
 
-          {/* Disable token clicks entirely if drawing mode is on so the DM doesn't drag a token while trying to draw */}
           <div className={`absolute inset-0 grid z-20 ${isDrawingMode ? 'pointer-events-none' : ''}`} style={{ gridTemplateColumns: `repeat(${cols}, ${currentCellSize}px)`, gridTemplateRows: `repeat(${rows}, ${currentCellSize}px)` }}>
-            {tiles.map((tile) => {
+            {Array.from({ length: cols * rows }).map((_, i) => {
+              const tile = { x: i % cols, y: Math.floor(i / cols) };
               let tileClass = isDisplayMode ? '' : 'hover:bg-white/10'; 
 
-              if (!isDisplayMode) {
-                if (showMovementRangeFor) {
+              if (!isDisplayMode && showMovementRangeFor) {
                   const tSize = showMovementRangeFor.size || 1;
                   const dx = Math.max(0, tile.x - (showMovementRangeFor.x + tSize - 1), showMovementRangeFor.x - tile.x);
                   const dy = Math.max(0, tile.y - (showMovementRangeFor.y + tSize - 1), showMovementRangeFor.y - tile.y);
                   const dist = Math.max(dx, dy) * 5;
                   const speed = showMovementRangeFor.speed || 30;
 
-                  if (dist > 0 && dist <= speed) {
-                    tileClass = 'bg-emerald-500/30 border border-emerald-400/50 hover:bg-emerald-400/50';
-                  } else if (dist > speed && dist <= speed * 2) {
-                    tileClass = 'bg-amber-500/30 border border-amber-400/50 hover:bg-amber-400/50';
-                  }
-                }
+                  if (dist > 0 && dist <= speed) tileClass = 'bg-emerald-500/30 border border-emerald-400/50 hover:bg-emerald-400/50';
+                  else if (dist > speed && dist <= speed * 2) tileClass = 'bg-amber-500/30 border border-amber-400/50 hover:bg-amber-400/50';
               }
 
               return (
                 <div 
                   key={`click-${tile.x},${tile.y}`}
-                  onMouseDown={(e) => { 
-                    e.preventDefault(); 
-                    if(isDisplayMode) return;
-                  }}
-                  onClick={() => {
-                    if(!isDisplayMode && onTileClick) onTileClick(tile.x, tile.y);
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    if(!isDisplayMode && onPing) onPing(tile.x, tile.y);
-                  }}
+                  onMouseDown={(e) => { e.preventDefault(); if(isDisplayMode) return; }}
+                  onClick={() => { if(!isDisplayMode && onTileClick) onTileClick(tile.x, tile.y); }}
+                  onContextMenu={(e) => handleContextMenuPing(e, tile.x, tile.y)}
                   onDragOver={(e) => { 
                     if(isDisplayMode) return;
                     e.preventDefault(); 
                     e.dataTransfer.dropEffect = "move";
+                    if (dragMeasure?.isMeasuring) {
+                      const dist = Math.max(Math.abs(tile.x - dragMeasure.startX), Math.abs(tile.y - dragMeasure.startY)) * 5;
+                      setDragMeasure(prev => ({ ...prev, currentX: tile.x, currentY: tile.y, distance: dist }));
+                    }
                   }}
                   onDrop={(e) => {
                     if(isDisplayMode) return;
                     e.preventDefault();
+                    setDragMeasure(null);
                     const dragId = e.dataTransfer.getData('tokenId');
-                    if (dragId && onTokenDrop) {
-                      onTokenDrop(dragId, tile.x, tile.y);
-                    }
+                    if (dragId && onTokenDrop) onTokenDrop(dragId, tile.x, tile.y);
                   }}
-                  className={`w-full h-full transition-colors ${isDisplayMode ? '' : 'cursor-pointer'} ${tileClass}`}
+                  className={`w-full h-full transition-colors ${isDisplayMode ? '' : 'cursor-crosshair'} ${tileClass}`}
                 />
               );
             })}
           </div>
+
+          {/* Drag-to-Measure Overlay */}
+          {dragMeasure && dragMeasure.isMeasuring && !isDisplayMode && (
+             <div className="absolute z-[80] pointer-events-none" style={{ left: dragMeasure.currentX * currentCellSize + currentCellSize/2, top: dragMeasure.currentY * currentCellSize - 30 }}>
+               <div className={`px-2 py-1 rounded shadow-lg font-black text-xs whitespace-nowrap ${dragMeasure.distance > dragMeasure.speed ? 'bg-red-600 text-white' : 'bg-slate-800 text-emerald-400'}`}>
+                 {dragMeasure.distance} ft
+               </div>
+             </div>
+          )}
 
           <div className="absolute inset-0 pointer-events-none z-30">
             {Object.values(tokens || {})
@@ -311,8 +295,13 @@ export default function MapGrid({
               const isEnemy = token.type === 'enemy';
               const tSize = token.size || 1; 
               
-              const isDead = token.hp !== undefined && token.hp <= 0;
-              const isBloodied = !isDead && token.hp !== undefined && token.maxHp && (token.hp <= token.maxHp / 2);
+              const entityData = isEnemy ? activeEnemies.find(e => e.id === token.id) : activePlayers.find(p => p.id === token.id);
+              const tHp = entityData ? (entityData.currentHp ?? entityData.hp) : token.hp;
+              const tMaxHp = entityData ? (entityData.maxHp ?? entityData.hp) : token.maxHp;
+              const tTempHp = entityData ? entityData.tempHp : token.tempHp;
+
+              const isDead = tHp !== undefined && tHp <= 0;
+              const isBloodied = !isDead && tHp !== undefined && tMaxHp && (tHp <= tMaxHp / 2);
               
               if (token.isHidden && !isDM) return null; 
 
@@ -327,8 +316,14 @@ export default function MapGrid({
                     if (isDisplayMode || isDrawingMode) return;
                     e.dataTransfer.setData('tokenId', token.id);
                     e.dataTransfer.effectAllowed = "move";
+                    if (e.shiftKey) {
+                      const img = new Image(); img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+                      e.dataTransfer.setDragImage(img, 0, 0); 
+                      setDragMeasure({ isMeasuring: true, startX: safeX, startY: safeY, currentX: safeX, currentY: safeY, distance: 0, speed: token.speed || 30 });
+                    }
                     if (onTokenClick) onTokenClick(token.id); 
                   }}
+                  onDragEnd={() => setDragMeasure(null)}
                   onMouseDown={(e) => {
                     if (!isDisplayMode && onTokenClick && (isDM || token.id === selectedTokenId)) {
                       e.stopPropagation();
@@ -336,11 +331,7 @@ export default function MapGrid({
                     }
                   }}
                   className={`absolute transition-all duration-700 ease-in-out flex items-center justify-center ${isDisplayMode || isDrawingMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer hover:scale-105'} ${token.isHidden ? 'opacity-40 grayscale' : ''}`}
-                  style={{
-                    width: currentCellSize * tSize,
-                    height: currentCellSize * tSize,
-                    transform: `translate(${safeX * currentCellSize}px, ${safeY * currentCellSize}px)`
-                  }}
+                  style={{ width: currentCellSize * tSize, height: currentCellSize * tSize, transform: `translate(${safeX * currentCellSize}px, ${safeY * currentCellSize}px)` }}
                 >
                   
                   {token.aura > 0 && !isDead && (
@@ -348,15 +339,12 @@ export default function MapGrid({
                       className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-dashed pointer-events-none z-0 transition-all duration-500
                         ${isEnemy ? 'border-red-500/50 bg-red-500/10' : 'border-indigo-400/50 bg-indigo-400/10'} 
                         ${isDisplayMode ? 'animate-[spin_20s_linear_infinite]' : 'animate-[spin_30s_linear_infinite]'}`}
-                      style={{
-                        width: currentCellSize * (tSize + (token.aura / 5) * 2),
-                        height: currentCellSize * (tSize + (token.aura / 5) * 2)
-                      }}
+                      style={{ width: currentCellSize * (tSize + (token.aura / 5) * 2), height: currentCellSize * (tSize + (token.aura / 5) * 2) }}
                     />
                   )}
 
                   <div className={`relative w-[75%] h-[75%] rounded-full shadow-lg transition-all z-10
-                    ${isSelected && !isDisplayMode ? 'ring-2 md:ring-4 ring-white animate-pulse scale-105 z-40' : ''} 
+                    ${isSelected && !isDisplayMode ? 'ring-2 md:ring-4 ring-white scale-105 z-40' : ''} 
                     ${isActiveTurn ? (isDisplayMode ? 'ring-[4px] ring-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.8)] scale-105 z-50' : 'ring-[3px] md:ring-[6px] ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)] animate-pulse z-50') : ''} 
                     ${isDead ? 'grayscale-[0.9] opacity-60' : ''}
                     ${isBloodied && !isActiveTurn ? 'ring-[3px] ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.8)]' : ''}
@@ -384,21 +372,17 @@ export default function MapGrid({
                       </div>
                     )}
 
+                    {(tTempHp > 0) && !isDead && (
+                      <div className="absolute inset-0 rounded-full ring-[3px] ring-inset ring-blue-500 shadow-[inset_0_0_15px_rgba(59,130,246,0.8)] z-30 pointer-events-none animate-pulse"></div>
+                    )}
+
                     {(token.conditions?.length > 0) && !isDead && (
                       <div className={`absolute ${isDisplayMode ? '-top-3 -right-5 gap-2' : '-top-1 -right-3 gap-1'} flex flex-wrap-reverse justify-end w-16 z-50 pointer-events-none`}>
                         {token.conditions.map(cond => {
                           const config = CONDITION_ICONS[cond];
-                          if (!config) return (
-                            <div key={cond} className={`bg-fuchsia-600 rounded-full ${isDisplayMode ? 'p-1 border-2' : 'p-0.5 border'} shadow border-fuchsia-300`} title={cond}>
-                              <AlertCircle className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'} text-white`} />
-                            </div>
-                          );
+                          if (!config) return <div key={cond} className={`bg-fuchsia-600 rounded-full ${isDisplayMode ? 'p-1 border-2' : 'p-0.5 border'} shadow border-fuchsia-300`}><AlertCircle className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'} text-white`} /></div>;
                           const Icon = config.icon;
-                          return (
-                            <div key={cond} className={`rounded-full ${isDisplayMode ? 'p-1 border-2' : 'p-0.5 border'} shadow-md ${config.color}`} title={cond}>
-                              <Icon className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'}`} />
-                            </div>
-                          );
+                          return <div key={cond} className={`rounded-full ${isDisplayMode ? 'p-1 border-2' : 'p-0.5 border'} shadow-md ${config.color}`} title={cond}><Icon className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'}`} /></div>;
                         })}
                       </div>
                     )}
@@ -408,13 +392,43 @@ export default function MapGrid({
                         <EyeOff className="w-3 h-3 md:w-4 md:h-4" />
                       </div>
                     )}
-
-                    {isDM && !isDisplayMode && currentCellSize >= 30 && (
-                      <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-slate-900/80 border border-slate-700 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-40">
-                        {token.name.substring(0, 8)}
-                      </div>
-                    )}
                   </div>
+
+                  {/* On-Map Health Bars (DM ONLY) */}
+                  {isDM && !isDisplayMode && tHp !== undefined && !isDead && (
+                    <div className="absolute -bottom-2 left-[10%] w-[80%] h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 z-50 shadow-sm pointer-events-none">
+                       {(tTempHp > 0) && (
+                         <div className="absolute top-0 left-0 h-full bg-blue-500 z-20 shadow-[0_0_5px_rgba(59,130,246,0.8)]" style={{ width: `${Math.min(100, (tTempHp / (tMaxHp || 1)) * 100)}%` }} />
+                       )}
+                       <div className={`absolute top-0 left-0 h-full z-10 transition-all ${tHp / (tMaxHp || 1) > 0.5 ? 'bg-emerald-500' : tHp / (tMaxHp || 1) > 0.2 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.max(0, Math.min(100, (tHp / (tMaxHp || 1)) * 100))}%` }} />
+                    </div>
+                  )}
+
+                  {isDM && !isDisplayMode && currentCellSize >= 30 && (
+                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-700 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-40">
+                      {token.name.substring(0, 8)}
+                    </div>
+                  )}
+
+                  {isSelected && isDM && !isDisplayMode && (
+                    <TokenContextMenu 
+                      token={token}
+                      activePlayers={activePlayers}
+                      activeEnemies={activeEnemies}
+                      showMovementRangeFor={showMovementRangeFor}
+                      onUpdateHpLive={onUpdateHpLive}
+                      onDeselect={onDeselect}
+                      onToggleSize={onToggleSize}
+                      onToggleAura={onToggleAura}
+                      onToggleElevation={onToggleElevation}
+                      onToggleConcentration={onToggleConcentration}
+                      onToggleRuler={onToggleRuler}
+                      onToggleHidden={onToggleHidden}
+                      onUpdateImage={onUpdateImage}
+                      onRemoveToken={onRemoveToken}
+                      onToggleCondition={onToggleCondition}
+                    />
+                  )}
                 </div>
               );
             })}

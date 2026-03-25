@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map as MapIcon, X, AlertTriangle, Zap } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -8,6 +8,9 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
   const [tokens, setTokens] = useState({});
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert' });
+  
+  const [activePlayers, setActivePlayers] = useState([]);
+  const [activeEnemies, setActiveEnemies] = useState([]);
   
   const [showRange, setShowRange] = useState(false);
   const [hasMovedThisTurn, setHasMovedThisTurn] = useState(false);
@@ -32,6 +35,23 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
       }
     });
     return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsubPlayers = onSnapshot(collection(db, 'characters'), (snap) => {
+       const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+       setActivePlayers(players);
+    });
+    
+    const unsubEnemies = onSnapshot(collection(db, 'active_enemies'), (snap) => {
+       const enemies = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+       setActiveEnemies(enemies);
+    });
+
+    return () => {
+      unsubPlayers();
+      unsubEnemies();
+    };
   }, []);
 
   useEffect(() => {
@@ -65,7 +85,6 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
     }
 
     const isOccupied = Object.values(tokens).some(t => {
-      // Don't collide with hidden tokens!
       if (t.isHidden) return false; 
       const size = t.size || 1;
       return targetX >= t.x && targetX < t.x + size && targetY >= t.y && targetY < t.y + size;
@@ -123,6 +142,12 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
     }
   };
 
+  const handlePing = async (x, y, type = 'default') => {
+    await updateDoc(doc(db, 'campaign', 'battlemap'), {
+      ping: { x, y, type, timestamp: Date.now() }
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -134,7 +159,7 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
           </div>
           <div>
             <h2 className="text-white font-black text-sm uppercase tracking-widest">Tactical View</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase">Tap your token to see range</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase">Tap your token to see range. Long-press to ping.</p>
           </div>
         </div>
         <button onClick={onClose} className="bg-slate-800 text-slate-400 p-2 rounded-xl border border-slate-700 hover:text-white transition-colors">
@@ -177,11 +202,14 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
           <MapGrid 
             mapData={mapData} 
             tokens={tokens} 
+            activePlayers={activePlayers}
+            activeEnemies={activeEnemies}
             onTileClick={handleTileClick} 
             onTokenClick={handleTokenClick}
             selectedTokenId={charId}
             isDM={false} 
             showMovementRangeFor={showRange ? tokens[charId] : null}
+            onPing={handlePing}
           />
         )}
       </div>
