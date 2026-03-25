@@ -1,23 +1,27 @@
 import React from 'react';
-import { Zap, Sword, RotateCcw, AlertTriangle, Crosshair, Sparkles } from 'lucide-react';
+import { Zap, Sword, RotateCcw, AlertTriangle, Crosshair, Sparkles, Battery, Heart } from 'lucide-react';
 
 export default function CombatTab({ 
   char, 
   isDM, 
+  activeTheme,
   combatWarnings,
   activeConditions,
   handleAddCondition,
-  handleRemoveCondition
+  handleRemoveCondition,
+  handleResourceToggle
 }) {
   
   const bonusActions = (char.features || []).filter(f => f.desc.toLowerCase().includes('bonus action'));
   const reactions = (char.features || []).filter(f => f.desc.toLowerCase().includes('reaction'));
   const hasSpells = char.spells && char.spells.length > 0;
+  
+  const resources = char.resources || [];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
-      {/* CONDITIONS & WARNINGS */}
+      {/* STATUS WARNINGS */}
       {(combatWarnings.length > 0 || isDM) && (
         <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-sm">
           <div className="flex justify-between items-center mb-4">
@@ -53,6 +57,55 @@ export default function CombatTab({
         </div>
       )}
 
+      {/* CLASS RESOURCES (Auto-populated by Arkla Engine) */}
+      {resources.length > 0 && (
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-5 shadow-xl relative overflow-hidden">
+          <div className={`absolute top-0 right-0 w-32 h-32 ${activeTheme.bg} blur-[50px] opacity-10 rounded-full -mr-10 -mt-10 pointer-events-none`}></div>
+          <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4 relative z-10 border-b border-slate-700 pb-2">
+            <Battery className={`w-5 h-5 ${activeTheme.text}`} /> Class Resources
+          </h3>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
+            {resources.map((res, idx) => (
+              <div key={idx} className="bg-slate-900 border border-slate-700 rounded-lg p-3">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-sm font-bold text-slate-300">{res.name}</span>
+                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800">
+                    {res.recharge} Rest
+                  </span>
+                </div>
+                
+                {res.isPool || res.max > 15 ? (
+                  <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
+                     <Heart className="w-4 h-4 text-emerald-500" />
+                     <input 
+                       type="number" 
+                       disabled={isDM}
+                       value={res.current}
+                       onChange={(e) => handleResourceToggle(idx, Math.min(res.max, Math.max(0, parseInt(e.target.value) || 0)))}
+                       className="w-16 bg-transparent text-white font-bold text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
+                     />
+                     <span className="text-slate-500 font-bold text-sm">/ {res.max}</span>
+                  </div>
+                ) : (
+                  <div className="flex gap-1.5 flex-wrap">
+                    {Array.from({ length: res.max }).map((_, bubbleIdx) => (
+                      <button 
+                        key={bubbleIdx} 
+                        onClick={() => handleResourceToggle(idx, bubbleIdx < res.current ? res.current - 1 : res.current + 1)} 
+                        disabled={isDM} 
+                        className={`w-6 h-6 rounded-full border-2 transition-all duration-300 shrink-0 ${bubbleIdx < res.current ? `${activeTheme.bg} ${activeTheme.border} shadow-[0_0_10px_rgba(255,255,255,0.2)] cursor-pointer` : 'bg-slate-800 border-slate-600 opacity-50 cursor-pointer'}`} 
+                        title={bubbleIdx < res.current ? "Click to expend" : "Click to regain"} 
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ACTION ECONOMY DASHBOARD */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -63,7 +116,6 @@ export default function CombatTab({
           </h3>
           <div className="space-y-3">
             
-            {/* Dynamic Magic Blurb */}
             {hasSpells && (
               <div className="bg-indigo-950/30 border border-indigo-900/50 rounded-xl p-3 shadow-sm hover:border-indigo-500/30 transition-colors">
                 <div className="flex justify-between items-start mb-1">
@@ -71,7 +123,7 @@ export default function CombatTab({
                   <span className="bg-indigo-900/50 text-indigo-200 text-[10px] font-bold px-2 py-0.5 rounded border border-indigo-700">Magic</span>
                 </div>
                 <p className="text-xs text-indigo-200/80">
-                  You have access to magic. Refer to your <strong className="text-indigo-400">Spells Tab</strong> to view your spellbook, read casting times, and expend spell slots.
+                  Refer to your <strong className="text-indigo-400">Spells Tab</strong> to view your spellbook and expend spell slots.
                 </p>
               </div>
             )}

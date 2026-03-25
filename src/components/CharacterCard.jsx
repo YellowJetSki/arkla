@@ -200,6 +200,16 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     await updateDoc(doc(db, 'characters', currentUser.charId), { conditions: arrayRemove(condition) });
   };
 
+  const handleResourceToggle = async (resourceIndex, newCurrentValue) => {
+    if (!char || !char.resources || isDM) return;
+    const updatedResources = [...char.resources];
+    updatedResources[resourceIndex] = {
+      ...updatedResources[resourceIndex],
+      current: newCurrentValue
+    };
+    await updateDoc(doc(db, 'characters', currentUser.charId), { resources: updatedResources });
+  };
+
   const addFeature = async (featData) => {
     await updateDoc(doc(db, 'characters', currentUser.charId), {
       features: arrayUnion(featData)
@@ -214,7 +224,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     if (!customFeat.name || !customFeat.desc) return;
     
     const newFeat = { name: customFeat.name, desc: customFeat.desc };
+    
     await setDoc(doc(db, 'custom_feats', 'feat_' + Date.now()), newFeat);
+    
     await updateDoc(doc(db, 'characters', currentUser.charId), {
       features: arrayUnion(newFeat)
     });
@@ -281,11 +293,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   if (!char) return <CardWrapper><GlobalLoader /></CardWrapper>;
 
   const activeConditions = char.conditions || [];
-  
-  // Phase 3: Bloodied Immersion Status
-  const hpPercent = Math.max(0, Math.min(100, ((char.hp || 0) / (char.maxHp || 1)) * 100));
   const isUnconscious = (char.hp || 0) <= 0;
-  const isBloodied = !isUnconscious && hpPercent <= 50;
 
   const getConditionWarnings = (conditions) => {
     const warnings = [];
@@ -304,6 +312,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const isFrightened = activeConditions.includes('Frightened');
   const isExhausted = activeConditions.includes('Exhaustion');
 
+  const hpPercent = Math.max(0, Math.min(100, ((char.hp || 0) / (char.maxHp || 1)) * 100));
   const tempHpPercent = Math.max(0, Math.min(100, ((char.tempHp || 0) / (char.maxHp || 1)) * 100));
   const hpColor = isPoisoned ? 'bg-lime-500/40' : hpPercent > 50 ? 'bg-emerald-500/20' : hpPercent > 20 ? 'bg-yellow-500/20' : 'bg-red-500/30';
 
@@ -344,7 +353,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
         <div className={`${isDM ? 'p-6' : 'max-w-4xl mx-auto p-3 md:p-8 min-h-[100dvh]'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'}`}>
           
-          {/* Top Bar Navigation */}
           {isDM ? (
             <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-4 sticky top-0 bg-slate-900 z-40 pt-2">
               <h2 className="text-xl font-bold text-white flex items-center gap-2"><User className="w-6 h-6 text-indigo-400" /> {char.name}'s Sheet (DM Mode)</h2>
@@ -366,12 +374,10 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             </div>
           )}
 
-          {/* HEADER SECTION */}
-          <div className={`bg-slate-900 border ${isUnconscious ? 'border-red-900 shadow-[0_0_30px_rgba(220,38,38,0.2)]' : isBloodied ? 'border-red-600/50 shadow-[0_0_20px_rgba(220,38,38,0.3)]' : 'border-slate-700 shadow-xl'} rounded-2xl mb-6 relative flex flex-col overflow-hidden`}>
+          <div className={`bg-slate-900 border ${isUnconscious ? 'border-red-900 shadow-[0_0_30px_rgba(220,38,38,0.2)]' : 'border-slate-700 shadow-xl'} rounded-2xl mb-6 relative flex flex-col overflow-hidden`}>
             
-            {/* Portrait Container - Now includes Bloodied Ring */}
             <div className="w-full h-32 md:h-48 relative group shrink-0 overflow-hidden block">
-              <div className={`w-full h-full relative ${char.isConcentrating ? `ring-[4px] ring-inset ${activeTheme.ring} animate-pulse z-20` : ''} ${isFrightened ? 'ring-[4px] ring-inset ring-fuchsia-600 animate-pulse z-20' : ''} ${isBloodied && !isUnconscious ? 'ring-[4px] ring-inset ring-red-600/80 shadow-[inset_0_0_30px_rgba(220,38,38,0.5)] animate-pulse z-20' : ''}`}>
+              <div className={`w-full h-full relative ${char.isConcentrating ? `ring-[4px] ring-inset ${activeTheme.ring} animate-pulse z-20` : ''} ${isFrightened ? 'ring-[4px] ring-inset ring-fuchsia-600 animate-pulse z-20' : ''}`}>
                 <img src={`/${currentUser.charId}.png`} alt={char.name} className={`w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105 ${isUnconscious ? 'grayscale' : ''}`} onError={(e) => { e.target.src = 'https://via.placeholder.com/800x400?text=No+Image'; }} />
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent pointer-events-none z-10"></div>
@@ -382,7 +388,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
               
               <div className="absolute bottom-3 left-4 md:left-6 text-left pointer-events-none z-10">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <h2 className={`text-2xl md:text-3xl font-black leading-tight drop-shadow-lg text-balance ${isUnconscious || isBloodied ? 'text-red-400' : 'text-white'}`}>{char.name}</h2>
+                  <h2 className={`text-2xl md:text-3xl font-black leading-tight drop-shadow-lg text-balance ${isUnconscious ? 'text-red-400' : 'text-white'}`}>{char.name}</h2>
                   <div className="flex items-center pointer-events-auto">
                     <button onClick={isDM ? toggleInspiration : undefined} className={`shrink-0 transition-all z-10 flex items-center justify-center ${isDM ? 'cursor-pointer hover:scale-110' : 'pointer-events-none'} ${char.inspiration ? 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,1)] scale-110' : (isDM ? 'text-slate-400 hover:text-yellow-400/50' : 'text-slate-600')}`}><Star className="w-5 h-5 md:w-6 md:h-6 fill-current pointer-events-none" /></button>
                   </div>
@@ -469,6 +475,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 <div className="relative z-10 flex items-center gap-1 pr-1">
                   <button onClick={() => adjustXp(-50)} className="w-6 h-6 md:w-8 md:h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 font-bold flex items-center justify-center border border-slate-600 transition-colors shadow-sm cursor-pointer">-</button>
                   <div className="flex items-center gap-1 text-white bg-slate-800/50 border border-slate-600 rounded-lg px-2 py-0.5 md:py-1">
+                    
                     <input 
                       type="number" 
                       value={isEditingXp ? displayXp : currentXp} 
@@ -478,6 +485,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                       onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
                       className="w-12 md:w-16 bg-transparent focus:outline-none text-right font-black text-sm md:text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-slate-100" 
                     />
+                    
                     <span className="text-slate-500 font-black text-sm md:text-base">/</span>
                     <span className="w-12 md:w-16 text-left text-slate-400 text-sm md:text-base font-bold">{nextLevelXp}</span>
                   </div>
@@ -531,6 +539,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 activeConditions={activeConditions}
                 handleAddCondition={(e) => handleAddCondition(e.target.value)}
                 handleRemoveCondition={handleRemoveCondition}
+                handleResourceToggle={handleResourceToggle}
               />
             )}
 
