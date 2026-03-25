@@ -7,12 +7,12 @@ export default function Login({ onLogin }) {
   const [passcode, setPasscode] = useState('');
   const [error, setError] = useState('');
 
-  const isDM = name.trim().toLowerCase() === 'mike';
+  const normalizedName = name.trim().toLowerCase();
+  const isDM = normalizedName === 'mike';
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
-    const normalizedName = name.trim().toLowerCase();
 
     // DM Login Flow
     if (isDM) {
@@ -25,7 +25,6 @@ export default function Login({ onLogin }) {
     }
 
     // Player Login Flow
-    // Allow players to type either their short key ('wendy') or full name ('Wendy Warmwind')
     const charKey = Object.keys(PREMADE_CHARACTERS).find(
       key => key.toLowerCase() === normalizedName || 
              PREMADE_CHARACTERS[key].name.toLowerCase() === normalizedName
@@ -43,18 +42,12 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    // Using h-[100dvh] and overflow-hidden locks the viewport and prevents phantom mobile scrolling
     <div className="h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-center p-4 overflow-hidden selection:bg-indigo-500/30 relative">
-      
-      {/* Background Decorative Blurs */}
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-indigo-600/10 blur-[100px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-fuchsia-600/10 blur-[100px] rounded-full pointer-events-none"></div>
 
       <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-3xl p-6 md:p-10 w-full max-w-md shadow-[0_0_40px_rgba(0,0,0,0.5)] relative z-10">
-        
         <div className="flex flex-col items-center mb-8 text-center">
-          
-          {/* CUSTOM APP ICON */}
           <div className="w-20 h-20 mb-5 transform -rotate-3 transition-transform hover:rotate-0 duration-300">
             <img 
               src="/icon.png" 
@@ -63,7 +56,6 @@ export default function Login({ onLogin }) {
               onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=Icon'; }}
             />
           </div>
-
           <h1 className="text-3xl font-black text-white tracking-tight mb-2 break-words text-balance">
             Campaign Login
           </h1>
@@ -92,7 +84,6 @@ export default function Login({ onLogin }) {
             </div>
           </div>
 
-          {/* Conditionally render passcode input if they type Mike */}
           {isDM && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-300">
               <label className="block text-xs font-bold text-fuchsia-400 uppercase tracking-wider pl-1 mb-2">

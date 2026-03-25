@@ -1,46 +1,59 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc, arrayUnion } from 'firebase/firestore';
-import { db } from './services/firebase'; // Importing your setup!
+import { db } from './services/firebase'; 
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import BattleMapDisplay from './components/battlemap/BattleMapDisplay';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  // Check if this tab was opened specifically as the Display screen via URL
+  const isDisplayMode = new URLSearchParams(window.location.search).get('display') === 'true';
+
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('dnd_currentUser');
+    if (!saved) return null;
+    
+    const parsedUser = JSON.parse(saved);
+    // THE FIX: If the old local storage 'display' role is detected, wipe it out to prevent crashes.
+    if (parsedUser.role === 'display') {
+      localStorage.removeItem('dnd_currentUser');
+      return null;
+    }
+    return parsedUser;
+  });
+  
   const [unlockedCharacters, setUnlockedCharacters] = useState([]);
 
-  // 1. Remember the user on this specific device
   useEffect(() => {
-    const savedUser = localStorage.getItem('dnd_currentUser');
-    if (savedUser) setCurrentUser(JSON.parse(savedUser));
-  }, []);
+    if (currentUser) {
+      localStorage.setItem('dnd_currentUser', JSON.stringify(currentUser));
+    }
+  }, [currentUser]);
 
-  // 2. Real-time listener for the Campaign State
   useEffect(() => {
-    // We are creating a document called 'main_session' in a 'campaign' collection
+    if (isDisplayMode) return; 
+
     const campaignRef = doc(db, 'campaign', 'main_session');
     
     const unsubscribe = onSnapshot(campaignRef, (docSnap) => {
       if (docSnap.exists()) {
         setUnlockedCharacters(docSnap.data().unlockedCharacters || []);
       } else {
-        // Initialize the document in Firebase if it doesn't exist yet
         setDoc(campaignRef, { unlockedCharacters: [] });
       }
     });
 
-    // Cleanup listener on unmount
     return () => unsubscribe();
-  }, []);
+  }, [isDisplayMode]);
 
   const handleLogin = async (user) => {
     setCurrentUser(user);
     localStorage.setItem('dnd_currentUser', JSON.stringify(user));
 
-    // If a player logs in, tell Firebase so the DM sees it instantly
     if (user.role === 'player') {
       const campaignRef = doc(db, 'campaign', 'main_session');
       await setDoc(campaignRef, {
-        unlockedCharacters: arrayUnion(user.charId) // arrayUnion prevents duplicates
+        unlockedCharacters: arrayUnion(user.charId) 
       }, { merge: true });
     }
   };
@@ -48,9 +61,12 @@ export default function App() {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('dnd_currentUser');
-    // Note: We don't remove them from Firebase unlockedCharacters, 
-    // because the DM might still want to see their card!
   };
+
+  // OVERRIDE: If this is the display tab, only render the Battle Map
+  if (isDisplayMode) {
+    return <BattleMapDisplay onLogout={() => window.close()} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 selection:bg-indigo-500/30">
