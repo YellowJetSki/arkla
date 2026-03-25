@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, arrayUnion } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, arrayUnion, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize, Ruler, CircleDashed, ArrowUpCircle, BrainCircuit, PenTool, Eraser } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -147,24 +147,43 @@ export default function DMBattleMap() {
   };
 
   const handleRestorePreset = async (presetData) => {
-    await setDoc(doc(db, 'campaign', 'battlemap'), {
-      ...presetData.mapData,
-      tokens: presetData.tokens,
-      isPublished: false 
-    });
-    
-    const presetEnemies = Object.values(presetData.tokens || {}).filter(t => t.type === 'enemy');
-    for (const enemy of presetEnemies) {
-       await setDoc(doc(db, 'active_enemies', enemy.id), {
-          name: enemy.name,
-          hp: enemy.hp || 10,
-          currentHp: enemy.hp || 10,
-          ac: 10, 
-          speed: enemy.speed || 30
-       }, { merge: true });
-    }
+    try {
+      const batch = writeBatch(db);
+      
+      // 1. Wipe current active_enemies to prevent duplicates from lingering
+      const enemyDocs = await getDocs(collection(db, 'active_enemies'));
+      enemyDocs.forEach((docSnap) => batch.delete(docSnap.ref));
 
-    setSelectedTokenId(null);
+      // 2. Stage the battlemap
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      batch.set(mapRef, {
+        ...presetData.mapData,
+        tokens: presetData.tokens,
+        isPublished: false 
+      });
+
+      // 3. Add the preset enemies back into the active_enemies collection with ALL their details
+      const presetEnemies = Object.values(presetData.tokens || {}).filter(t => t.type === 'enemy');
+      for (const enemy of presetEnemies) {
+         const enemyRef = doc(db, 'active_enemies', enemy.id);
+         batch.set(enemyRef, {
+            name: enemy.name,
+            hp: enemy.hp || 10,
+            maxHp: enemy.maxHp || enemy.hp || 10,
+            currentHp: enemy.hp || 10,
+            speed: enemy.speed || 30,
+            img: enemy.img || '',
+            conditions: enemy.conditions || [],
+            size: enemy.size || 1,
+            isConcentrating: enemy.isConcentrating || false
+         });
+      }
+
+      await batch.commit();
+      setSelectedTokenId(null);
+    } catch (error) {
+      console.error("Error restoring preset:", error);
+    }
   };
 
   const getCreatureSize = (name) => {

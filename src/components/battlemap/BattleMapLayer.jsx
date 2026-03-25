@@ -5,7 +5,7 @@ import { Map as MapIcon, X, AlertTriangle, Zap } from 'lucide-react';
 import MapGrid from './MapGrid';
 
 export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
-  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null });
+  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
   const [tokens, setTokens] = useState({});
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert' });
   
@@ -23,7 +23,10 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
           cols: data.cols || 20,
           rows: data.rows || 15,
           isPublished: data.isPublished || false,
-          activeTokenId: data.activeTokenId || null
+          activeTokenId: data.activeTokenId || null,
+          ping: data.ping || null,
+          gridColor: data.gridColor || 'rgba(255,255,255,0.35)',
+          drawings: data.drawings || []
         });
         setTokens(data.tokens || {});
       }
