@@ -2,7 +2,7 @@ import {
   User, ZoomIn, ZoomOut, Target, 
   EyeOff, Heart, EarOff, Flame, Ghost, Link, 
   Ban, Cloud, Lock, Mountain, Skull, ArrowDown, 
-  Stars, Moon, AlertCircle
+  Stars, Moon, AlertCircle, BrainCircuit
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
@@ -59,8 +59,8 @@ export default function MapGrid({
   isDM,
   showMovementRangeFor = null,
   isDisplayMode = false,
-  onTokenDrop, // NEW: Drag and Drop Handler
-  onPing // NEW: Ping System Handler
+  onTokenDrop, 
+  onPing 
 }) {
   
   const rawCols = Number(mapData?.cols);
@@ -72,7 +72,6 @@ export default function MapGrid({
   const currentCellSize = 30 * zoom;
   const scrollRef = useRef(null);
 
-  // NEW: Local state to force a re-render to hide stale pings without waiting for Firebase
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -161,6 +160,9 @@ export default function MapGrid({
 
   const activeToken = mapData?.activeTokenId ? tokens[mapData.activeTokenId] : null;
 
+  // NEW QoL: Dynamic Adaptive Grid Color
+  const gridColor = mapData?.gridColor || 'rgba(255,255,255,0.35)';
+
   return (
     <div className={`relative w-full flex flex-col overflow-hidden ${isDisplayMode ? 'h-[100dvh] rounded-none border-0 bg-black' : 'max-h-[70vh] rounded-xl border border-slate-700 bg-slate-950 shadow-inner'}`}>
       
@@ -174,10 +176,13 @@ export default function MapGrid({
       )}
 
       {isDisplayMode && activeToken && (
-        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-[200] flex flex-col items-center pointer-events-none animate-in slide-in-from-bottom-10 fade-in duration-700">
-          <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.4em] mb-1 drop-shadow-md">Active Turn</span>
-          <div className={`bg-slate-950/80 backdrop-blur-md border-y-2 px-16 py-3 shadow-2xl ${activeToken.type === 'enemy' ? 'border-red-500/50 shadow-red-900/20' : 'border-amber-500/50 shadow-amber-900/20'}`}>
-            <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+        <div className="fixed top-8 left-8 z-[200] flex items-center gap-4 bg-slate-950/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-3 shadow-2xl animate-in slide-in-from-left-8 fade-in duration-500">
+          <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-slate-800">
+            <TokenImage token={activeToken} isEnemy={activeToken.type === 'enemy'} />
+          </div>
+          <div className="flex flex-col pr-4">
+            <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-0.5">Current Turn</span>
+            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none">
               {activeToken.name}
             </h1>
           </div>
@@ -204,11 +209,11 @@ export default function MapGrid({
             imageRendering: 'crisp-edges' 
           }}
         >
-          {!isDisplayMode && (
-            <div className="absolute inset-0 pointer-events-none z-0 transition-all duration-500" style={{ backgroundImage: `linear-gradient(to right, rgba(255,255,255,0.35) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.35) 1px, transparent 1px)`, backgroundSize: `${currentCellSize}px ${currentCellSize}px` }}></div>
+          {/* NEW QoL: Dynamic Adaptive Grid Rendering */}
+          {!isDisplayMode && gridColor !== 'transparent' && (
+            <div className="absolute inset-0 pointer-events-none z-0 transition-all duration-500" style={{ backgroundImage: `linear-gradient(to right, ${gridColor} 1px, transparent 1px), linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)`, backgroundSize: `${currentCellSize}px ${currentCellSize}px` }}></div>
           )}
 
-          {/* NEW: Global Ping Visual Renderer */}
           {mapData?.ping && (now - mapData.ping.timestamp < 3500) && (
             <div 
               className="absolute z-50 pointer-events-none"
@@ -248,8 +253,6 @@ export default function MapGrid({
               return (
                 <div 
                   key={`click-${tile.x},${tile.y}`}
-                  
-                  // NEW: Left Click to Move (Fallback), Right Click to Ping!
                   onMouseDown={(e) => { 
                     e.preventDefault(); 
                     if(isDisplayMode) return;
@@ -261,8 +264,6 @@ export default function MapGrid({
                     e.preventDefault();
                     if(!isDisplayMode && onPing) onPing(tile.x, tile.y);
                   }}
-                  
-                  // NEW: Drag and Drop Handlers
                   onDragOver={(e) => { 
                     if(isDisplayMode) return;
                     e.preventDefault(); 
@@ -276,7 +277,6 @@ export default function MapGrid({
                       onTokenDrop(dragId, tile.x, tile.y);
                     }
                   }}
-                  
                   className={`w-full h-full transition-colors ${isDisplayMode ? '' : 'cursor-pointer'} ${tileClass}`}
                 />
               );
@@ -288,10 +288,8 @@ export default function MapGrid({
               .sort((a, b) => {
                 const aDead = (a.hp !== undefined && a.hp <= 0);
                 const bDead = (b.hp !== undefined && b.hp <= 0);
-                
                 if (aDead && !bDead) return -1;
                 if (!aDead && bDead) return 1;
-
                 return (b.size || 1) - (a.size || 1);
               })
               .map(token => {
@@ -311,13 +309,12 @@ export default function MapGrid({
               return (
                 <div
                   key={token.id}
-                  // NEW: Native Draggable Attribute
-                  draggable={!isDisplayMode && isDM} // DMs can drag anything. (Players can drag via their layer)
+                  draggable={!isDisplayMode && isDM} 
                   onDragStart={(e) => {
                     if (isDisplayMode) return;
                     e.dataTransfer.setData('tokenId', token.id);
                     e.dataTransfer.effectAllowed = "move";
-                    if (onTokenClick) onTokenClick(token.id); // Select it visually while dragging
+                    if (onTokenClick) onTokenClick(token.id); 
                   }}
                   onMouseDown={(e) => {
                     if (!isDisplayMode && onTokenClick && (isDM || token.id === selectedTokenId)) {
@@ -332,15 +329,40 @@ export default function MapGrid({
                     transform: `translate(${safeX * currentCellSize}px, ${safeY * currentCellSize}px)`
                   }}
                 >
-                  <div className={`relative w-[75%] h-[75%] rounded-full shadow-lg transition-all 
-                    ${isSelected && !isDisplayMode ? 'ring-2 md:ring-4 ring-white animate-pulse scale-105 z-40' : 'z-10'} 
-                    ${isActiveTurn ? (isDisplayMode ? 'ring-[8px] ring-amber-400 shadow-[0_0_40px_rgba(251,191,36,1)] scale-110 z-50' : 'ring-[3px] md:ring-[6px] ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)] animate-pulse z-50') : ''} 
+                  
+                  {token.aura > 0 && !isDead && (
+                    <div 
+                      className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-dashed pointer-events-none z-0 transition-all duration-500
+                        ${isEnemy ? 'border-red-500/50 bg-red-500/10' : 'border-indigo-400/50 bg-indigo-400/10'} 
+                        ${isDisplayMode ? 'animate-[spin_20s_linear_infinite]' : 'animate-[spin_30s_linear_infinite]'}`}
+                      style={{
+                        width: currentCellSize * (tSize + (token.aura / 5) * 2),
+                        height: currentCellSize * (tSize + (token.aura / 5) * 2)
+                      }}
+                    />
+                  )}
+
+                  <div className={`relative w-[75%] h-[75%] rounded-full shadow-lg transition-all z-10
+                    ${isSelected && !isDisplayMode ? 'ring-2 md:ring-4 ring-white animate-pulse scale-105 z-40' : ''} 
+                    ${isActiveTurn ? (isDisplayMode ? 'ring-[4px] ring-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.8)] scale-105 z-50' : 'ring-[3px] md:ring-[6px] ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)] animate-pulse z-50') : ''} 
                     ${isDead ? 'grayscale-[0.9] opacity-60' : ''}
                     ${isBloodied && !isActiveTurn ? 'ring-[3px] ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.8)]' : ''}
                     ${isEnemy && !isBloodied && !isActiveTurn && !isDead ? 'bg-red-950/80 shadow-red-900/50' : ''}
                     ${!isEnemy && !isBloodied && !isActiveTurn && !isDead ? 'bg-indigo-950/80 shadow-indigo-900/50' : ''}
                   `}>
                     
+                    {token.elevation > 0 && !isDead && (
+                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-sky-900/90 border border-sky-400 text-sky-100 text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-lg z-50 whitespace-nowrap pointer-events-none">
+                        +{token.elevation}ft
+                      </div>
+                    )}
+
+                    {token.isConcentrating && !isDead && (
+                      <div className="absolute -top-1 -left-3 bg-amber-600 rounded-full p-0.5 shadow-md border border-amber-300 z-50 pointer-events-none animate-pulse">
+                        <BrainCircuit className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'} text-white`} />
+                      </div>
+                    )}
+
                     <TokenImage token={token} isEnemy={isEnemy} />
 
                     {isDead && (

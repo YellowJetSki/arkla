@@ -32,7 +32,6 @@ export default function DMDashboard({ onLogout }) {
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'confirm', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
-  // NEW QoL: DM Global Toast Notification State
   const [toast, setToast] = useState('');
   const showToast = (msg) => {
     setToast(msg);
@@ -41,6 +40,14 @@ export default function DMDashboard({ onLogout }) {
 
   const [massMathAmount, setMassMathAmount] = useState('');
   const fileInputRef = useRef(null);
+
+  // NEW QoL: Swipe-to-dismiss toast tracking variables
+  let touchStartX = 0;
+  const handleTouchStart = (e) => { touchStartX = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    if (touchEndX - touchStartX > 50) setToast(''); // Swiped right to dismiss!
+  };
 
   useEffect(() => {
     localStorage.setItem('dm_scratchpad', scratchpad);
@@ -211,9 +218,13 @@ export default function DMDashboard({ onLogout }) {
     <>
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
-      {/* NEW QoL: Global DM Toast Notification */}
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-2xl border border-indigo-900/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2">
+        <div 
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onClick={() => setToast('')}
+          className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-2xl border border-indigo-900/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2 cursor-pointer touch-pan-x"
+        >
           <Sparkles className="w-4 h-4" /> {toast}
         </div>
       )}
@@ -242,40 +253,40 @@ export default function DMDashboard({ onLogout }) {
             </div>
             <div>
               <h1 className="text-2xl font-black text-white tracking-widest uppercase">The Forge</h1>
-              <p className="text-indigo-400 font-bold text-sm">Command Center</p>
+              <p className="text-indigo-400 font-bold text-xs md:text-sm">Command Center</p>
             </div>
           </div>
           
           <div className="flex flex-wrap items-center justify-center gap-3 w-full xl:w-auto">
             
-            <button onClick={() => setShowScratchpad(!showScratchpad)} className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${showScratchpad ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'}`}>
+            <button onClick={() => setShowScratchpad(!showScratchpad)} className={`px-4 py-2.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${showScratchpad ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'}`}>
               <PenTool className="w-4 h-4" /> Notes
             </button>
 
             <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-700 shadow-inner mr-2 ml-2">
-              <button onClick={handleExportCampaign} className="hover:bg-slate-800 text-slate-400 hover:text-emerald-400 px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5"><HardDriveDownload className="w-4 h-4" /> Backup</button>
-              <button onClick={() => fileInputRef.current?.click()} className="hover:bg-slate-800 text-slate-400 hover:text-red-400 px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5"><HardDriveUpload className="w-4 h-4" /> Restore</button>
+              <button onClick={handleExportCampaign} className="hover:bg-slate-800 text-slate-400 hover:text-emerald-400 px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5"><HardDriveDownload className="w-4 h-4" /> <span className="hidden md:inline">Backup</span></button>
+              <button onClick={() => fileInputRef.current?.click()} className="hover:bg-slate-800 text-slate-400 hover:text-red-400 px-3 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1.5"><HardDriveUpload className="w-4 h-4" /> <span className="hidden md:inline">Restore</span></button>
               <input type="file" accept=".json" ref={fileInputRef} onChange={handleImportCampaign} className="hidden" />
             </div>
 
-            <button onClick={() => setActiveManager(activeManager === 'rules' ? null : 'rules')} className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${activeManager === 'rules' ? 'bg-sky-600 text-white border-sky-400' : 'bg-slate-800 hover:bg-slate-700 text-sky-400 border-sky-900/50'}`}>
-              <Book className="w-4 h-4" /> Rules
+            <button onClick={() => setActiveManager(activeManager === 'rules' ? null : 'rules')} className={`px-3 md:px-4 py-2.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${activeManager === 'rules' ? 'bg-sky-600 text-white border-sky-400' : 'bg-slate-800 hover:bg-slate-700 text-sky-400 border-sky-900/50'}`}>
+              <Book className="w-4 h-4" /> <span className="hidden md:inline">Rules</span>
             </button>
-            <button onClick={() => setActiveManager(activeManager === 'encounters' ? null : 'encounters')} className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${activeManager === 'encounters' ? 'bg-amber-600 text-white border-amber-400' : 'bg-slate-800 hover:bg-slate-700 text-amber-400 border-amber-900/50'}`}>
-              <ShieldAlert className="w-4 h-4" /> Encounters
+            <button onClick={() => setActiveManager(activeManager === 'encounters' ? null : 'encounters')} className={`px-3 md:px-4 py-2.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${activeManager === 'encounters' ? 'bg-amber-600 text-white border-amber-400' : 'bg-slate-800 hover:bg-slate-700 text-amber-400 border-amber-900/50'}`}>
+              <ShieldAlert className="w-4 h-4" /> <span className="hidden md:inline">Encounters</span>
             </button>
-            <button onClick={() => setActiveManager(activeManager === 'items' ? null : 'items')} className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${activeManager === 'items' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border-emerald-900/50'}`}>
-              <PackagePlus className="w-4 h-4" /> Vault
+            <button onClick={() => setActiveManager(activeManager === 'items' ? null : 'items')} className={`px-3 md:px-4 py-2.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${activeManager === 'items' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border-emerald-900/50'}`}>
+              <PackagePlus className="w-4 h-4" /> <span className="hidden md:inline">Vault</span>
             </button>
-            <button onClick={() => setActiveManager(activeManager === 'handouts' ? null : 'handouts')} className={`px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${activeManager === 'handouts' ? 'bg-purple-600 text-white border-purple-400' : 'bg-slate-800 hover:bg-slate-700 text-purple-400 border-purple-900/50'}`}>
-              <ImageIcon className="w-4 h-4" /> Handouts
+            <button onClick={() => setActiveManager(activeManager === 'handouts' ? null : 'handouts')} className={`px-3 md:px-4 py-2.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-2 transition-all border shadow-sm ${activeManager === 'handouts' ? 'bg-purple-600 text-white border-purple-400' : 'bg-slate-800 hover:bg-slate-700 text-purple-400 border-purple-900/50'}`}>
+              <ImageIcon className="w-4 h-4" /> <span className="hidden md:inline">Handouts</span>
             </button>
             
             <div className="w-px h-8 bg-slate-700 hidden md:block mx-1"></div>
 
-            <button onClick={confirmClearConditions} className="bg-fuchsia-900/30 hover:bg-fuchsia-600 text-fuchsia-400 hover:text-white border border-fuchsia-900/50 px-4 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2"><Eraser className="w-4 h-4" /> Sweep</button>
-            <button onClick={confirmResetSession} className="bg-red-900/30 hover:bg-red-600 text-red-400 hover:text-white border border-red-900/50 px-4 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center gap-2"><RefreshCw className="w-4 h-4" /> Wipe</button>
-            <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 px-4 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-2"><LogOut className="w-4 h-4" /> Exit</button>
+            <button onClick={confirmClearConditions} className="bg-fuchsia-900/30 hover:bg-fuchsia-600 text-fuchsia-400 hover:text-white border border-fuchsia-900/50 px-3 md:px-4 py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-2"><Eraser className="w-4 h-4" /> Sweep</button>
+            <button onClick={confirmResetSession} className="bg-red-900/30 hover:bg-red-600 text-red-400 hover:text-white border border-red-900/50 px-3 md:px-4 py-2.5 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-2"><RefreshCw className="w-4 h-4" /> Wipe</button>
+            <button onClick={onLogout} className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 px-3 md:px-4 py-2.5 rounded-lg text-xs md:text-sm transition-colors flex items-center gap-2"><LogOut className="w-4 h-4" /> Exit</button>
           </div>
         </div>
 
@@ -335,8 +346,8 @@ export default function DMDashboard({ onLogout }) {
 
                 <Calculator className="w-4 h-4 text-slate-500 ml-1 shrink-0" />
                 <input type="number" value={massMathAmount} onChange={(e) => setMassMathAmount(e.target.value)} placeholder="Amt..." className="w-20 bg-slate-950 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:outline-none" />
-                <button onClick={() => handleMassMath(true)} disabled={!massMathAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"><Flame className="w-3 h-3"/> Dmg</button>
-                <button onClick={() => handleMassMath(false)} disabled={!massMathAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors">Heal</button>
+                <button onClick={() => handleMassMath(true)} disabled={!massMathAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"><Flame className="w-3 h-3"/> Dmg All</button>
+                <button onClick={() => handleMassMath(false)} disabled={!massMathAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors">Heal All</button>
               </div>
             )}
           </div>

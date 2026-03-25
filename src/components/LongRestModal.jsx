@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Moon, Bed, ShieldAlert, CheckCircle2, X } from 'lucide-react';
+import { Moon, Bed, CheckCircle2, X } from 'lucide-react';
 
 export default function LongRestModal({ char, charId, onClose }) {
   const [isResting, setIsResting] = useState(false);
@@ -10,15 +10,26 @@ export default function LongRestModal({ char, charId, onClose }) {
     setIsResting(true);
 
     try {
-      // 1. Reset HP & Hit Dice
-      const updates = {
-        hp: char.maxHp || 10,
-        'hitDice.current': char.hitDice?.max || char.level,
-        'deathSaves.successes': 0,
-        'deathSaves.failures': 0,
-      };
+      let updates = {};
 
-      // 2. Reset all Spell Slots to their max
+      // 1. Reset HP & Clear Temp HP
+      updates.hp = char.maxHp || 10;
+      updates.tempHp = 0;
+
+      // 2. Reset Death Saves
+      updates['deathSaves.successes'] = 0;
+      updates['deathSaves.failures'] = 0;
+
+      // 3. Break Concentration
+      updates.isConcentrating = false;
+
+      // 4. Recover half max hit dice (RAW 5e rules: minimum 1)
+      const maxHD = char.hitDice?.max || char.level || 1;
+      const currentHD = char.hitDice?.current || 0;
+      const recoverAmount = Math.max(1, Math.floor(maxHD / 2));
+      updates['hitDice.current'] = Math.min(maxHD, currentHD + recoverAmount);
+
+      // 5. Reset all Spell Slots to their max
       if (char.spellSlots) {
         const resetSlots = { ...char.spellSlots };
         Object.keys(resetSlots).forEach(level => {
@@ -27,13 +38,20 @@ export default function LongRestModal({ char, charId, onClose }) {
         updates.spellSlots = resetSlots;
       }
 
-      // 3. Reset all Custom Resources to their max
+      // 6. Reset all Custom Resources to their max
       if (char.resources && char.resources.length > 0) {
         const resetResources = char.resources.map(res => ({
           ...res,
           current: res.max
         }));
         updates.resources = resetResources;
+      }
+
+      // 7. Clear temporary conditions
+      if (char.conditions && char.conditions.length > 0) {
+        // We leave things like 'Poisoned' or 'Petrified' as those usually require lesser restoration/time
+        const clearedConditions = ['Unconscious', 'Prone'];
+        updates.conditions = char.conditions.filter(c => !clearedConditions.includes(c));
       }
 
       await updateDoc(doc(db, 'characters', charId), updates);
@@ -68,14 +86,14 @@ export default function LongRestModal({ char, charId, onClose }) {
             <div className="animate-in fade-in zoom-in duration-500 flex flex-col items-center py-4">
               <CheckCircle2 className="w-16 h-16 text-emerald-400 mb-4 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
               <h3 className="text-2xl font-black text-white mb-2">Restored!</h3>
-              <p className="text-sm text-slate-400">HP, Hit Dice, and spell slots have been fully reset.</p>
+              <p className="text-sm text-slate-400">HP, Resources, and Spell Slots have been reset.</p>
             </div>
           ) : (
             <div className="animate-in fade-in duration-300">
               <Bed className="w-12 h-12 text-indigo-400 mx-auto mb-4 opacity-80" />
               <h3 className="text-xl font-black text-white mb-2">Take a Long Rest?</h3>
               <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                This will simulate 8 hours of rest. You will fully recover your <strong className="text-emerald-400">HP</strong>, regain all spent <strong className="text-emerald-400">Hit Dice</strong>, and restore all <strong className="text-fuchsia-400">Spell Slots</strong> and <strong className="text-amber-400">Resources</strong> to their maximums.
+                This will simulate 8 hours of rest. You will fully recover your <strong className="text-emerald-400">HP</strong>, regain half your <strong className="text-emerald-400">Hit Dice</strong>, and restore all <strong className="text-fuchsia-400">Spell Slots</strong> and <strong className="text-amber-400">Resources</strong>.
               </p>
 
               <div className="flex gap-3">

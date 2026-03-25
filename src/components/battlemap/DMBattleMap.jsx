@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize, Ruler, CircleDashed, ArrowUpCircle, BrainCircuit } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 
@@ -11,9 +11,11 @@ const LOCAL_MAPS = [
 ];
 
 export default function DMBattleMap() {
-  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null });
+  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)' });
   const [tokens, setTokens] = useState({});
   const [selectedTokenId, setSelectedTokenId] = useState(null);
+  
+  const [showRulerFor, setShowRulerFor] = useState(null);
   
   const [activePlayers, setActivePlayers] = useState([]);
   const [activeEnemies, setActiveEnemies] = useState([]);
@@ -24,6 +26,7 @@ export default function DMBattleMap() {
   
   const [tempImageUrl, setTempImageUrl] = useState('');
   const [tempGridScale, setTempGridScale] = useState(30); 
+  const [tempGridColor, setTempGridColor] = useState('rgba(255,255,255,0.35)');
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
@@ -42,11 +45,12 @@ export default function DMBattleMap() {
           rows: safeRows,
           isPublished: data.isPublished || false,
           activeTokenId: data.activeTokenId || null,
-          ping: data.ping || null
+          ping: data.ping || null,
+          gridColor: data.gridColor || 'rgba(255,255,255,0.35)'
         });
         setTokens(data.tokens || {});
       } else {
-        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null, ping: null });
+        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)' });
       }
     });
     return () => unsub();
@@ -81,7 +85,7 @@ export default function DMBattleMap() {
     setIsSavingMap(true);
 
     if (!tempImageUrl) {
-      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: '', cols: 20, rows: 15 }, { merge: true }).then(() => {
+      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: '', cols: 20, rows: 15, gridColor: tempGridColor }, { merge: true }).then(() => {
         setIsSavingMap(false);
         setIsEditingMap(false);
       });
@@ -98,7 +102,8 @@ export default function DMBattleMap() {
       setDoc(doc(db, 'campaign', 'battlemap'), { 
         imageUrl: tempImageUrl,
         cols: calcCols,
-        rows: calcRows
+        rows: calcRows,
+        gridColor: tempGridColor
       }, { merge: true }).then(() => {
         setIsSavingMap(false);
         setIsEditingMap(false);
@@ -109,7 +114,8 @@ export default function DMBattleMap() {
       setDoc(doc(db, 'campaign', 'battlemap'), { 
         imageUrl: tempImageUrl,
         cols: 20,
-        rows: 15
+        rows: 15,
+        gridColor: tempGridColor
       }, { merge: true }).then(() => {
         setIsSavingMap(false);
         setIsEditingMap(false);
@@ -166,7 +172,10 @@ export default function DMBattleMap() {
       size: getCreatureSize(actor.name), 
       isHidden: false, 
       hp: actor.currentHp ?? actor.hp ?? 0,
-      maxHp: actor.maxHp ?? actor.hp ?? 1
+      maxHp: actor.maxHp ?? actor.hp ?? 1,
+      aura: 0,
+      elevation: 0, 
+      isConcentrating: actor.isConcentrating || false
     };
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: { ...tokens, [actor.id]: newToken } }, { merge: true });
   };
@@ -177,10 +186,10 @@ export default function DMBattleMap() {
     let eX = 0;
     
     unstagedPlayers.forEach(p => {
-      newTokens[p.id] = { id: p.id, name: p.name || 'Unknown', type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1 };
+      newTokens[p.id] = { id: p.id, name: p.name || 'Unknown', type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
     });
     unstagedEnemies.forEach(e => {
-      newTokens[e.id] = { id: e.id, name: e.name || 'Unknown', type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1 };
+      newTokens[e.id] = { id: e.id, name: e.name || 'Unknown', type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
     });
     
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: newTokens }, { merge: true });
@@ -237,8 +246,31 @@ export default function DMBattleMap() {
   const handleToggleTokenSize = async () => {
     if (!selectedTokenId || !tokens[selectedTokenId]) return;
     const currentSize = tokens[selectedTokenId].size || 1;
-    const newSize = currentSize >= 3 ? 1 : currentSize + 1; 
+    const newSize = currentSize >= 4 ? 1 : currentSize + 1; 
     const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], size: newSize } };
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+  };
+
+  const handleToggleAura = async () => {
+    if (!selectedTokenId || !tokens[selectedTokenId]) return;
+    const currentAura = tokens[selectedTokenId].aura || 0;
+    const newAura = currentAura === 0 ? 10 : currentAura === 10 ? 15 : currentAura === 15 ? 30 : 0; 
+    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], aura: newAura } };
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+  };
+
+  const handleToggleElevation = async () => {
+    if (!selectedTokenId || !tokens[selectedTokenId]) return;
+    const current = tokens[selectedTokenId].elevation || 0;
+    const newElev = current === 0 ? 10 : current === 10 ? 20 : current === 20 ? 30 : current === 30 ? 60 : 0;
+    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], elevation: newElev } };
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+  };
+
+  const handleToggleConcentration = async () => {
+    if (!selectedTokenId || !tokens[selectedTokenId]) return;
+    const current = tokens[selectedTokenId].isConcentrating || false;
+    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], isConcentrating: !current } };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
   };
 
@@ -264,14 +296,12 @@ export default function DMBattleMap() {
     setSelectedTokenId(null); 
   };
 
-  // NEW QoL: Native Drag-and-Drop
   const handleTokenDrop = async (tokenId, x, y) => {
     if (!tokenId || !tokens[tokenId]) return;
     const updatedTokens = { ...tokens, [tokenId]: { ...tokens[tokenId], x, y } };
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
   };
 
-  // NEW QoL: Global Ping
   const handlePing = async (x, y) => {
     await updateDoc(doc(db, 'campaign', 'battlemap'), {
       ping: { x, y, timestamp: Date.now() }
@@ -286,8 +316,9 @@ export default function DMBattleMap() {
     if (isEditingMap) {
       setTempImageUrl(mapData.imageUrl);
       setTempGridScale(30); 
+      setTempGridColor(mapData.gridColor || 'rgba(255,255,255,0.35)');
     }
-  }, [isEditingMap, mapData.imageUrl]);
+  }, [isEditingMap, mapData.imageUrl, mapData.gridColor]);
 
   const launchDisplayTab = () => {
     const displayUrl = window.location.pathname + '?display=true';
@@ -311,7 +342,7 @@ export default function DMBattleMap() {
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
           <button 
             onClick={launchDisplayTab}
-            className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-2 transition-colors"
+            className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors"
             title="Cast to a second monitor"
           >
             <MonitorPlay className="w-3 h-3" /> Cast Display
@@ -319,18 +350,18 @@ export default function DMBattleMap() {
 
           <button 
             onClick={() => setIsPresetsOpen(true)}
-            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-2 transition-colors mr-auto md:mr-2"
+            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors mr-auto md:mr-2"
           >
             <Save className="w-3 h-3" /> Presets
           </button>
 
-          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-2 transition-colors">
+          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors">
             <Settings className="w-3 h-3" /> Config
           </button>
           
           <button 
             onClick={togglePublish} 
-            className={`px-4 py-1.5 rounded-lg font-black text-xs flex items-center gap-2 transition-all shadow-md ${mapData.isPublished ? 'bg-emerald-600 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-800 text-slate-400 border border-slate-600 hover:text-white'}`}
+            className={`px-4 py-1.5 rounded-lg font-black text-[10px] md:text-xs flex items-center gap-2 transition-all shadow-md ${mapData.isPublished ? 'bg-emerald-600 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-800 text-slate-400 border border-slate-600 hover:text-white'}`}
           >
             {mapData.isPublished ? <><Send className="w-3 h-3"/> LIVE</> : <><EyeOff className="w-3 h-3"/> HIDDEN</>}
           </button>
@@ -339,7 +370,8 @@ export default function DMBattleMap() {
 
       {isEditingMap && (
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* NEW QoL: Grid Color Toggle added to config panel */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Preset Local Map</label>
               <select 
@@ -371,7 +403,19 @@ export default function DMBattleMap() {
                  onChange={(e) => setTempGridScale(Number(e.target.value))}
                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-black focus:outline-none focus:border-indigo-500"
                />
-               <p className="text-[9px] text-slate-500 mt-1">Adjust if grid lines don't perfectly align. Standard is 30.</p>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Grid Color</label>
+              <select 
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                onChange={(e) => setTempGridColor(e.target.value)}
+                value={tempGridColor}
+              >
+                <option value="rgba(255,255,255,0.35)">White (Default)</option>
+                <option value="rgba(0,0,0,0.6)">Black (Snow Maps)</option>
+                <option value="rgba(220,38,38,0.6)">Red (High Contrast)</option>
+                <option value="transparent">Hidden</option>
+              </select>
             </div>
           </div>
 
@@ -387,7 +431,6 @@ export default function DMBattleMap() {
         </div>
       )}
 
-      {/* DM TOOLBOX / STAGING AREA */}
       <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2 flex-wrap flex-1">
           
@@ -405,9 +448,31 @@ export default function DMBattleMap() {
                 />
               </div>
 
-              <button onClick={handleToggleTokenSize} className="text-indigo-300 hover:text-white ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0" title="Cycle Token Size (1x1, 2x2, 3x3)">
+              <button onClick={handleToggleTokenSize} className="text-indigo-300 hover:text-white ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0" title="Cycle Token Size (1x1, 2x2, 3x3, 4x4)">
                 <Maximize className="w-3 h-3" />
                 <span className="text-[10px] font-bold">{tokens[selectedTokenId].size || 1}x</span>
+              </button>
+
+              <button onClick={handleToggleAura} className="text-sky-300 hover:text-white ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0" title="Cycle Aura Radius (10ft, 15ft, 30ft)">
+                <CircleDashed className="w-3 h-3" />
+                {tokens[selectedTokenId].aura > 0 && <span className="text-[10px] font-bold">{tokens[selectedTokenId].aura}ft</span>}
+              </button>
+
+              <button onClick={handleToggleElevation} className="text-emerald-300 hover:text-white ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0" title="Cycle Elevation (+10ft, +20ft, etc.)">
+                <ArrowUpCircle className="w-3 h-3" />
+                {tokens[selectedTokenId].elevation > 0 && <span className="text-[10px] font-bold">+{tokens[selectedTokenId].elevation}</span>}
+              </button>
+
+              <button onClick={handleToggleConcentration} className={`ml-1 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0 transition-colors ${tokens[selectedTokenId].isConcentrating ? 'text-amber-400' : 'text-slate-400 hover:text-amber-300'}`} title="Toggle Spell Concentration">
+                <BrainCircuit className="w-3 h-3" />
+              </button>
+
+              <button 
+                onClick={() => setShowRulerFor(showRulerFor === selectedTokenId ? null : selectedTokenId)} 
+                className={`ml-2 border-l border-indigo-500/30 pl-2 flex items-center gap-1 shrink-0 transition-colors ${showRulerFor === selectedTokenId ? 'text-emerald-400' : 'text-slate-400 hover:text-emerald-300'}`} 
+                title="Toggle Movement Radius Ruler"
+              >
+                <Ruler className="w-3 h-3" />
               </button>
 
               <button onClick={handleUpdateTokenImage} className="text-emerald-400 hover:text-emerald-300 ml-2 border-l border-indigo-500/30 pl-2 shrink-0" title="Set Custom Image URL"><ImageIcon className="w-4 h-4"/></button>
@@ -443,17 +508,17 @@ export default function DMBattleMap() {
                 <>
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 hidden xl:block">Stage:</span>
                   
-                  <button onClick={stageAllActive} className="text-xs bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 px-2 py-1 rounded hover:bg-emerald-600 transition-colors mr-2 flex items-center gap-1">
+                  <button onClick={stageAllActive} className="text-[10px] md:text-xs bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 px-2 py-1 rounded hover:bg-emerald-600 transition-colors mr-2 flex items-center gap-1">
                     <Users className="w-3 h-3"/> Deploy All
                   </button>
 
                   <div className="w-px h-4 bg-slate-700 mx-1"></div>
 
                   {unstagedPlayers.map(p => (
-                    <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-xs bg-indigo-900/40 border border-indigo-500/50 text-indigo-200 px-2 py-1 rounded hover:bg-indigo-600 transition-colors">+ {(p.name || 'Unknown').split(' ')[0]}</button>
+                    <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs bg-indigo-900/40 border border-indigo-500/50 text-indigo-200 px-2 py-1 rounded hover:bg-indigo-600 transition-colors">+ {(p.name || 'Unknown').split(' ')[0]}</button>
                   ))}
                   {unstagedEnemies.map(e => (
-                    <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-xs bg-red-900/40 border border-red-500/50 text-red-200 px-2 py-1 rounded hover:bg-red-600 transition-colors">+ {(e.name || 'Unknown').substring(0,8)}</button>
+                    <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs bg-red-900/40 border border-red-500/50 text-red-200 px-2 py-1 rounded hover:bg-red-600 transition-colors">+ {(e.name || 'Unknown').substring(0,8)}</button>
                   ))}
                 </>
               )}
@@ -471,6 +536,7 @@ export default function DMBattleMap() {
         isDM={true} 
         onTokenDrop={handleTokenDrop}
         onPing={handlePing}
+        showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null}
       />
     </div>
   );

@@ -251,7 +251,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
   const activeConditions = char.conditions || [];
   const isUnconscious = (char.hp || 0) <= 0;
-  
+
   const getConditionWarnings = (conditions) => {
     const warnings = [];
     if (!conditions) return warnings;
@@ -270,6 +270,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const isExhausted = activeConditions.includes('Exhaustion');
 
   const hpPercent = Math.max(0, Math.min(100, ((char.hp || 0) / (char.maxHp || 1)) * 100));
+  // NEW QoL: Temp HP Bar sizing
+  const tempHpPercent = Math.max(0, Math.min(100, ((char.tempHp || 0) / (char.maxHp || 1)) * 100));
   const hpColor = isPoisoned ? 'bg-lime-500/40' : hpPercent > 50 ? 'bg-emerald-500/20' : hpPercent > 20 ? 'bg-yellow-500/20' : 'bg-red-500/30';
 
   const currentXp = char.exp || 0;
@@ -363,10 +365,18 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 
                 {/* Left Side: HP */}
                 <div className="relative bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-inner flex items-center justify-between p-2">
-                  <div className={`absolute left-0 top-0 bottom-0 ${hpColor} transition-all duration-500`} style={{ width: `${hpPercent}%` }}></div>
+                  <div className={`absolute left-0 top-0 bottom-0 ${hpColor} transition-all duration-500 z-0`} style={{ width: `${hpPercent}%` }}></div>
                   
+                  {/* NEW QoL: Dynamic Temp HP Border Segment */}
+                  {(char.tempHp > 0) && (
+                    <div 
+                      className="absolute left-0 bottom-0 h-1.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] transition-all duration-500 z-10" 
+                      style={{ width: `${Math.min(100, tempHpPercent)}%` }}
+                    ></div>
+                  )}
+
                   {isUnconscious ? (
-                    <div className="relative z-10 flex items-center justify-center gap-4 w-full">
+                    <div className="relative z-20 flex items-center justify-center gap-4 w-full">
                       <div className="flex flex-col items-center">
                         <span className="text-[9px] font-bold text-slate-400 mb-0.5">PASS</span>
                         <div className="flex gap-1">
@@ -382,15 +392,15 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                     </div>
                   ) : (
                     <>
-                      <div className="relative z-10 flex items-center gap-2 pl-2">
+                      <div className="relative z-20 flex items-center gap-2 pl-2">
                         <Heart className={`w-4 h-4 ${isPoisoned ? 'text-lime-400' : 'text-emerald-400'}`} />
-                        <div className="flex items-center gap-1 bg-blue-900/30 border border-blue-500/40 px-1.5 py-0.5 rounded ml-1">
+                        <div className="flex items-center gap-1 bg-blue-900/40 border border-blue-500/40 px-1.5 py-0.5 rounded ml-1 shadow-sm">
                           <Shield className="w-3 h-3 text-blue-400" />
                           <input type="number" value={isEditingTempHp ? displayTempHp : (char.tempHp || 0)} onFocus={() => { setDisplayTempHp(char.tempHp || 0); setIsEditingTempHp(true); }} onChange={(e) => setDisplayTempHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingTempHp(false); submitHpUpdate(char.hp, e.target.value); }} className="w-6 bg-transparent focus:outline-none text-center font-black text-blue-100 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                         </div>
                       </div>
 
-                      <div className="relative z-10 flex items-center gap-1 pr-1">
+                      <div className="relative z-20 flex items-center gap-1 pr-1">
                         <button onClick={() => adjustHp(-1)} className="w-8 h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-lg flex items-center justify-center border border-slate-600 cursor-pointer">-</button>
                         <div className="flex items-center gap-1 text-white bg-slate-800/50 border border-slate-600 rounded px-2 py-1">
                           <input type="number" value={isEditingHp ? displayHp : (char.hp ?? 0)} onFocus={() => { setDisplayHp(char.hp ?? 0); setIsEditingHp(true); }} onChange={(e) => setDisplayHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingHp(false); submitHpUpdate(e.target.value, char.tempHp); }} className={`w-8 bg-transparent focus:outline-none text-center font-black text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isUnconscious && !isEditingHp ? 'text-red-400' : ''} ${isEditingHp ? activeTheme.text : ''}`} />
@@ -448,7 +458,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             <QuickTraits features={char.features} />
           </div>
 
-          {/* NEW QoL: Native Swipeable Sticky Tabs */}
+          {/* COMPACT STICKY TAB NAVIGATION */}
           <div className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-xl pt-1 pb-3 -mx-3 px-3 md:-mx-8 md:px-8 border-b border-slate-800 shadow-md mb-6">
             <div className="bg-slate-900 p-1.5 rounded-xl border border-slate-800 flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-1 sm:gap-2 justify-between snap-x snap-mandatory">
               {[
@@ -518,6 +528,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
         {isLevelUpOpen && <LevelUpModal char={char} charId={currentUser.charId} onClose={() => setIsLevelUpOpen(false)} />}
         {isShortRestOpen && <ShortRestModal char={char} charId={currentUser.charId} onClose={() => setIsShortRestOpen(false)} />}
+        {/* NEW QoL: Mounted the updated LongRestModal so it actually triggers the DB rules! */}
         {isLongRestOpen && <LongRestModal char={char} charId={currentUser.charId} onClose={() => setIsLongRestOpen(false)} />}
         
         {!isDM && (
