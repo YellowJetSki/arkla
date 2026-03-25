@@ -234,6 +234,63 @@ export const PREMADE_ENEMIES = [
     ]
   },
   {
+    id: 'bengo',
+    name: 'Bengo',
+    flavor: '“The Scrawny One.” Scrawny, pale green, wears a massive pirate hat.', // [cite: 298, 416]
+    ac: 12, // [cite: 406]
+    hp: 7, // [cite: 407]
+    speed: '30 ft.', // [cite: 408]
+    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' }, // [cite: 409]
+    passivePerception: 9,
+    spellSave: null,
+    spellAttack: null,
+    features: [
+      { name: 'Nimble Escape', desc: 'The goblins can take the Disengage or Hide action as a Bonus Action on each of their turns.' } // [cite: 411]
+    ],
+    actions: [
+      { name: 'Rusted Rusty Cutlass', desc: 'Melee Weapon Attack. +4 to hit. Hit: 3 (1d4 + 1) slashing damage.' } // [cite: 416, 417]
+    ]
+  },
+  {
+    id: 'leeta',
+    name: 'Leeta',
+    flavor: '“The Hater.” Female goblin, hates Screwbeard.', // [cite: 299, 418]
+    ac: 12, // [cite: 406]
+    hp: 7, // [cite: 407]
+    speed: '30 ft.', // [cite: 408]
+    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' }, // [cite: 409]
+    passivePerception: 9,
+    spellSave: null,
+    spellAttack: null,
+    features: [
+      { name: 'Nimble Escape', desc: 'The goblins can take the Disengage or Hide action as a Bonus Action on each of their turns.' }, // [cite: 411]
+      { name: 'Spiteful Strike', desc: 'Leeta automatically deals 1 point of spite damage to Screwbeard before combat starts.' }, // [cite: 419]
+      { name: 'Self-Preservation', desc: 'If the player is struggling, she will use her Nimble Escape to run away on round 2 or 3, muttering that she isn\'t paid enough.' } // [cite: 420]
+    ],
+    actions: [
+      { name: 'Shiv', desc: 'Melee Weapon Attack. +4 to hit. Hit: 3 (1d4 + 1) piercing damage.' } // [cite: 418]
+    ]
+  },
+  {
+    id: 'geepo',
+    name: 'Geepo',
+    flavor: '“The Black Eye.” A bickering cowardly grunt.', // [cite: 405, 413]
+    ac: 12, // [cite: 406]
+    hp: 7, // [cite: 407]
+    speed: '30 ft.', // [cite: 408]
+    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' }, // [cite: 409]
+    passivePerception: 9,
+    spellSave: null,
+    spellAttack: null,
+    features: [
+      { name: 'Nimble Escape', desc: 'The goblins can take the Disengage or Hide action as a Bonus Action on each of their turns.' }, // [cite: 411]
+      { name: 'Swollen Eye', desc: 'Geepo has Disadvantage on all Perception checks because his good eye is swollen shut from Loof the Baker punching him.' } // [cite: 415]
+    ],
+    actions: [
+      { name: 'Pointed Stick', desc: 'Melee Weapon Attack. +4 to hit. Hit: 3 (1d4 + 1) piercing damage.' } // [cite: 413, 414]
+    ]
+  },
+  {
     id: 'goblin_boss',
     name: 'Goblin Boss',
     flavor: 'A slightly larger, significantly meaner goblin shouting orders from the back.',

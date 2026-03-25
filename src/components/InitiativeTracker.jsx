@@ -1,155 +1,228 @@
-import { useState, useEffect } from 'react';
-import { Swords, ArrowRight, ArrowLeft, Play, Plus, X, Clock } from 'lucide-react';
-import { PREMADE_CHARACTERS } from '../data/campaignData';
-import DialogModal from './shared/DialogModal';
-import ScrollableRow from './shared/ScrollableRow';
+import { useState, useEffect, useRef } from 'react';
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { Swords, Trash2, ArrowDown, Play, Users, X, RotateCcw, Plus } from 'lucide-react';
 
-export default function InitiativeTracker({ unlockedCharacters, activeEnemies }) {
-  const [combatants, setCombatants] = useState([]);
-  const [activeTurnIndex, setActiveTurnIndex] = useState(0);
-  const [entityToAdd, setEntityToAdd] = useState('');
+export default function InitiativeTracker({ unlockedCharacters, activeEnemies, isBattleMode, onLaunchBattle, onExitBattle }) {
+  const [initiative, setInitiative] = useState([]);
+  const [activeTurn, setActiveTurn] = useState(-1); 
   const [round, setRound] = useState(1);
+  const [isLoaded, setIsLoaded] = useState(false);
   
-  const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
-  const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
+  // NEW: Custom Lair Actions / Actors State
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [newCustomName, setNewCustomName] = useState('');
 
-  // NEW: Auto-scroll the active combatant into the center of the view!
+  const missingIdsTracker = useRef(new Set());
+
   useEffect(() => {
-    const activeElement = document.getElementById(`combatant-${activeTurnIndex}`);
-    if (activeElement) {
-      activeElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
-  }, [activeTurnIndex]);
-
-  const handleAdd = () => {
-    if (!entityToAdd) return;
-    let newCombatant = null;
-    if (entityToAdd.startsWith('player_')) {
-      const id = entityToAdd.replace('player_', '');
-      const char = PREMADE_CHARACTERS[id];
-      if (char) {
-        newCombatant = { id, trackerId: `tracker_${Date.now()}_${id}`, type: 'player', name: char.name, image: `/${id}.png`, initiative: '' };
+    const initRef = doc(db, 'campaign', 'initiative');
+    const unsub = onSnapshot(initRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setInitiative(data.order || []);
+        setActiveTurn(data.activeTurn !== undefined ? data.activeTurn : -1);
+        setRound(data.round || 1);
       }
-    } else if (entityToAdd.startsWith('enemy_')) {
-      const id = entityToAdd.replace('enemy_', '');
-      const enemy = activeEnemies.find(e => e.id === id);
-      if (enemy) {
-        newCombatant = { id, trackerId: `tracker_${Date.now()}_${id}`, type: 'enemy', name: enemy.name, image: null, initiative: '' };
+      setIsLoaded(true); 
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const autoSync = async () => {
+      if (!isLoaded) return; 
+
+      try {
+        const currentIds = initiative.map(i => i.id);
+        
+        const safePlayers = (unlockedCharacters || [])
+          .filter(id => id && typeof id === 'string' && !missingIdsTracker.current.has(id));
+        
+        const safeEnemies = (activeEnemies || [])
+          .filter(e => e && e.id && typeof e.id === 'string' && !missingIdsTracker.current.has(e.id))
+          .map(e => e.id);
+        
+        const targetIds = [...safePlayers, ...safeEnemies];
+        
+        const hasMissing = targetIds.some(id => !currentIds.includes(id));
+        
+        // Ensure we DO NOT strip out 'custom' type actors when syncing
+        const staleActors = initiative.filter(i => i.type !== 'custom' && !targetIds.includes(i.id));
+
+        if (hasMissing || staleActors.length > 0) {
+          let newOrder = [...initiative];
+          
+          newOrder = newOrder.filter(item => targetIds.includes(item.id) || item.type === 'custom');
+
+          if (hasMissing) {
+            const missingPlayerIds = safePlayers.filter(id => !currentIds.includes(id));
+            
+            if (missingPlayerIds.length > 0) {
+              const playerDocs = await Promise.all(
+                missingPlayerIds.map(id => getDoc(doc(db, 'characters', id)))
+              );
+              
+              playerDocs.forEach((d, index) => {
+                if (d.exists()) {
+                  const p = { id: d.id, ...d.data() };
+                  newOrder.push({ id: p.id, name: p.name || 'Unknown', type: 'player', value: 0 });
+                } else {
+                  missingIdsTracker.current.add(missingPlayerIds[index]);
+                }
+              });
+            }
+
+            activeEnemies.forEach(e => {
+              if (targetIds.includes(e.id) && !currentIds.includes(e.id)) {
+                newOrder.push({ id: e.id, name: e.name || 'Unknown', type: 'enemy', value: 0 });
+              }
+            });
+          }
+
+          await saveInitiative(newOrder, activeTurn, round);
+        }
+      } catch (error) {
+        console.error("Safely aborted initiative sync to prevent crash:", error);
       }
+    };
+
+    if (isLoaded) {
+      autoSync();
     }
-    if (newCombatant) setCombatants(prev => [...prev, newCombatant]);
-    setEntityToAdd(''); 
+  }, [unlockedCharacters, activeEnemies, initiative, isLoaded]); 
+
+  const saveInitiative = async (newOrder, newTurn, newRound) => {
+    await setDoc(doc(db, 'campaign', 'initiative'), { order: newOrder, activeTurn: newTurn, round: newRound }, { merge: true });
+    
+    const activeActor = (newTurn >= 0 && newTurn < newOrder.length) ? newOrder[newTurn] : null;
+    await setDoc(doc(db, 'campaign', 'battlemap'), { 
+      activeTokenId: activeActor ? activeActor.id : null 
+    }, { merge: true });
   };
 
-  const handleRemove = (trackerId) => {
-    setCombatants(prev => prev.filter(c => c.trackerId !== trackerId));
-    setActiveTurnIndex(0); 
+  const updateValue = (index, val) => {
+    const newOrder = [...initiative];
+    newOrder[index].value = Number(val);
+    newOrder.sort((a, b) => b.value - a.value);
+    saveInitiative(newOrder, activeTurn, round);
   };
 
-  const updateInitiative = (trackerId, val) => {
-    setCombatants(prev => prev.map(c => c.trackerId === trackerId ? { ...c, initiative: val } : c));
-  };
-
-  const sortInitiative = () => {
-    setCombatants(prev => [...prev].sort((a, b) => Number(b.initiative || 0) - Number(a.initiative || 0)));
-    setActiveTurnIndex(0);
-    setRound(1); 
+  const resetValues = () => {
+    const resetOrder = initiative.map(item => ({ ...item, value: 0 }));
+    saveInitiative(resetOrder, -1, 1);
   };
 
   const nextTurn = () => {
-    if (combatants.length === 0) return;
-    setActiveTurnIndex(prev => {
-      const nextIndex = prev + 1;
-      if (nextIndex >= combatants.length) { setRound(r => r + 1); return 0; }
-      return nextIndex;
-    });
+    if (initiative.length === 0) return;
+    let newTurn = activeTurn + 1;
+    let newRound = round;
+    if (newTurn >= initiative.length) { newTurn = 0; newRound++; }
+    saveInitiative(initiative, newTurn, newRound);
   };
 
-  const prevTurn = () => {
-    if (combatants.length === 0) return;
-    setActiveTurnIndex(prev => {
-      const nextIndex = prev - 1;
-      if (nextIndex < 0) { setRound(r => Math.max(1, r - 1)); return combatants.length - 1; }
-      return nextIndex;
-    });
+  // NEW: Add and Remove Custom Actors
+  const addCustomActor = (e) => {
+    e.preventDefault();
+    if (!newCustomName.trim()) return;
+    
+    const newActor = {
+      id: 'custom_' + Date.now(),
+      name: newCustomName.trim(),
+      type: 'custom',
+      value: 20 // Default Lair Action initiative
+    };
+    
+    const newOrder = [...initiative, newActor].sort((a, b) => b.value - a.value);
+    saveInitiative(newOrder, activeTurn, round);
+    setNewCustomName('');
+    setShowCustomForm(false);
   };
 
-  const confirmClearTracker = () => {
-    setDialog({ isOpen: true, title: 'Clear Initiative Tracker', message: 'Are you sure you want to clear all combatants from the initiative tracker?', type: 'confirm', onConfirm: () => { setCombatants([]); setActiveTurnIndex(0); setRound(1); closeDialog(); } });
+  const removeCustomActor = (id) => {
+    const newOrder = initiative.filter(i => i.id !== id);
+    saveInitiative(newOrder, activeTurn, round);
   };
-
-  const availablePlayers = unlockedCharacters.filter(id => !combatants.some(c => c.id === id && c.type === 'player'));
-  const availableEnemies = activeEnemies.filter(e => !combatants.some(c => c.id === e.id && c.type === 'enemy'));
 
   return (
-    <>
-      <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
-
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 md:p-5 shadow-xl mb-8 transition-all relative overflow-hidden">
-        {round > 1 && <div className="absolute top-0 right-0 w-96 h-96 bg-red-500/5 blur-[100px] rounded-full pointer-events-none transition-opacity duration-1000"></div>}
-
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 relative z-10">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2"><Swords className="w-6 h-6 text-yellow-500" /> Initiative Tracker</h2>
-            {combatants.length > 0 && <div className="bg-slate-900 border border-slate-600 px-3 py-1 rounded-full flex items-center gap-2 shadow-inner"><Clock className="w-4 h-4 text-red-400" /><span className="text-sm font-bold text-slate-300 tracking-widest uppercase">Round <span className="text-white text-base">{round}</span></span></div>}
-          </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <div className="flex w-full sm:w-auto items-center bg-slate-900 border border-slate-700 rounded-lg p-1">
-              <select value={entityToAdd} onChange={(e) => setEntityToAdd(e.target.value)} className="bg-transparent text-sm text-slate-300 px-2 py-1.5 focus:outline-none w-full sm:w-48">
-                <option value="">+ Add to Order...</option>
-                {availablePlayers.length > 0 && <optgroup label="Players">{availablePlayers.map(id => <option key={`player_${id}`} value={`player_${id}`}>{PREMADE_CHARACTERS[id]?.name || id}</option>)}</optgroup>}
-                {availableEnemies.length > 0 && <optgroup label="Active Enemies">{availableEnemies.map(enemy => <option key={`enemy_${enemy.id}`} value={`enemy_${enemy.id}`}>{enemy.name}</option>)}</optgroup>}
-              </select>
-              <button onClick={handleAdd} disabled={!entityToAdd} className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white p-1.5 rounded-md transition-colors shrink-0"><Plus className="w-4 h-4" /></button>
-            </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button onClick={confirmClearTracker} className="flex-1 sm:flex-none flex justify-center items-center gap-1 bg-red-900/30 hover:bg-red-900/60 text-red-400 px-3 py-2 rounded-lg text-sm transition-colors border border-red-900/50"><X className="w-4 h-4" /> Clear</button>
-              <button onClick={sortInitiative} className="flex-1 sm:flex-none flex justify-center items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"><Play className="w-4 h-4" /> Sort & Start</button>
-            </div>
-          </div>
+    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4 shadow-lg h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <div>
+          <h2 className="text-xl font-black text-white flex items-center gap-2"><Swords className="w-5 h-5 text-fuchsia-500" /> Initiative</h2>
+          <p className="text-xs text-slate-400">
+            {activeTurn === -1 ? 'Pre-Combat' : `Round ${round} • Turn ${activeTurn + 1}`}
+          </p>
         </div>
+        <div className="flex gap-2">
+          
+          <button onClick={() => setShowCustomForm(!showCustomForm)} className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2" title="Add Custom Actor/Lair Action">
+            <Plus className="w-3 h-3" /> Add Custom
+          </button>
 
-        {combatants.length === 0 ? (
-          <div className="p-6 text-center text-slate-500 border border-dashed border-slate-700 rounded-xl bg-slate-900/30 relative z-10">Select a player or enemy from the dropdown above to add them to the initiative order.</div>
+          {!isBattleMode ? (
+            <button onClick={() => { if(onLaunchBattle) onLaunchBattle(); }} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-2">
+              <Users className="w-4 h-4" /> View Map
+            </button>
+          ) : (
+            <button onClick={() => { if(onExitBattle) onExitBattle(); }} className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-2">
+              <X className="w-4 h-4" /> Close Map
+            </button>
+          )}
+          <button onClick={resetValues} className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-400 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-2" title="Reset all initiative values to 0">
+            <RotateCcw className="w-3 h-3" /> Reset
+          </button>
+        </div>
+      </div>
+
+      {showCustomForm && (
+        <form onSubmit={addCustomActor} className="mb-4 flex gap-2 animate-in fade-in slide-in-from-top-2">
+          <input 
+            type="text" 
+            value={newCustomName}
+            onChange={(e) => setNewCustomName(e.target.value)}
+            placeholder="e.g. Lair Action, Boulder..." 
+            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-fuchsia-500"
+            autoFocus
+          />
+          <button type="submit" disabled={!newCustomName.trim()} className="bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-sm font-bold transition-colors">
+            Add
+          </button>
+        </form>
+      )}
+
+      <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-1">
+        {initiative.length === 0 ? (
+          <p className="text-xs text-slate-500 italic p-4 text-center">Waiting for active characters or enemies...</p>
         ) : (
-          <div className="relative z-10">
-            <ScrollableRow className="gap-4 py-4 px-2">
-              {combatants.map((combatant, index) => {
-                const isActive = index === activeTurnIndex;
-                return (
-                  <div 
-                    key={combatant.trackerId} 
-                    id={`combatant-${index}`}
-                    className={`w-32 sm:w-36 shrink-0 snap-center flex flex-col items-center p-3 rounded-xl border-2 transition-all relative ${isActive ? 'border-yellow-500 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.2)] transform scale-105 z-10' : 'border-slate-700 bg-slate-900/50 opacity-70 hover:opacity-100 z-0'}`}
-                  >
-                    <button onClick={() => handleRemove(combatant.trackerId)} className="absolute -top-2 -right-2 bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white rounded-full p-1 border border-slate-700 transition-colors shadow-md z-20"><X className="w-3 h-3" /></button>
-                    <div className="relative mb-3 mt-1">
-                      {combatant.type === 'player' ? <img src={combatant.image} alt={combatant.name} className="w-12 h-12 rounded-full border-2 border-indigo-500 object-cover bg-slate-950" /> : <div className="w-12 h-12 rounded-full border-2 border-red-500 bg-slate-950 flex items-center justify-center text-red-500 font-bold"><Swords className="w-6 h-6" /></div>}
-                      {isActive && <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-yellow-500 text-slate-900 text-[10px] font-black px-2 py-0.5 rounded-full shadow-md pointer-events-none">TURN</div>}
-                    </div>
-                    <div className="text-center w-full">
-                      <p className="text-sm font-bold text-white truncate w-full mb-2" title={combatant.name}>{combatant.name.split(' ')[0]}</p>
-                      {/* Hide spinners class added below */}
-                      <input 
-                        type="number" 
-                        value={combatant.initiative} 
-                        onChange={(e) => updateInitiative(combatant.trackerId, e.target.value)} 
-                        placeholder="Roll" 
-                        className="w-16 bg-slate-950 border border-slate-600 rounded text-center text-white py-1 text-lg font-bold focus:border-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </ScrollableRow>
-
-            <div className="flex justify-center gap-4 mt-4 border-t border-slate-700/50 pt-5">
-              <button onClick={prevTurn} className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors"><ArrowLeft className="w-4 h-4" /> Prev</button>
-              <button onClick={nextTurn} className="flex items-center gap-2 bg-slate-200 hover:bg-white text-slate-900 px-6 py-2 rounded-lg font-bold shadow-lg transition-colors">Next Turn <ArrowRight className="w-4 h-4" /></button>
+          initiative.map((actor, idx) => (
+            <div key={actor.id + idx} className={`flex items-center gap-2 p-2 rounded-xl border transition-all ${activeTurn === idx ? 'bg-fuchsia-900/20 border-fuchsia-500 shadow-[0_0_10px_rgba(217,70,239,0.2)]' : 'bg-slate-950 border-slate-800'}`}>
+              <div className="flex-1 flex items-center gap-2">
+                {activeTurn === idx && <Play className="w-3 h-3 text-fuchsia-400 fill-current shrink-0" />}
+                <span className={`font-bold truncate ${actor.type === 'enemy' ? 'text-red-400' : 'text-indigo-400'} ${activeTurn === idx ? 'text-sm' : 'text-xs'}`}>{actor.name}</span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {actor.type === 'custom' && (
+                  <button onClick={() => removeCustomActor(actor.id)} className="p-1 text-slate-500 hover:text-red-400 transition-colors mr-1">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+                <input 
+                  type="number" 
+                  value={actor.value} 
+                  onChange={(e) => updateValue(idx, e.target.value)}
+                  className="w-12 bg-slate-800 border border-slate-600 rounded px-1 py-1 text-center text-white text-sm font-black focus:outline-none focus:border-fuchsia-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
             </div>
-          </div>
+          ))
         )}
       </div>
-    </>
+
+      {initiative.length > 0 && (
+        <button onClick={nextTurn} className="w-full mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-black py-2.5 rounded-xl transition-all flex justify-center items-center gap-2 text-sm shadow-md">
+          {activeTurn === -1 ? 'Start Combat' : 'Next Turn'} <ArrowDown className="w-4 h-4" />
+        </button>
+      )}
+    </div>
   );
 }

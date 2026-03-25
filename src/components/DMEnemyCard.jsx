@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { doc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Shield, Heart, Skull, Trash2, Swords, Calculator } from 'lucide-react';
+import { Shield, Heart, Skull, Trash2, Swords, Calculator, CheckSquare, Square, Plus } from 'lucide-react';
 import { CONDITIONS_LIST } from '../data/campaignData';
 
-export default function DMEnemyCard({ enemy }) {
+export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
   const [mathInput, setMathInput] = useState('');
+  
+  // NEW: Visual Condition Picker State
+  const [showConditionPicker, setShowConditionPicker] = useState(false);
 
   const updateHp = async (newHp) => {
     const boundedHp = Math.max(0, Math.min(newHp, enemy.hp));
@@ -17,7 +20,6 @@ export default function DMEnemyCard({ enemy }) {
     await updateDoc(doc(db, 'active_enemies', enemy.id), { currentHp: newHp });
   };
 
-  // NEW: Process the quick math input
   const handleQuickMath = (e, isDamage) => {
     e.preventDefault();
     if (!mathInput) return;
@@ -25,14 +27,13 @@ export default function DMEnemyCard({ enemy }) {
     if (isNaN(amount)) return;
 
     adjustHp(isDamage ? -amount : amount);
-    setMathInput(''); // Clear the input after applying
+    setMathInput(''); 
   };
 
-  const handleAddCondition = async (e) => {
-    const condition = e.target.value;
+  const handleAddCondition = async (condition) => {
     if (!condition) return;
     await updateDoc(doc(db, 'active_enemies', enemy.id), { conditions: arrayUnion(condition) });
-    e.target.value = ''; 
+    setShowConditionPicker(false);
   };
 
   const handleRemoveCondition = async (condition) => {
@@ -53,8 +54,16 @@ export default function DMEnemyCard({ enemy }) {
   const hpColor = hpPercent > 50 ? 'bg-emerald-500/20' : hpPercent > 20 ? 'bg-yellow-500/20' : 'bg-red-500/30';
 
   return (
-    <div className={`bg-slate-800 border ${isDead ? 'border-red-900/50 shadow-[0_0_15px_rgba(220,38,38,0.15)]' : 'border-slate-700'} rounded-2xl shadow-lg relative flex flex-col h-full transition-colors overflow-hidden`}>
+    <div className={`bg-slate-800 border ${isSelected ? 'border-indigo-500 ring-2 ring-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.3)]' : isDead ? 'border-red-900/50 shadow-[0_0_15px_rgba(220,38,38,0.15)]' : 'border-slate-700'} rounded-2xl shadow-lg relative flex flex-col h-full transition-all overflow-hidden`}>
       
+      <button 
+        onClick={onToggleSelect}
+        className="absolute top-3 left-3 z-20 p-1.5 bg-slate-900/80 backdrop-blur-sm rounded-lg hover:scale-110 transition-transform shadow-lg border border-slate-700"
+        title={isSelected ? "Deselect Target" : "Select for Mass Damage/Healing"}
+      >
+        {isSelected ? <CheckSquare className="w-5 h-5 text-indigo-400" /> : <Square className="w-5 h-5 text-slate-400" />}
+      </button>
+
       <div className="w-full h-32 relative flex items-center justify-center shrink-0 border-b border-slate-700 overflow-hidden bg-gradient-to-br from-red-950 via-slate-900 to-slate-900">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 mix-blend-overlay"></div>
         <Skull className={`w-16 h-16 ${isDead ? 'text-red-600/40' : 'text-slate-600/30'} drop-shadow-lg`} />
@@ -107,7 +116,6 @@ export default function DMEnemyCard({ enemy }) {
               </div>
             </div>
 
-            {/* NEW: QUICK COMBAT CALCULATOR */}
             <div className="flex gap-2 items-center bg-slate-950/50 p-1.5 rounded-lg border border-slate-700/50">
               <Calculator className="w-4 h-4 text-slate-500 ml-1 shrink-0" />
               <input 
@@ -152,16 +160,38 @@ export default function DMEnemyCard({ enemy }) {
         </div>
 
         <div className="bg-slate-900 p-4 rounded-xl border border-fuchsia-900/30">
-          <label className="flex flex-col xl:flex-row xl:items-center justify-between gap-2 text-sm text-slate-300 font-bold mb-3">
-            <span className="flex items-center gap-2 text-fuchsia-400"><Skull className="w-4 h-4" /> Conditions</span>
-            <select onChange={handleAddCondition} value="" className="w-full xl:w-auto bg-slate-800 text-xs text-white border border-slate-600 rounded-lg py-1.5 px-2 focus:outline-none focus:border-fuchsia-500">
-              <option value="" disabled>+ Add</option>
-              {CONDITIONS_LIST.filter(c => !activeConditions.includes(c)).map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2 mb-3 relative">
+            <span className="flex items-center gap-2 text-sm text-fuchsia-400 font-bold"><Skull className="w-4 h-4" /> Conditions</span>
+            
+            {/* NEW QoL: Visual Condition Picker Popover */}
+            <div>
+              <button 
+                onClick={() => setShowConditionPicker(!showConditionPicker)} 
+                className="w-full xl:w-auto bg-slate-800 text-xs font-bold text-white border border-slate-600 rounded-lg py-1.5 px-3 hover:bg-slate-700 transition-colors flex items-center gap-1 justify-center"
+              >
+                <Plus className="w-3 h-3" /> Add
+              </button>
+              
+              {showConditionPicker && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-slate-900 border border-fuchsia-500/50 rounded-xl p-2 shadow-2xl z-50 grid grid-cols-2 gap-1 animate-in fade-in zoom-in-95">
+                  {CONDITIONS_LIST.filter(c => !activeConditions.includes(c)).map(c => (
+                    <button 
+                      key={c} 
+                      onClick={() => handleAddCondition(c)} 
+                      className="text-[10px] font-bold bg-slate-800 hover:bg-fuchsia-600 text-slate-300 hover:text-white rounded py-1.5 px-2 text-left transition-colors truncate"
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+          
           <div className="flex flex-wrap gap-2 min-h-[32px]">
             {activeConditions.length === 0 ? (
-              <span className="text-xs text-slate-500 italic">No active conditions</span>
+              <span className="text-xs text-slate-500 italic mt-1">No active conditions</span>
             ) : (
               activeConditions.map(cond => (
                 <button 

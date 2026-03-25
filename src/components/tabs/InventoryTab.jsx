@@ -7,8 +7,8 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
   const [isForgingItem, setIsForgingItem] = useState(false);
   const [customItem, setCustomItem] = useState({ name: '', type: 'Wondrous Item', stats: '', desc: '' });
   
-  // NEW: Quick Transaction State
   const [transactionAmount, setTransactionAmount] = useState('');
+  const [transactionType, setTransactionType] = useState('assarions'); 
 
   const addEquipmentToInventory = async (formattedItemText) => {
     const currentInventory = char.inventory || '';
@@ -35,12 +35,44 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
     updateField(`currency.${type}`, Math.max(0, current + amount));
   };
 
-  // NEW: Process quick bulk transactions
-  const handleTransaction = (type, isAdding) => {
+  const handleTransaction = (isAdding) => {
     const amount = parseInt(transactionAmount, 10);
     if (isNaN(amount) || amount <= 0) return;
     
-    adjustCurrency(type, isAdding ? amount : -amount);
+    if (isAdding) {
+      // Just add the raw amount
+      adjustCurrency(transactionType, amount);
+    } else {
+      // SMART CONVERSION: Pool total wealth, subtract, and auto-consolidate change!
+      const currentGold = char.currency?.assarions || 0;
+      const currentSilver = char.currency?.quadrans || 0;
+      const currentCopper = char.currency?.leptons || 0;
+
+      let costInCopper = 0;
+      if (transactionType === 'assarions') costInCopper = amount * 100;
+      if (transactionType === 'quadrans') costInCopper = amount * 10;
+      if (transactionType === 'leptons') costInCopper = amount;
+
+      const totalCopper = (currentGold * 100) + (currentSilver * 10) + currentCopper;
+
+      if (totalCopper < costInCopper) {
+        alert("Not enough total wealth to cover this transaction.");
+        return;
+      }
+
+      const remainingCopperTotal = totalCopper - costInCopper;
+      const newGold = Math.floor(remainingCopperTotal / 100);
+      const newSilver = Math.floor((remainingCopperTotal % 100) / 10);
+      const newCopper = remainingCopperTotal % 10;
+
+      updateField('currency', { 
+        ...char.currency,
+        assarions: newGold, 
+        quadrans: newSilver, 
+        leptons: newCopper 
+      });
+    }
+    
     setTransactionAmount('');
   };
 
@@ -100,18 +132,26 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-5 h-fit flex flex-col">
         <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4"><Coins className="w-5 h-5 text-yellow-400" /> Wallet</h3>
         
-        {/* NEW: QUICK TRANSACTION BAR */}
         <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-600 mb-4 flex gap-2">
           <input 
             type="number" 
             value={transactionAmount}
             onChange={(e) => setTransactionAmount(e.target.value)}
-            placeholder="Amount..." 
-            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-yellow-500"
+            placeholder="Amt..." 
+            className="w-16 sm:w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-yellow-500"
           />
+          <select 
+            value={transactionType} 
+            onChange={(e) => setTransactionType(e.target.value)} 
+            className="bg-slate-950 border border-slate-700 rounded px-1 sm:px-2 py-1 text-slate-300 text-xs focus:outline-none focus:border-yellow-500"
+          >
+            <option value="assarions">Gold</option>
+            <option value="quadrans">Silver</option>
+            <option value="leptons">Copper</option>
+          </select>
           <div className="flex flex-col gap-1 shrink-0">
-            <button onClick={() => handleTransaction('assarions', true)} disabled={!transactionAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white border border-emerald-900/50 px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors">+ Loot Gold</button>
-            <button onClick={() => handleTransaction('assarions', false)} disabled={!transactionAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white border border-red-900/50 px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors">- Pay Gold</button>
+            <button onClick={() => handleTransaction(true)} disabled={!transactionAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white border border-emerald-900/50 px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors">+ Loot</button>
+            <button onClick={() => handleTransaction(false)} disabled={!transactionAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white border border-red-900/50 px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors">- Pay</button>
           </div>
         </div>
 
