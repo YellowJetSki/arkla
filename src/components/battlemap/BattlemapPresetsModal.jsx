@@ -23,14 +23,21 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
     if (!newPresetName.trim()) return;
     setIsSaving(true);
     
-    // Save everything except the "isPublished" flag to ensure presets load secretly
     const cleanMapData = { ...currentMapData, isPublished: false };
+    
+    // REQ 2: Filter the tokens so we ONLY save enemies and their states!
+    const enemyTokens = Object.keys(currentTokens).reduce((acc, key) => {
+      if (currentTokens[key].type === 'enemy') {
+        acc[key] = currentTokens[key];
+      }
+      return acc;
+    }, {});
     
     const updatedPresets = {
       ...presets,
       [newPresetName]: {
         mapData: cleanMapData,
-        tokens: currentTokens,
+        tokens: enemyTokens,
         savedAt: new Date().toISOString()
       }
     };
@@ -50,7 +57,7 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
   };
 
   const handleDeploy = (name, data) => {
-    if (window.confirm(`Deploying "${name}" will wipe the current board and replace it with this preset. Proceed?`)) {
+    if (window.confirm(`Deploying "${name}" will wipe the current board and replace it with this preset's enemies. Proceed?`)) {
       onRestorePreset(data);
       onClose();
     }
@@ -101,7 +108,7 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
                   <div key={name} className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800 group hover:border-slate-600 transition-colors">
                     <div>
                       <h4 className="font-bold text-slate-200">{name}</h4>
-                      <p className="text-[10px] text-slate-500">{Object.keys(data.tokens).length} Tokens • {data.mapData.cols}x{data.mapData.rows} Grid</p>
+                      <p className="text-[10px] text-slate-500">{Object.keys(data.tokens).length} Enemies • {data.mapData.cols}x{data.mapData.rows} Grid</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button 

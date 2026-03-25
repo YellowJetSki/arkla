@@ -3,7 +3,7 @@ import { doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from 'fir
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
-  Tent, Moon, PenTool, Skull, Gem, X, HelpCircle, ArrowUpCircle, Star, User, Edit3, Flame, Shield, Heart, Maximize, Settings
+  Tent, Moon, PenTool, Skull, Gem, X, HelpCircle, ArrowUpCircle, Star, User, Edit3, Flame, Shield, Heart, Maximize, Settings, Search, Hammer
 } from 'lucide-react';
 
 import { PREMADE_CHARACTERS } from '../data/campaignData';
@@ -29,6 +29,7 @@ import BioTab from './tabs/BioTab';
 import PartyLootTab from './tabs/PartyLootTab';
 import JournalTab from './tabs/JournalTab';
 import SettingsTab from './tabs/SettingsTab';
+import FeatDiscovery from './FeatDiscovery'; // NEW REQ 7
 
 import BattleMapLayer from './battlemap/BattleMapLayer';
 import StickyBattleNav from './battlemap/StickyBattleNav';
@@ -68,12 +69,20 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [isBattleMapOpen, setIsBattleMapOpen] = useState(false);
   const [saveToast, setSaveToast] = useState(''); 
 
+  // Input Buffers
   const [displayHp, setDisplayHp] = useState("");
   const [isEditingHp, setIsEditingHp] = useState(false);
   const [displayMaxHp, setDisplayMaxHp] = useState("");
   const [isEditingMaxHp, setIsEditingMaxHp] = useState(false);
   const [displayTempHp, setDisplayTempHp] = useState("");
   const [isEditingTempHp, setIsEditingTempHp] = useState(false);
+  const [displayXp, setDisplayXp] = useState(""); // REQ 4: XP Buffer
+  const [isEditingXp, setIsEditingXp] = useState(false);
+
+  // REQ 7: Feats system UI
+  const [showFeatSearch, setShowFeatSearch] = useState(false);
+  const [isForgingFeat, setIsForgingFeat] = useState(false);
+  const [customFeat, setCustomFeat] = useState({ name: '', desc: '' });
 
   useEffect(() => {
     localStorage.setItem(`activeTab_${currentUser.charId}`, activeTab);
@@ -193,6 +202,36 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     await updateDoc(doc(db, 'characters', currentUser.charId), { conditions: arrayRemove(condition) });
   };
 
+  // REQ 7: Add Feat function
+  const addFeature = async (featData) => {
+    await updateDoc(doc(db, 'characters', currentUser.charId), {
+      features: arrayUnion(featData)
+    });
+    setShowFeatSearch(false);
+    setSaveToast('Feat Added to Sheet');
+    setTimeout(() => setSaveToast(''), 2500);
+  };
+
+  const handleForgeCustomFeat = async (e) => {
+    e.preventDefault();
+    if (!customFeat.name || !customFeat.desc) return;
+    
+    const newFeat = { name: customFeat.name, desc: customFeat.desc };
+    
+    // Save to global list so players can find it!
+    await setDoc(doc(db, 'custom_feats', 'feat_' + Date.now()), newFeat);
+    
+    // Optionally add it to the current char sheet if the DM wants to
+    await updateDoc(doc(db, 'characters', currentUser.charId), {
+      features: arrayUnion(newFeat)
+    });
+    
+    setIsForgingFeat(false);
+    setCustomFeat({ name: '', desc: '' });
+    setSaveToast('Feat Forged & Added!');
+    setTimeout(() => setSaveToast(''), 2500);
+  };
+
   const updateDeathSaves = async (type, value) => { await updateField(`deathSaves.${type}`, value); };
   
   const toggleInspiration = async (e) => { 
@@ -246,7 +285,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   };
 
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
-  
   if (!char) return <CardWrapper><GlobalLoader /></CardWrapper>;
 
   const activeConditions = char.conditions || [];
@@ -270,7 +308,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const isExhausted = activeConditions.includes('Exhaustion');
 
   const hpPercent = Math.max(0, Math.min(100, ((char.hp || 0) / (char.maxHp || 1)) * 100));
-  // NEW QoL: Temp HP Bar sizing
   const tempHpPercent = Math.max(0, Math.min(100, ((char.tempHp || 0) / (char.maxHp || 1)) * 100));
   const hpColor = isPoisoned ? 'bg-lime-500/40' : hpPercent > 50 ? 'bg-emerald-500/20' : hpPercent > 20 ? 'bg-yellow-500/20' : 'bg-red-500/30';
 
@@ -360,14 +397,10 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
             <div className="p-3 md:p-4 bg-slate-800 space-y-3">
               
-              {/* Condense HP & Rests into a Single Row/Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                
-                {/* Left Side: HP */}
                 <div className="relative bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-inner flex items-center justify-between p-2">
                   <div className={`absolute left-0 top-0 bottom-0 ${hpColor} transition-all duration-500 z-0`} style={{ width: `${hpPercent}%` }}></div>
                   
-                  {/* NEW QoL: Dynamic Temp HP Border Segment */}
                   {(char.tempHp > 0) && (
                     <div 
                       className="absolute left-0 bottom-0 h-1.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)] transition-all duration-500 z-10" 
@@ -413,7 +446,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                   )}
                 </div>
 
-                {/* Right Side: Rests & Hit Dice */}
                 <div className="flex gap-2 h-full">
                   <button onClick={handleSpendHitDie} className="flex-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl flex items-center justify-center flex-col shadow-inner px-2 py-1 transition-colors cursor-pointer group">
                     <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5 group-hover:text-slate-300 transition-colors">Hit Dice</span>
@@ -432,7 +464,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
               </div>
 
-              {/* Improved Sleek XP Tracker */}
               <div className="relative bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-inner flex items-center justify-between p-2">
                 <div className={`absolute left-0 top-0 bottom-0 ${canLevelUp ? 'bg-amber-500/30' : 'bg-blue-500/20'} transition-all duration-500`} style={{ width: `${xpPercent}%` }}></div>
                 <div className="relative z-10 flex items-center gap-2 pl-2">
@@ -442,7 +473,18 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 <div className="relative z-10 flex items-center gap-1 pr-1">
                   <button onClick={() => adjustXp(-50)} className="w-6 h-6 md:w-8 md:h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 font-bold flex items-center justify-center border border-slate-600 transition-colors shadow-sm cursor-pointer">-</button>
                   <div className="flex items-center gap-1 text-white bg-slate-800/50 border border-slate-600 rounded-lg px-2 py-0.5 md:py-1">
-                    <input type="number" value={currentXp} onChange={(e) => updateField('exp', Number(e.target.value))} className="w-12 md:w-16 bg-transparent focus:outline-none text-right font-black text-sm md:text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-slate-100" />
+                    
+                    {/* REQ 4: Input Buffering for XP to avoid accidental zeroes */}
+                    <input 
+                      type="number" 
+                      value={isEditingXp ? displayXp : currentXp} 
+                      onFocus={() => { setDisplayXp(currentXp); setIsEditingXp(true); }}
+                      onChange={(e) => setDisplayXp(e.target.value)} 
+                      onBlur={() => { setIsEditingXp(false); updateField('exp', Number(displayXp)); }}
+                      onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
+                      className="w-12 md:w-16 bg-transparent focus:outline-none text-right font-black text-sm md:text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-slate-100" 
+                    />
+                    
                     <span className="text-slate-500 font-black text-sm md:text-base">/</span>
                     <span className="w-12 md:w-16 text-left text-slate-400 text-sm md:text-base font-bold">{nextLevelXp}</span>
                   </div>
@@ -502,14 +544,55 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
             {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM} />}
 
+            {/* REQ 7: Feat Discovery UI added into the Features Tab */}
             {activeTab === 'features' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-2"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Class & Racial Features</h3>
-                {(char.features || []).map((feat, i) => (
-                  <CollapsibleSection key={`feat-${i}`} title={feat.name} defaultOpen={i === 0}>
-                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
-                  </CollapsibleSection>
-                ))}
+              <div className="space-y-6">
+                
+                <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-2">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
+                  {!isDM ? (
+                    <button 
+                      onClick={() => setShowFeatSearch(!showFeatSearch)}
+                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${showFeatSearch ? 'bg-slate-700 border-slate-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
+                    >
+                      <Search className="w-3 h-3" /> {showFeatSearch ? 'Close' : 'Discover Feats'}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => setIsForgingFeat(!isForgingFeat)}
+                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${isForgingFeat ? 'bg-fuchsia-700 border-fuchsia-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
+                    >
+                      <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Cancel Forge' : 'Forge Custom Feat'}
+                    </button>
+                  )}
+                </div>
+
+                {isDM && isForgingFeat && (
+                  <form onSubmit={handleForgeCustomFeat} className="bg-slate-900/80 p-4 md:p-5 rounded-xl border border-fuchsia-500/30 shadow-inner mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
+                    <h4 className="text-sm font-bold text-fuchsia-400 flex items-center gap-2"><Hammer className="w-4 h-4" /> Homebrew Feat Forge</h4>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Feat Name</label>
+                      <input type="text" required value={customFeat.name} onChange={e => setCustomFeat({...customFeat, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-fuchsia-500" placeholder="e.g. Sharpshooter" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
+                      <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-slate-300 text-sm focus:outline-none focus:border-fuchsia-500 resize-y" placeholder="Describe the stat bumps and mechanics..." />
+                    </div>
+                    <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2.5 rounded-lg shadow-md transition-colors flex items-center justify-center gap-2">
+                      <Plus className="w-4 h-4" /> Add to Global Database
+                    </button>
+                  </form>
+                )}
+
+                {showFeatSearch && !isDM && <FeatDiscovery onAddFeat={addFeature} />}
+
+                <div className="space-y-4">
+                  {(char.features || []).map((feat, i) => (
+                    <CollapsibleSection key={`feat-${i}`} title={feat.name} defaultOpen={i === 0}>
+                      <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
+                    </CollapsibleSection>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -528,7 +611,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
         {isLevelUpOpen && <LevelUpModal char={char} charId={currentUser.charId} onClose={() => setIsLevelUpOpen(false)} />}
         {isShortRestOpen && <ShortRestModal char={char} charId={currentUser.charId} onClose={() => setIsShortRestOpen(false)} />}
-        {/* NEW QoL: Mounted the updated LongRestModal so it actually triggers the DB rules! */}
         {isLongRestOpen && <LongRestModal char={char} charId={currentUser.charId} onClose={() => setIsLongRestOpen(false)} />}
         
         {!isDM && (

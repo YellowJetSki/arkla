@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, arrayUnion } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize, Ruler, CircleDashed, ArrowUpCircle, BrainCircuit } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize, Ruler, CircleDashed, ArrowUpCircle, BrainCircuit, PenTool, Eraser } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 
@@ -11,11 +11,15 @@ const LOCAL_MAPS = [
 ];
 
 export default function DMBattleMap() {
-  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)' });
+  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
   const [tokens, setTokens] = useState({});
   const [selectedTokenId, setSelectedTokenId] = useState(null);
   
   const [showRulerFor, setShowRulerFor] = useState(null);
+  
+  // REQ 1: Drawing State
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [drawingColor, setDrawingColor] = useState('#ef4444');
   
   const [activePlayers, setActivePlayers] = useState([]);
   const [activeEnemies, setActiveEnemies] = useState([]);
@@ -28,12 +32,15 @@ export default function DMBattleMap() {
   const [tempGridScale, setTempGridScale] = useState(30); 
   const [tempGridColor, setTempGridColor] = useState('rgba(255,255,255,0.35)');
 
+  // REQ 4 & 5: Buffer state for HP input to prevent accidental 0 overwrites
+  const [editingHp, setEditingHp] = useState("");
+  const [isEditingHpFocus, setIsEditingHpFocus] = useState(false);
+
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
     const unsub = onSnapshot(mapRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        
         const rawCols = Number(data.cols);
         const rawRows = Number(data.rows);
         const safeCols = Math.min(100, Math.max(1, isNaN(rawCols) ? 20 : rawCols));
@@ -46,18 +53,19 @@ export default function DMBattleMap() {
           isPublished: data.isPublished || false,
           activeTokenId: data.activeTokenId || null,
           ping: data.ping || null,
-          gridColor: data.gridColor || 'rgba(255,255,255,0.35)'
+          gridColor: data.gridColor || 'rgba(255,255,255,0.35)',
+          drawings: data.drawings || []
         });
         setTokens(data.tokens || {});
       } else {
-        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)' });
+        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
       }
     });
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchSessionData = async () => {
       try {
         const sessionSnap = await getDoc(doc(db, 'campaign', 'main_session'));
         if (sessionSnap.exists()) {
@@ -65,20 +73,28 @@ export default function DMBattleMap() {
           const validIds = playerIds.filter(id => id && typeof id === 'string');
           
           if (validIds.length > 0) {
-            const playerDocs = await Promise.all(validIds.map(id => getDoc(doc(db, 'characters', id))));
-            setActivePlayers(playerDocs.filter(d => d.exists()).map(d => ({ id: d.id, ...d.data() })));
+            // Setup live listeners for players so HP syncs!
+            const unsubPlayers = onSnapshot(collection(db, 'characters'), (snap) => {
+               const players = snap.docs.filter(d => validIds.includes(d.id)).map(d => ({ id: d.id, ...d.data() }));
+               setActivePlayers(players);
+            });
+            return () => unsubPlayers();
           } else {
             setActivePlayers([]);
           }
         }
-        
-        const enemySnap = await getDocs(collection(db, 'active_enemies'));
-        setActiveEnemies(enemySnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (error) {
         console.error("Safely aborted fetch due to database error:", error);
       }
     };
-    fetchData();
+    
+    const unsubEnemies = onSnapshot(collection(db, 'active_enemies'), (snap) => {
+       const enemies = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+       setActiveEnemies(enemies);
+    });
+
+    fetchSessionData();
+    return () => unsubEnemies();
   }, []);
 
   const handleUpdateMapSettings = () => {
@@ -225,18 +241,21 @@ export default function DMBattleMap() {
     }
   };
 
-  const handleUpdateTokenHp = async (newHp) => {
-    if (!selectedTokenId || !tokens[selectedTokenId]) return;
-    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], hp: newHp } };
+  // REQ 4 & 5: Live Sync HP function that saves safely to the DB
+  const handleUpdateTokenHpLive = async (newHpVal) => {
+    const parsedHp = parseInt(newHpVal, 10);
+    if (isNaN(parsedHp) || !selectedTokenId || !tokens[selectedTokenId]) return;
+    
+    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], hp: parsedHp } };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
     
     const type = tokens[selectedTokenId].type;
     const collectionName = type === 'player' ? 'characters' : 'active_enemies';
     try {
       if (type === 'enemy') {
-        await updateDoc(doc(db, collectionName, selectedTokenId), { currentHp: newHp });
+        await updateDoc(doc(db, collectionName, selectedTokenId), { currentHp: parsedHp, hp: parsedHp });
       } else {
-        await updateDoc(doc(db, collectionName, selectedTokenId), { hp: newHp });
+        await updateDoc(doc(db, collectionName, selectedTokenId), { hp: parsedHp });
       }
     } catch (e) {
       console.error("Failed to sync HP to entity", e);
@@ -308,6 +327,20 @@ export default function DMBattleMap() {
     });
   };
 
+  // REQ 1: Save Drawing Line
+  const handleDrawEnd = async (lineData) => {
+    const newLine = { ...lineData, id: Date.now() };
+    await updateDoc(doc(db, 'campaign', 'battlemap'), {
+      drawings: arrayUnion(newLine)
+    });
+  };
+
+  const handleClearDrawings = async () => {
+    if (window.confirm("Clear all drawings from the map?")) {
+      await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [] });
+    }
+  };
+
   const unstagedPlayers = activePlayers.filter(p => !tokens[p.id]);
   const unstagedEnemies = activeEnemies.filter(e => !tokens[e.id]);
   const hasUnstagedActors = unstagedPlayers.length > 0 || unstagedEnemies.length > 0;
@@ -325,6 +358,10 @@ export default function DMBattleMap() {
     window.open(displayUrl, '_blank');
   };
 
+  // Live HP Resolution
+  const activeTokenEntity = selectedTokenId ? (tokens[selectedTokenId]?.type === 'player' ? activePlayers.find(p => p.id === selectedTokenId) : activeEnemies.find(e => e.id === selectedTokenId)) : null;
+  const liveDisplayHp = activeTokenEntity ? (activeTokenEntity.currentHp ?? activeTokenEntity.hp ?? 0) : (tokens[selectedTokenId]?.hp || 0);
+
   return (
     <div className="space-y-4">
       <BattlemapPresetsModal 
@@ -340,6 +377,27 @@ export default function DMBattleMap() {
           <Map className="w-5 h-5" /> Battlefield
         </h2>
         <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          
+          {/* REQ 1: Drawing Controls */}
+          <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-700 shadow-inner mr-2">
+            <button 
+              onClick={() => setIsDrawingMode(!isDrawingMode)}
+              className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${isDrawingMode ? 'bg-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-red-400 hover:bg-slate-800'}`}
+            >
+              <PenTool className="w-3 h-3" /> Pen
+            </button>
+            {isDrawingMode && (
+              <div className="flex gap-1 px-2 border-l border-slate-700 ml-1 pl-2">
+                {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
+                  <button key={c} onClick={() => setDrawingColor(c)} className={`w-4 h-4 rounded-full border-2 transition-transform ${drawingColor === c ? 'scale-125 border-white' : 'border-transparent opacity-70'}`} style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            )}
+            <button onClick={handleClearDrawings} className="text-slate-500 hover:text-red-400 p-1.5 ml-1 border-l border-slate-700" title="Clear Map Drawings">
+              <Eraser className="w-4 h-4" />
+            </button>
+          </div>
+
           <button 
             onClick={launchDisplayTab}
             className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors"
@@ -350,7 +408,7 @@ export default function DMBattleMap() {
 
           <button 
             onClick={() => setIsPresetsOpen(true)}
-            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors mr-auto md:mr-2"
+            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors"
           >
             <Save className="w-3 h-3" /> Presets
           </button>
@@ -370,7 +428,6 @@ export default function DMBattleMap() {
 
       {isEditingMap && (
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 space-y-4">
-          {/* NEW QoL: Grid Color Toggle added to config panel */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Preset Local Map</label>
@@ -438,12 +495,21 @@ export default function DMBattleMap() {
             <div className="flex items-center gap-2 bg-indigo-900/50 px-3 py-1.5 rounded-lg border border-indigo-400/50 shadow-inner animate-in zoom-in-95 w-full md:w-auto overflow-x-auto custom-scrollbar">
               <span className="text-xs font-bold text-white mr-auto md:mr-0 whitespace-nowrap">Selected: {tokens[selectedTokenId].name}</span>
               
+              {/* REQ 4 & 5: Buffered HP Input using live sync */}
               <div className="flex items-center gap-1 border-l border-indigo-500/30 pl-2 ml-1" title="Edit HP">
                 <Heart className="w-3 h-3 text-red-400" />
                 <input 
                   type="number" 
-                  value={tokens[selectedTokenId].hp || 0}
-                  onChange={(e) => handleUpdateTokenHp(Number(e.target.value))}
+                  value={isEditingHpFocus ? editingHp : liveDisplayHp}
+                  onFocus={() => { setEditingHp(liveDisplayHp); setIsEditingHpFocus(true); }}
+                  onChange={(e) => setEditingHp(e.target.value)}
+                  onBlur={() => {
+                    setIsEditingHpFocus(false);
+                    if (editingHp !== "" && parseInt(editingHp, 10) !== liveDisplayHp) {
+                      handleUpdateTokenHpLive(editingHp);
+                    }
+                  }}
+                  onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
                   className="w-12 bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-white text-xs font-bold focus:outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
@@ -537,6 +603,9 @@ export default function DMBattleMap() {
         onTokenDrop={handleTokenDrop}
         onPing={handlePing}
         showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null}
+        isDrawingMode={isDrawingMode}
+        drawingColor={drawingColor}
+        onDrawEnd={handleDrawEnd}
       />
     </div>
   );

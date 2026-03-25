@@ -2,22 +2,28 @@ import { useState } from 'react';
 import { doc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Shield, Heart, Skull, Trash2, Swords, Calculator, CheckSquare, Square, Plus } from 'lucide-react';
-import { CONDITIONS_LIST } from '../data/campaignData';
+import { CONDITIONS_LIST, PREMADE_ENEMIES } from '../data/campaignData';
 
 export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
-  const [mathInput, setMathInput] = useState('');
   
-  // NEW: Visual Condition Picker State
+  // REQ 6: Rehydrate missing data from PREMADE_ENEMIES so stats are never lost!
+  const template = PREMADE_ENEMIES.find(e => e.id === enemy.baseId || e.id === enemy.id) || {};
+  const fullEnemy = { ...template, ...enemy };
+
+  // REQ 4: Input buffering for smooth typing
+  const [displayHp, setDisplayHp] = useState("");
+  const [isEditingHp, setIsEditingHp] = useState(false);
+  const [mathInput, setMathInput] = useState('');
   const [showConditionPicker, setShowConditionPicker] = useState(false);
 
   const updateHp = async (newHp) => {
-    const boundedHp = Math.max(0, Math.min(newHp, enemy.hp));
-    await updateDoc(doc(db, 'active_enemies', enemy.id), { currentHp: boundedHp });
+    const boundedHp = Math.max(0, Math.min(newHp, fullEnemy.hp));
+    await updateDoc(doc(db, 'active_enemies', fullEnemy.id), { currentHp: boundedHp });
   };
 
   const adjustHp = async (amount) => {
-    const newHp = Math.max(0, Math.min((enemy.currentHp ?? enemy.hp) + amount, enemy.hp));
-    await updateDoc(doc(db, 'active_enemies', enemy.id), { currentHp: newHp });
+    const newHp = Math.max(0, Math.min((fullEnemy.currentHp ?? fullEnemy.hp) + amount, fullEnemy.hp));
+    await updateDoc(doc(db, 'active_enemies', fullEnemy.id), { currentHp: newHp });
   };
 
   const handleQuickMath = (e, isDamage) => {
@@ -32,25 +38,25 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
 
   const handleAddCondition = async (condition) => {
     if (!condition) return;
-    await updateDoc(doc(db, 'active_enemies', enemy.id), { conditions: arrayUnion(condition) });
+    await updateDoc(doc(db, 'active_enemies', fullEnemy.id), { conditions: arrayUnion(condition) });
     setShowConditionPicker(false);
   };
 
   const handleRemoveCondition = async (condition) => {
-    await updateDoc(doc(db, 'active_enemies', enemy.id), { conditions: arrayRemove(condition) });
+    await updateDoc(doc(db, 'active_enemies', fullEnemy.id), { conditions: arrayRemove(condition) });
   };
 
   const handleDelete = async () => {
-    if (window.confirm(`Remove ${enemy.name} from the board?`)) {
-      await deleteDoc(doc(db, 'active_enemies', enemy.id));
+    if (window.confirm(`Remove ${fullEnemy.name} from the board?`)) {
+      await deleteDoc(doc(db, 'active_enemies', fullEnemy.id));
     }
   };
 
-  const currentHp = enemy.currentHp ?? enemy.hp;
+  const currentHp = fullEnemy.currentHp ?? fullEnemy.hp;
   const isDead = currentHp <= 0;
-  const activeConditions = enemy.conditions || [];
+  const activeConditions = fullEnemy.conditions || [];
   
-  const hpPercent = Math.max(0, Math.min(100, (currentHp / enemy.hp) * 100));
+  const hpPercent = Math.max(0, Math.min(100, (currentHp / fullEnemy.hp) * 100));
   const hpColor = hpPercent > 50 ? 'bg-emerald-500/20' : hpPercent > 20 ? 'bg-yellow-500/20' : 'bg-red-500/30';
 
   return (
@@ -70,10 +76,10 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
         
         <div className="absolute bottom-3 left-4 right-14 text-left">
           <h3 className={`font-black text-xl leading-tight truncate ${isDead ? 'text-red-400 line-through' : 'text-white'}`}>
-            {enemy.name}
+            {fullEnemy.name}
           </h3>
           <p className="text-xs text-slate-400 truncate w-full mt-0.5">
-            {enemy.flavor || "A dangerous foe..."}
+            {fullEnemy.flavor || "A dangerous foe..."}
           </p>
         </div>
 
@@ -104,12 +110,15 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
                 <div className="flex items-center gap-1.5 text-white">
                   <input 
                     type="number" 
-                    value={currentHp} 
-                    onChange={(e) => updateHp(e.target.value)} 
-                    className={`w-12 bg-slate-800/80 border border-slate-600 rounded px-1 py-0.5 focus:border-red-500 focus:outline-none text-center font-black text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isDead ? 'text-red-400' : ''}`} 
+                    value={isEditingHp ? displayHp : currentHp} 
+                    onFocus={() => { setDisplayHp(currentHp); setIsEditingHp(true); }}
+                    onChange={(e) => setDisplayHp(e.target.value)} 
+                    onBlur={() => { setIsEditingHp(false); updateHp(Number(displayHp)); }}
+                    onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
+                    className={`w-12 bg-slate-800/80 border border-slate-600 rounded px-1 py-0.5 focus:border-red-500 focus:outline-none text-center font-black text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isDead && !isEditingHp ? 'text-red-400' : ''}`} 
                   />
                   <span className="text-slate-500 font-bold">/</span>
-                  <span className="w-8 text-center text-slate-400 font-bold">{enemy.hp}</span>
+                  <span className="w-8 text-center text-slate-400 font-bold">{fullEnemy.hp}</span>
                 </div>
 
                 <button onClick={() => adjustHp(1)} className="w-7 h-7 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold flex items-center justify-center border border-slate-600 transition-colors shadow-sm cursor-pointer">+</button>
@@ -149,13 +158,13 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
             <label className="flex items-center gap-1.5 text-xs text-slate-400 font-bold mb-1 uppercase tracking-wider">
               <Shield className="w-4 h-4 text-blue-400" /> Armor
             </label>
-            <div className="text-2xl font-black text-white">{enemy.ac}</div>
+            <div className="text-2xl font-black text-white">{fullEnemy.ac}</div>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border border-slate-700 flex flex-col justify-center items-center shadow-sm">
             <label className="flex items-center gap-1.5 text-xs text-slate-400 font-bold mb-1 uppercase tracking-wider">
               <Swords className="w-4 h-4 text-yellow-500" /> Perc.
             </label>
-            <div className="text-2xl font-black text-white">{enemy.passivePerception}</div>
+            <div className="text-2xl font-black text-white">{fullEnemy.passivePerception}</div>
           </div>
         </div>
 
@@ -163,7 +172,6 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2 mb-3 relative">
             <span className="flex items-center gap-2 text-sm text-fuchsia-400 font-bold"><Skull className="w-4 h-4" /> Conditions</span>
             
-            {/* NEW QoL: Visual Condition Picker Popover */}
             <div>
               <button 
                 onClick={() => setShowConditionPicker(!showConditionPicker)} 
@@ -206,15 +214,15 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
           </div>
         </div>
 
-        {(enemy.actions?.length > 0 || enemy.features?.length > 0) && (
+        {(fullEnemy.actions?.length > 0 || fullEnemy.features?.length > 0) && (
           <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-3 mt-auto shadow-sm">
-            {enemy.features?.map((f, i) => (
+            {fullEnemy.features?.map((f, i) => (
               <div key={`f-${i}`} className="text-xs border-b border-slate-800 pb-2 last:border-0 last:pb-0">
                 <span className="font-bold text-amber-400 block mb-0.5">{f.name}</span>
                 <span className="text-slate-300 leading-relaxed">{f.desc}</span>
               </div>
             ))}
-            {enemy.actions?.map((a, i) => (
+            {fullEnemy.actions?.map((a, i) => (
               <div key={`a-${i}`} className="text-xs border-b border-slate-800 pb-2 last:border-0 last:pb-0">
                 <span className="font-bold text-red-400 block mb-0.5">{a.name}</span>
                 <span className="text-slate-300 leading-relaxed">{a.desc}</span>

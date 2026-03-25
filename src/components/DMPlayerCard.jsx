@@ -10,7 +10,6 @@ export default function DMPlayerCard({ charId }) {
   const [kickConfirm, setKickConfirm] = useState(false); 
   const [showSummary, setShowSummary] = useState(false);
   
-  // NEW: State for expanding spells and features
   const [activeSpell, setActiveSpell] = useState(null);
   const [activeFeature, setActiveFeature] = useState(null);
 
@@ -40,12 +39,17 @@ export default function DMPlayerCard({ charId }) {
   const hpPercent = Math.max(0, Math.min(100, ((char.hp || 0) / (char.maxHp || 1)) * 100));
   const hpColor = hpPercent > 50 ? 'bg-emerald-500' : hpPercent > 20 ? 'bg-yellow-500' : 'bg-red-500';
   const isUnconscious = (char.hp || 0) <= 0;
-  const passivePerception = (char.stats?.WIS || 10) + 10;
+  
+  // REQ 8: Correct Passive Perception Calculation
+  const wisScore = char.stats?.WIS || 10;
+  const wisMod = Math.floor((wisScore - 10) / 2);
+  const proficiencyBonus = Math.ceil(((char.level || 1) / 4) + 1);
+  const hasPerception = (char.proficiencies?.skills || '').toLowerCase().includes('perception');
+  const passivePerception = 10 + wisMod + (hasPerception ? proficiencyBonus : 0);
 
   const bonusActions = (char.features || []).filter(f => f.desc.toLowerCase().includes('bonus action'));
   const reactions = (char.features || []).filter(f => f.desc.toLowerCase().includes('reaction'));
   
-  // Extract features that are likely passive traits / senses
   const passives = (char.features || []).filter(f => 
     !f.desc.toLowerCase().includes('bonus action') && 
     !f.desc.toLowerCase().includes('reaction')
@@ -147,7 +151,6 @@ export default function DMPlayerCard({ charId }) {
               </div>
             )}
 
-            {/* NEW: Passives and Senses Tracker */}
             {passives.length > 0 && (
               <div className="mb-3">
                 <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Eye className="w-3 h-3" /> Passives & Senses</h4>
@@ -170,7 +173,6 @@ export default function DMPlayerCard({ charId }) {
               </div>
             )}
 
-            {/* UPGRADED: Interactive Magic Arsenal */}
             {char.spells && char.spells.length > 0 && (
               <div>
                 <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Sparkles className="w-3 h-3" /> Magic Arsenal</h4>

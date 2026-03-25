@@ -5,6 +5,7 @@ import {
   Stars, Moon, AlertCircle, BrainCircuit
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import MapDrawings from './MapDrawings';
 
 const CONDITION_ICONS = {
   'Blinded': { icon: EyeOff, color: 'bg-slate-700 text-slate-300 border-slate-500' },
@@ -60,7 +61,10 @@ export default function MapGrid({
   showMovementRangeFor = null,
   isDisplayMode = false,
   onTokenDrop, 
-  onPing 
+  onPing,
+  isDrawingMode = false, 
+  drawingColor = '#ef4444',
+  onDrawEnd
 }) {
   
   const rawCols = Number(mapData?.cols);
@@ -159,8 +163,6 @@ export default function MapGrid({
   }
 
   const activeToken = mapData?.activeTokenId ? tokens[mapData.activeTokenId] : null;
-
-  // NEW QoL: Dynamic Adaptive Grid Color
   const gridColor = mapData?.gridColor || 'rgba(255,255,255,0.35)';
 
   return (
@@ -209,10 +211,20 @@ export default function MapGrid({
             imageRendering: 'crisp-edges' 
           }}
         >
-          {/* NEW QoL: Dynamic Adaptive Grid Rendering */}
           {!isDisplayMode && gridColor !== 'transparent' && (
             <div className="absolute inset-0 pointer-events-none z-0 transition-all duration-500" style={{ backgroundImage: `linear-gradient(to right, ${gridColor} 1px, transparent 1px), linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)`, backgroundSize: `${currentCellSize}px ${currentCellSize}px` }}></div>
           )}
+
+          {/* REQ 1: SVG Drawing Overlay */}
+          <MapDrawings 
+            drawings={mapData?.drawings || []}
+            isDrawingMode={isDrawingMode && !isDisplayMode}
+            onDrawEnd={onDrawEnd}
+            currentCellSize={currentCellSize}
+            cols={cols}
+            rows={rows}
+            drawingColor={drawingColor}
+          />
 
           {mapData?.ping && (now - mapData.ping.timestamp < 3500) && (
             <div 
@@ -230,7 +242,8 @@ export default function MapGrid({
             </div>
           )}
 
-          <div className="absolute inset-0 grid z-20" style={{ gridTemplateColumns: `repeat(${cols}, ${currentCellSize}px)`, gridTemplateRows: `repeat(${rows}, ${currentCellSize}px)` }}>
+          {/* Disable token clicks entirely if drawing mode is on so the DM doesn't drag a token while trying to draw */}
+          <div className={`absolute inset-0 grid z-20 ${isDrawingMode ? 'pointer-events-none' : ''}`} style={{ gridTemplateColumns: `repeat(${cols}, ${currentCellSize}px)`, gridTemplateRows: `repeat(${rows}, ${currentCellSize}px)` }}>
             {tiles.map((tile) => {
               let tileClass = isDisplayMode ? '' : 'hover:bg-white/10'; 
 
@@ -309,9 +322,9 @@ export default function MapGrid({
               return (
                 <div
                   key={token.id}
-                  draggable={!isDisplayMode && isDM} 
+                  draggable={!isDisplayMode && isDM && !isDrawingMode} 
                   onDragStart={(e) => {
-                    if (isDisplayMode) return;
+                    if (isDisplayMode || isDrawingMode) return;
                     e.dataTransfer.setData('tokenId', token.id);
                     e.dataTransfer.effectAllowed = "move";
                     if (onTokenClick) onTokenClick(token.id); 
@@ -319,10 +332,10 @@ export default function MapGrid({
                   onMouseDown={(e) => {
                     if (!isDisplayMode && onTokenClick && (isDM || token.id === selectedTokenId)) {
                       e.stopPropagation();
-                      onTokenClick(token.id);
+                      if (!isDrawingMode) onTokenClick(token.id);
                     }
                   }}
-                  className={`absolute transition-all duration-700 ease-in-out flex items-center justify-center ${isDisplayMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer hover:scale-105'} ${token.isHidden ? 'opacity-40 grayscale' : ''}`}
+                  className={`absolute transition-all duration-700 ease-in-out flex items-center justify-center ${isDisplayMode || isDrawingMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer hover:scale-105'} ${token.isHidden ? 'opacity-40 grayscale' : ''}`}
                   style={{
                     width: currentCellSize * tSize,
                     height: currentCellSize * tSize,
