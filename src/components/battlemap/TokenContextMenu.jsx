@@ -1,5 +1,9 @@
 import React from 'react';
-import { Heart, Maximize, CircleDashed, ArrowUpCircle, BrainCircuit, Ruler, EyeOff, Eye, Image as ImageIcon, Trash2, AlertCircle } from 'lucide-react';
+import { 
+  Heart, Maximize, CircleDashed, ArrowUpCircle, BrainCircuit, Ruler, 
+  EyeOff, Eye, Image as ImageIcon, Trash2, AlertCircle, EarOff, Flame, 
+  Ghost, Link, Ban, Cloud, Lock, Mountain, Skull, ArrowDown, Stars, Moon, X 
+} from 'lucide-react';
 
 const CONDITION_ICONS = {
   'Blinded': { icon: EyeOff, color: 'bg-slate-700 text-slate-300 border-slate-500' },

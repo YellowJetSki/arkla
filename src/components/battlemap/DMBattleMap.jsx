@@ -4,6 +4,7 @@ import { db } from '../../services/firebase';
 import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize, Ruler, CircleDashed, ArrowUpCircle, BrainCircuit, PenTool, Eraser, Triangle, Circle } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
+import DialogModal from '../shared/DialogModal';
 
 const LOCAL_MAPS = [
   { label: 'Tutorial Forest', value: '/tutorial_forest_enc.png' },
@@ -17,10 +18,9 @@ export default function DMBattleMap() {
   
   const [showRulerFor, setShowRulerFor] = useState(null);
   
-  // Drawing & Template State
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [drawingColor, setDrawingColor] = useState('#ef4444');
-  const [drawingShape, setDrawingShape] = useState('freehand'); // 'freehand', 'line', 'circle', 'cone'
+  const [drawingShape, setDrawingShape] = useState('freehand'); 
   
   const [activePlayers, setActivePlayers] = useState([]);
   const [activeEnemies, setActiveEnemies] = useState([]);
@@ -32,6 +32,15 @@ export default function DMBattleMap() {
   const [tempImageUrl, setTempImageUrl] = useState('');
   const [tempGridScale, setTempGridScale] = useState(30); 
   const [tempGridColor, setTempGridColor] = useState('rgba(255,255,255,0.35)');
+
+  const [editingHp, setEditingHp] = useState("");
+  const [isEditingHpFocus, setIsEditingHpFocus] = useState(false);
+
+  // Modal Replacements for System Alerts
+  const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
+  const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
+  
+  const [imagePrompt, setImagePrompt] = useState({ isOpen: false, tokenId: null, url: '' });
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
@@ -131,7 +140,7 @@ export default function DMBattleMap() {
       }, { merge: true }).then(() => {
         setIsSavingMap(false);
         setIsEditingMap(false);
-        alert("Could not read exact image dimensions. Defaulted to a 20x15 grid.");
+        setDialog({ isOpen: true, title: 'Map Dimension Error', message: 'Could not read exact image dimensions. Defaulted to a 20x15 grid.', type: 'alert', onConfirm: closeDialog });
       });
     };
 
@@ -160,6 +169,7 @@ export default function DMBattleMap() {
       for (const enemy of presetEnemies) {
          const enemyRef = doc(db, 'active_enemies', enemy.id);
          batch.set(enemyRef, {
+            ...(enemy.entityData || {}), // Restores Flavor, Actions, Ac, etc.
             name: enemy.name,
             hp: enemy.hp || 10,
             maxHp: enemy.maxHp || enemy.hp || 10,
@@ -239,11 +249,21 @@ export default function DMBattleMap() {
     await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
   };
 
-  const handleUpdateTokenImage = async (tokenId) => {
+  const handleUpdateTokenImage = (tokenId) => {
     const targetId = tokenId || selectedTokenId;
     if (!targetId || !tokens[targetId]) return;
-    const url = window.prompt("Paste a custom Image URL for this token:");
-    if (!url) return;
+    setImagePrompt({ isOpen: true, tokenId: targetId, url: tokens[targetId].img || '' });
+  };
+
+  const confirmUpdateTokenImage = async (e) => {
+    e.preventDefault();
+    const targetId = imagePrompt.tokenId;
+    const url = imagePrompt.url;
+    
+    if (!targetId || !tokens[targetId] || !url) {
+       setImagePrompt({ isOpen: false, tokenId: null, url: '' });
+       return;
+    }
 
     try {
       const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], img: url } };
@@ -254,6 +274,7 @@ export default function DMBattleMap() {
     } catch (error) {
       console.error("Failed to update token image", error);
     }
+    setImagePrompt({ isOpen: false, tokenId: null, url: '' });
   };
 
   const handleUpdateTokenHpLive = async (tokenId, newHpVal) => {
@@ -353,10 +374,17 @@ export default function DMBattleMap() {
     });
   };
 
-  const handleClearDrawings = async () => {
-    if (window.confirm("Clear all drawings from the map?")) {
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [] });
-    }
+  const handleClearDrawings = () => {
+    setDialog({
+      isOpen: true,
+      title: 'Clear Drawings',
+      message: 'Clear all drawings and templates from the map?',
+      type: 'confirm',
+      onConfirm: async () => {
+        await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [] });
+        closeDialog();
+      }
+    });
   };
 
   const unstagedPlayers = activePlayers.filter(p => !tokens[p.id]);
@@ -378,11 +406,42 @@ export default function DMBattleMap() {
 
   return (
     <div className="space-y-4">
+      <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
+
+      {/* Custom Input Modal for Token Images */}
+      {imagePrompt.isOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
+          <form onSubmit={confirmUpdateTokenImage} className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
+             <div className="p-4 border-b border-indigo-900/50 bg-indigo-900/10 flex items-center justify-between">
+               <h3 className="font-bold text-indigo-400 flex items-center gap-2"><ImageIcon className="w-5 h-5"/> Update Token Image</h3>
+               <button type="button" onClick={() => setImagePrompt({ isOpen: false, tokenId: null, url: '' })} className="text-slate-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
+             </div>
+             <div className="p-6">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Image URL</label>
+                <input 
+                  type="url" 
+                  value={imagePrompt.url} 
+                  onChange={(e) => setImagePrompt({...imagePrompt, url: e.target.value})} 
+                  placeholder="https://example.com/avatar.png"
+                  className="w-full bg-slate-950 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
+                  autoFocus 
+                  required
+                />
+             </div>
+             <div className="p-4 bg-slate-800 flex gap-3 justify-end border-t border-slate-700">
+                <button type="button" onClick={() => setImagePrompt({ isOpen: false, tokenId: null, url: '' })} className="px-4 py-2 rounded-lg font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Cancel</button>
+                <button type="submit" className="px-6 py-2 rounded-lg font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-md">Update</button>
+             </div>
+          </form>
+        </div>
+      )}
+
       <BattlemapPresetsModal 
         isOpen={isPresetsOpen} 
         onClose={() => setIsPresetsOpen(false)} 
         currentMapData={mapData}
         currentTokens={tokens}
+        activeEnemies={activeEnemies}
         onRestorePreset={handleRestorePreset}
       />
 
@@ -393,7 +452,6 @@ export default function DMBattleMap() {
         
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar">
           
-          {/* Drawing & Template Controls */}
           <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-700 shadow-inner mr-2 shrink-0">
             <button 
               onClick={() => setIsDrawingMode(!isDrawingMode)}
@@ -511,7 +569,6 @@ export default function DMBattleMap() {
         </div>
       )}
 
-      {/* Staging Area for Unplaced Tokens */}
       {hasUnstagedActors && (
         <div className="bg-slate-800/80 p-2 md:p-3 rounded-xl border border-slate-700 border-dashed flex items-center flex-wrap gap-2">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 hidden xl:block">Stage Actors:</span>
@@ -548,7 +605,6 @@ export default function DMBattleMap() {
         drawingColor={drawingColor}
         drawingShape={drawingShape}
         onDrawEnd={handleDrawEnd}
-        // HUD Handlers passed down
         onUpdateHpLive={handleUpdateTokenHpLive}
         onToggleSize={handleToggleTokenSize}
         onToggleAura={handleToggleAura}
