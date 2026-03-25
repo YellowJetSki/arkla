@@ -1,8 +1,20 @@
 import { useState } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Backpack, Coins, Search, Hammer, Plus, Minus, Send } from 'lucide-react';
+import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import EquipmentDiscovery from '../EquipmentDiscovery';
+
+// Phase 3 Helper: Parse text block into Name and Description
+const parseInventory = (text) => {
+  if (!text) return [];
+  const blocks = text.split(/^(?=•|-|\d+x)/m).filter(b => b.trim());
+  return blocks.map(block => {
+    const lines = block.trim().split('\n');
+    const name = lines[0];
+    const desc = lines.slice(1).join('\n').trim();
+    return { name, desc };
+  });
+};
 
 export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
   const [showItemSearch, setShowItemSearch] = useState(false);
@@ -11,6 +23,7 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
   
   const [transactionAmount, setTransactionAmount] = useState('');
   const [transactionType, setTransactionType] = useState('assarions'); 
+  const [openItems, setOpenItems] = useState({}); // Track expanded cards
 
   const addEquipmentToInventory = async (formattedItemText) => {
     const currentInventory = char.inventory || '';
@@ -32,13 +45,13 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
     setIsForgingItem(false);
   };
 
-  // NEW QoL: Send Item to Party Loot
   const handleShareToParty = async (itemString, index) => {
     if (!window.confirm("Send this item to the Shared Party Loot? It will be removed from your personal inventory.")) return;
     
-    const invArray = (char.inventory || '').split('\n').filter(i => i.trim());
-    invArray.splice(index, 1);
-    await updateField('inventory', invArray.join('\n\n'));
+    // Using string manipulation to accurately remove the block we just parsed
+    const blocks = (char.inventory || '').split(/^(?=•|-|\d+x)/m).filter(b => b.trim());
+    blocks.splice(index, 1);
+    await updateField('inventory', blocks.join('\n\n'));
 
     const cleanName = itemString.replace(/^•\s*/, '').split('(')[0].trim() || 'Shared Item';
     const newItem = {
@@ -102,6 +115,12 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
     setTransactionAmount('');
   };
 
+  const toggleItemOpen = (idx) => {
+    setOpenItems(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const parsedItems = parseInventory(char.inventory);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div className="md:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-5">
@@ -149,41 +168,66 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
         {isDM ? (
           <textarea defaultValue={char.inventory || ''} onBlur={(e) => updateField('inventory', e.target.value)} className={`w-full min-h-[300px] bg-slate-900 border border-slate-700 rounded-xl p-4 text-slate-300 text-sm focus:outline-none focus:${activeTheme.border} resize-y leading-relaxed custom-scrollbar`} />
         ) : (
-          <ul className="space-y-2">
-            {(char.inventory || '').split('\n').filter(i => i.trim()).map((item, i) => (
-              <li key={`inv-${i}`} className="flex items-start justify-between gap-3 text-slate-300 bg-slate-900/50 p-3 rounded-lg border border-slate-800">
-                <div className="flex items-start gap-3 flex-1 whitespace-pre-wrap">
-                  <div className={`w-1.5 h-1.5 rounded-full ${activeTheme.bg} mt-2 shrink-0`}></div>
-                  <span className="text-sm md:text-base leading-relaxed">{item}</span>
+          <div className="space-y-3">
+            {parsedItems.length === 0 ? (
+               <p className="text-slate-500 italic p-4 text-center">Your bags are empty.</p>
+            ) : (
+              parsedItems.map((item, i) => (
+                <div key={`inv-${i}`} className={`bg-slate-900/50 border rounded-lg overflow-hidden transition-colors ${openItems[i] ? `border-${activeTheme.ring}` : 'border-slate-800'}`}>
+                  <div className="flex justify-between items-center p-3 cursor-pointer" onClick={() => toggleItemOpen(i)}>
+                    <span className={`font-bold text-sm md:text-base ${openItems[i] ? activeTheme.text : 'text-slate-300'}`}>{item.name}</span>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleShareToParty(`${item.name}${item.desc ? '\n' + item.desc : ''}`, i); }}
+                        className="bg-slate-800 border border-slate-700 p-1.5 rounded-md hover:bg-emerald-600 hover:text-white transition-colors text-slate-400 shadow-sm"
+                        title="Share to Party Loot"
+                      >
+                        <Send className="w-3 h-3" />
+                      </button>
+                      {item.desc && (
+                        <div className="text-slate-500">
+                          {openItems[i] ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {item.desc && openItems[i] && (
+                    <div className="p-3 pt-0 border-t border-slate-800/50 text-sm text-slate-400 whitespace-pre-wrap leading-relaxed animate-in slide-in-from-top-1 fade-in">
+                      {item.desc}
+                    </div>
+                  )}
                 </div>
-                {/* NEW QoL: Send to Party Loot Button */}
-                <button 
-                  onClick={() => handleShareToParty(item, i)}
-                  className={`shrink-0 bg-slate-800 border border-slate-700 p-2 rounded-lg hover:${activeTheme.bg} hover:text-white transition-colors text-slate-400`}
-                  title="Share to Party Loot"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
+              ))
+            )}
+          </div>
         )}
       </div>
 
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-5 h-fit flex flex-col">
         <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4"><Coins className="w-5 h-5 text-yellow-400" /> Wallet</h3>
         
-        <div className="bg-slate-900/80 p-2.5 rounded-lg border border-slate-600 mb-4 flex gap-2">
-          <input 
-            type="number" 
-            value={transactionAmount}
-            onChange={(e) => setTransactionAmount(e.target.value)}
-            placeholder="Amount..." 
-            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-yellow-500"
-          />
-          <div className="flex flex-col gap-1 shrink-0">
-            <button onClick={() => handleTransaction(true)} disabled={!transactionAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white border border-emerald-900/50 px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors">+ Loot</button>
-            <button onClick={() => handleTransaction(false)} disabled={!transactionAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white border border-red-900/50 px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors">- Pay</button>
+        <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-600 mb-4 flex flex-col gap-3 shadow-inner">
+          <div className="flex gap-2">
+            <input 
+              type="number" 
+              value={transactionAmount}
+              onChange={(e) => setTransactionAmount(e.target.value)}
+              placeholder="Amount..." 
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-black focus:outline-none focus:border-yellow-500"
+            />
+            <div className="flex flex-col gap-1 shrink-0">
+              <button onClick={() => handleTransaction(true)} disabled={!transactionAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white border border-emerald-900/50 px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-colors shadow-sm">+ Loot</button>
+              <button onClick={() => handleTransaction(false)} disabled={!transactionAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white border border-red-900/50 px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-colors shadow-sm">- Pay</button>
+            </div>
+          </div>
+          
+          {/* Phase 3 Quick Math Buttons */}
+          <div className="flex gap-1">
+             {[1, 5, 10, 50].map(val => (
+               <button key={val} onClick={() => setTransactionAmount(val.toString())} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 rounded py-1 text-xs font-bold transition-colors">
+                 {val}
+               </button>
+             ))}
           </div>
         </div>
 

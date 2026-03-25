@@ -1,10 +1,15 @@
 import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Moon, Bed, CheckCircle2, X } from 'lucide-react';
+import { Moon, Bed, CheckCircle2, X, Activity, Flame, ShieldPlus } from 'lucide-react';
 
 export default function LongRestModal({ char, charId, onClose }) {
   const [isResting, setIsResting] = useState(false);
+
+  const maxHD = char.hitDice?.max || char.level || 1;
+  const currentHD = char.hitDice?.current || 0;
+  const recoverAmount = Math.max(1, Math.floor(maxHD / 2));
+  const newHD = Math.min(maxHD, currentHD + recoverAmount);
 
   const handleConfirmRest = async () => {
     setIsResting(true);
@@ -12,24 +17,13 @@ export default function LongRestModal({ char, charId, onClose }) {
     try {
       let updates = {};
 
-      // 1. Reset HP & Clear Temp HP
       updates.hp = char.maxHp || 10;
       updates.tempHp = 0;
-
-      // 2. Reset Death Saves
       updates['deathSaves.successes'] = 0;
       updates['deathSaves.failures'] = 0;
-
-      // 3. Break Concentration
       updates.isConcentrating = false;
+      updates['hitDice.current'] = newHD;
 
-      // 4. Recover half max hit dice (RAW 5e rules: minimum 1)
-      const maxHD = char.hitDice?.max || char.level || 1;
-      const currentHD = char.hitDice?.current || 0;
-      const recoverAmount = Math.max(1, Math.floor(maxHD / 2));
-      updates['hitDice.current'] = Math.min(maxHD, currentHD + recoverAmount);
-
-      // 5. Reset all Spell Slots to their max
       if (char.spellSlots) {
         const resetSlots = { ...char.spellSlots };
         Object.keys(resetSlots).forEach(level => {
@@ -38,7 +32,6 @@ export default function LongRestModal({ char, charId, onClose }) {
         updates.spellSlots = resetSlots;
       }
 
-      // 6. Reset all Custom Resources to their max
       if (char.resources && char.resources.length > 0) {
         const resetResources = char.resources.map(res => ({
           ...res,
@@ -47,9 +40,7 @@ export default function LongRestModal({ char, charId, onClose }) {
         updates.resources = resetResources;
       }
 
-      // 7. Clear temporary conditions
       if (char.conditions && char.conditions.length > 0) {
-        // We leave things like 'Poisoned' or 'Petrified' as those usually require lesser restoration/time
         const clearedConditions = ['Unconscious', 'Prone'];
         updates.conditions = char.conditions.filter(c => !clearedConditions.includes(c));
       }
@@ -58,7 +49,7 @@ export default function LongRestModal({ char, charId, onClose }) {
       
       setTimeout(() => {
         onClose();
-      }, 1500); // Give them a second to see the success state
+      }, 2500); 
       
     } catch (error) {
       console.error("Long Rest Failed:", error);
@@ -81,15 +72,21 @@ export default function LongRestModal({ char, charId, onClose }) {
           )}
         </div>
 
-        <div className="p-6 text-center relative z-10">
+        <div className="p-6 relative z-10">
           {isResting ? (
             <div className="animate-in fade-in zoom-in duration-500 flex flex-col items-center py-4">
               <CheckCircle2 className="w-16 h-16 text-emerald-400 mb-4 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
-              <h3 className="text-2xl font-black text-white mb-2">Restored!</h3>
-              <p className="text-sm text-slate-400">HP, Resources, and Spell Slots have been reset.</p>
+              <h3 className="text-2xl font-black text-white mb-6">Restored!</h3>
+              
+              <div className="w-full bg-slate-950/50 border border-slate-800 rounded-xl p-4 text-left space-y-3">
+                <div className="flex items-center gap-3 text-emerald-400 text-sm font-bold"><ShieldPlus className="w-4 h-4"/> Full HP Recovered</div>
+                <div className="flex items-center gap-3 text-indigo-400 text-sm font-bold"><Activity className="w-4 h-4"/> {recoverAmount} Hit Dice Recovered</div>
+                <div className="flex items-center gap-3 text-fuchsia-400 text-sm font-bold"><Flame className="w-4 h-4"/> Spell Slots Replenished</div>
+                {(char.resources || []).length > 0 && <div className="flex items-center gap-3 text-amber-400 text-sm font-bold"><CheckCircle2 className="w-4 h-4"/> Custom Resources Reset</div>}
+              </div>
             </div>
           ) : (
-            <div className="animate-in fade-in duration-300">
+            <div className="animate-in fade-in duration-300 text-center">
               <Bed className="w-12 h-12 text-indigo-400 mx-auto mb-4 opacity-80" />
               <h3 className="text-xl font-black text-white mb-2">Take a Long Rest?</h3>
               <p className="text-sm text-slate-400 leading-relaxed mb-6">

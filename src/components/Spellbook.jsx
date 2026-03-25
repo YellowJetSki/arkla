@@ -13,8 +13,10 @@ export default function Spellbook({ char, charId, isDM }) {
   const [isForgingSpell, setIsForgingSpell] = useState(false);
   const [customSpell, setCustomSpell] = useState({ name: '', level: 0, castTime: '1 Action', desc: '' });
   
-  // NEW: Smart Spell Filtering State
   const [activeFilter, setActiveFilter] = useState('All');
+  
+  // Phase 3: Upcast Modal State
+  const [spellToCast, setSpellToCast] = useState(null);
 
   const spellSlots = char.spellSlots || {};
   const spells = char.spells || [];
@@ -32,16 +34,17 @@ export default function Spellbook({ char, charId, isDM }) {
     await updateDoc(doc(db, 'characters', charId), { spellSlots: updatedSlots });
   };
 
-  const handleQuickCast = async (level) => {
-    if (isDM || level === 0) return;
-    const currentAmount = spellSlots[level]?.current || 0;
+  const executeCast = async (castLevel) => {
+    if (isDM || castLevel === 0) return;
+    const currentAmount = spellSlots[castLevel]?.current || 0;
     if (currentAmount > 0) {
       const updatedSlots = { 
         ...spellSlots, 
-        [level]: { ...spellSlots[level], current: currentAmount - 1 } 
+        [castLevel]: { ...spellSlots[castLevel], current: currentAmount - 1 } 
       };
       await updateDoc(doc(db, 'characters', charId), { spellSlots: updatedSlots });
     }
+    setSpellToCast(null);
   };
 
   const toggleConcentration = async () => {
@@ -86,7 +89,6 @@ export default function Spellbook({ char, charId, isDM }) {
     await updateDoc(doc(db, 'characters', charId), { spellSlots: updatedSlots });
   };
 
-  // NEW: Filtering Engine
   const filteredSpells = spells.filter(spell => {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'Cantrips') return spell.level === 0;
@@ -110,6 +112,42 @@ export default function Spellbook({ char, charId, isDM }) {
   return (
     <div className="space-y-6">
       
+      {/* Phase 3: Upcast Modal */}
+      {spellToCast && !isDM && (
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-900 border border-fuchsia-500/50 rounded-2xl w-full max-w-sm shadow-[0_0_50px_rgba(217,70,239,0.3)] flex flex-col overflow-hidden">
+            <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-fuchsia-950/30">
+              <h3 className="font-bold text-fuchsia-400 flex items-center gap-2">
+                <Wand2 className="w-5 h-5" /> Cast Spell
+              </h3>
+              <button onClick={() => setSpellToCast(null)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6">
+              <h4 className="text-xl font-black text-white mb-2">{spellToCast.name}</h4>
+              <p className="text-sm text-slate-400 mb-6">Select a slot level to expend for this cast. Base level is {spellToCast.level}.</p>
+              
+              <div className="grid grid-cols-3 gap-3">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].filter(l => l >= spellToCast.level && spellSlots[l]).map(level => {
+                  const slots = spellSlots[level];
+                  const hasSlots = slots && slots.current > 0;
+                  return (
+                    <button 
+                      key={level}
+                      onClick={() => executeCast(level)}
+                      disabled={!hasSlots}
+                      className={`p-3 rounded-xl flex flex-col items-center justify-center border transition-all ${hasSlots ? 'bg-slate-800 border-fuchsia-500/50 hover:bg-fuchsia-600 hover:border-fuchsia-400 group cursor-pointer' : 'bg-slate-900 border-slate-800 opacity-50 cursor-not-allowed'}`}
+                    >
+                      <span className={`text-sm font-bold ${hasSlots ? 'text-white' : 'text-slate-500'}`}>Lvl {level}</span>
+                      <span className={`text-[10px] uppercase font-bold ${hasSlots ? 'text-fuchsia-400 group-hover:text-fuchsia-200' : 'text-slate-600'}`}>{slots.current}/{slots.max} Slots</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {hasSpellStats && (
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-slate-900 border border-fuchsia-900/50 rounded-xl p-3 flex items-center justify-between shadow-sm">
@@ -196,7 +234,6 @@ export default function Spellbook({ char, charId, isDM }) {
           )}
         </div>
 
-        {/* NEW: Smart Spell Filter Bar */}
         {spells.length > 0 && (
           <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
             <Filter className="w-4 h-4 text-slate-500 shrink-0 my-auto mr-1" />
@@ -212,7 +249,6 @@ export default function Spellbook({ char, charId, isDM }) {
           </div>
         )}
 
-        {/* DM ONLY: CUSTOM SPELL FORGE */}
         {isDM && isForgingSpell && (
           <form onSubmit={handleForgeCustomSpell} className="bg-slate-900/80 p-4 md:p-5 rounded-xl border border-fuchsia-500/30 shadow-inner mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
             <h4 className="text-sm font-bold text-fuchsia-400 flex items-center gap-2"><Hammer className="w-4 h-4" /> Homebrew Spell Forge</h4>
@@ -258,7 +294,7 @@ export default function Spellbook({ char, charId, isDM }) {
             <CollapsibleSection key={levelName} title={`${levelName} (${levelSpells.length})`} icon={Sparkles} defaultOpen={levelName === 'Cantrips' || activeFilter !== 'All'}>
               <div className="grid grid-cols-1 gap-3">
                 {levelSpells.map((spell, idx) => {
-                  const hasSlotAvailable = spell.level > 0 && (spellSlots[spell.level]?.current || 0) > 0;
+                  const canCastAny = levelName === 'Cantrips' || Object.values(spellSlots).some(s => s.current > 0);
                   return (
                     <div key={idx} className="bg-slate-900 border border-slate-700 rounded-lg p-4">
                       <div className="flex justify-between items-start mb-3">
@@ -270,11 +306,11 @@ export default function Spellbook({ char, charId, isDM }) {
                         <div className="flex gap-2">
                           {!isDM && spell.level > 0 && (
                             <button 
-                              onClick={() => handleQuickCast(spell.level)}
-                              disabled={!hasSlotAvailable}
-                              className={`text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-md transition-colors shrink-0 ${hasSlotAvailable ? 'bg-fuchsia-600 hover:bg-fuchsia-500 text-white cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'}`}
+                              onClick={() => setSpellToCast(spell)}
+                              disabled={!canCastAny}
+                              className={`text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-md transition-colors shrink-0 ${canCastAny ? 'bg-fuchsia-600 hover:bg-fuchsia-500 text-white cursor-pointer' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'}`}
                             >
-                              <Wand2 className="w-3 h-3" /> {hasSlotAvailable ? 'Cast' : 'No Slots'}
+                              <Wand2 className="w-3 h-3" /> {canCastAny ? 'Cast' : 'No Slots'}
                             </button>
                           )}
                           {!isDM && (spell.desc.toLowerCase().includes('concentration') || spell.desc.toLowerCase().includes('duration: concentration')) && (

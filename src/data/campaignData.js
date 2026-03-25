@@ -58,7 +58,7 @@ export const PREMADE_CHARACTERS = {
     currency: { assarions: 5, quadrans: 10, leptons: 15 },
     imageUrl: '', 
     deathSaves: { successes: 0, failures: 0 },
-    resources: [],
+    resources: [], // Monks get Ki at level 2 (which recharges on short rest!)
     spellSlots: {},
     spells: [],
     dmNotes: '',
@@ -76,7 +76,7 @@ export const PREMADE_CHARACTERS = {
     features: [
       { name: 'Dark Secret (flaw)', desc: 'It was my watch when the Brevants attacked... I cost my fellow pupils their lives.' },
       { name: 'Unarmored Defense', desc: 'AC equals 10 + DEX + WIS when not wearing armor or using a shield.' },
-      { name: 'Martial Arts', desc: 'Use DEX instead of STR for unarmed strikes/monk weapons. Roll d4 for unarmed damage.' },
+      { name: 'Martial Arts', desc: 'Use DEX instead of STR for unarmed strikes/monk weapons. Roll d4 for unarmed damage. You can make an unarmed strike as a bonus action.' },
       { name: 'Darkvision', desc: 'Dim light within 60ft = Bright light. Darkness = Dim light.' },
       { name: 'Gnome Cunning', desc: 'Advantage on INT, WIS and CHA saving throws against magic.' },
       { name: 'Tinkerer’s knowledge', desc: 'Add +4 to History checks around little gizmos and gadgets.' },
@@ -84,7 +84,7 @@ export const PREMADE_CHARACTERS = {
       { name: 'Background: Fly on the Wall', desc: 'People gloss over your presence. Easily eavesdrop or observe details in crowds if quiet. You have advantage when doing so.' },
       { name: 'Not so Brevar', desc: 'Wendy is Frightened when faced by Brevars or anything that reminds her of them. She hates bears.' }
     ],
-    inventory: "1x Quarterstaff\n10x Shurikens (gear-shaped)\n1x Bag of self-made caltrops\n1x Tinkerer’s Tools\n1x Worn Overalls\n1x Gnome cap\n1x Faded pic of mom, dad and uncle\n1x Sketch of a beautiful restaurant by the sea\n1x Duku’s belt - monogrammed lizard symbol\n1x Explorer’s pack",
+    inventory: "• 1x Quarterstaff\n  A simple, sturdy wooden staff.\n• 10x Shurikens\n  Custom-made gear-shaped throwing stars.\n• 1x Bag of Caltrops\n  Self-made traps to slow enemies.\n• 1x Tinkerer’s Tools\n  Used to craft tiny clockwork devices.\n• 1x Worn Overalls & Gnome cap\n  Comfortable and unassuming.\n• 1x Faded Picture\n  A picture of mom, dad and uncle.\n• 1x Coastal Sketch\n  A drawing of a beautiful restaurant by the sea.\n• 1x Duku’s Belt\n  Monogrammed with a mysterious lizard symbol.\n• 1x Explorer’s pack\n  Contains a backpack, bedroll, mess kit, tinderbox, 10 torches, 10 days of rations, and a waterskin.",
     traits: {
       personality: 'I prefer to watch and listen rather than speak. I tinker with small gears when I’m nervous.',
       ideal: 'Loyalty. True teachings come from the bond between master and student, not titles.',
@@ -97,7 +97,7 @@ export const PREMADE_CHARACTERS = {
   'kehrfuffle': {
     name: 'Kehrfuffle Songroot',
     race: 'Wood Elf',
-    class: 'Level 1 Bard',
+    class: 'Bard',
     level: 1,
     exp: 0,
     alignment: 'Chaotic Neutral',
@@ -122,10 +122,11 @@ export const PREMADE_CHARACTERS = {
     deathSaves: { successes: 0, failures: 0 },
     resources: [
       { 
-    name: 'Bardic Inspiration', 
-    max: 3, 
-    current: 3, 
-    desc: 'Use a Bonus Action to give an ally within 60 ft a 1d6 to add to an attack roll, saving throw, or skill check. Regains all uses on a Long Rest.' 
+        name: 'Bardic Inspiration', 
+        max: 3, 
+        current: 3, 
+        recharge: 'long', // Won't recharge on short rest until Font of Inspiration at Level 5!
+        desc: 'Use a Bonus Action to give an ally within 60 ft a 1d6 to add to an attack roll, saving throw, or skill check. Regains all uses on a Long Rest.' 
       }
     ],    
     spellSlots: {
@@ -190,7 +191,7 @@ export const PREMADE_CHARACTERS = {
       { name: 'The Tiny Bear (dormant)', desc: 'An unusually tiny bear that refuses to leave your side.' },
       { name: 'The Peg Leg', desc: 'Your leg was crushed in the Weeping Grove. You rely on your wooden peg leg to stand your ground.' }
     ],
-    inventory: "1x The Cursed Accordion\n1x Rusty Great Sickle\n1x Dagger\n1x Leather Armor\n1x Wooden Peg Leg\n1x The Tiny Bear\n1x Entertainer’s Pack\n1x Locket with Caroline's Picture",
+    inventory: "• 1x The Cursed Accordion\n  A magical instrument. Caroline's soul is bound to the wood and bellows.\n• 1x Rusty Great Sickle\n  A heavy, intimidating farming implement repurposed for combat.\n• 1x Dagger\n  A simple, sharp blade.\n• 1x Leather Armor\n  Light and flexible defense.\n• 1x Wooden Peg Leg\n  Replaces the leg crushed in the Weeping Grove.\n• 1x The Tiny Bear\n  A strangely small, loyal companion.\n• 1x Entertainer’s Pack\n  Contains a backpack, a bedroll, 2 costumes, 5 candles, 5 days of rations, a waterskin, and a disguise kit.\n• 1x Locket\n  Contains a faded picture of Caroline.",
     traits: {
       personality: 'I project a gruff, cynical exterior to keep people at arm\'s length... I complain about the tiny bear constantly, but I will viciously attack anyone who tries to hurt it.',
       ideal: 'Restitution. I will find the man who tricked me and free Caroline\'s spirit, at all cost.',
@@ -236,254 +237,58 @@ export const PREMADE_ENEMIES = [
   {
     id: 'bengo',
     name: 'Bengo',
-    flavor: '“The Scrawny One.” Scrawny, pale green, wears a massive pirate hat.', // [cite: 298, 416]
-    ac: 12, // [cite: 406]
-    hp: 7, // [cite: 407]
-    speed: '30 ft.', // [cite: 408]
-    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' }, // [cite: 409]
+    flavor: '“The Scrawny One.” Scrawny, pale green, wears a massive pirate hat.', 
+    ac: 12, 
+    hp: 7, 
+    speed: '30 ft.', 
+    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' }, 
     passivePerception: 9,
     spellSave: null,
     spellAttack: null,
     features: [
-      { name: 'Nimble Escape', desc: 'The goblins can take the Disengage or Hide action as a Bonus Action on each of their turns.' } // [cite: 411]
+      { name: 'Nimble Escape', desc: 'The goblins can take the Disengage or Hide action as a Bonus Action on each of their turns.' } 
     ],
     actions: [
-      { name: 'Rusted Rusty Cutlass', desc: 'Melee Weapon Attack. +4 to hit. Hit: 3 (1d4 + 1) slashing damage.' } // [cite: 416, 417]
+      { name: 'Rusted Rusty Cutlass', desc: 'Melee Weapon Attack. +4 to hit. Hit: 3 (1d4 + 1) slashing damage.' } 
     ]
   },
   {
     id: 'leeta',
     name: 'Leeta',
-    flavor: '“The Hater.” Female goblin, hates Screwbeard.', // [cite: 299, 418]
-    ac: 12, // [cite: 406]
-    hp: 7, // [cite: 407]
-    speed: '30 ft.', // [cite: 408]
-    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' }, // [cite: 409]
+    flavor: '“The Hater.” Female goblin, hates Screwbeard.', 
+    ac: 12, 
+    hp: 7, 
+    speed: '30 ft.', 
+    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' }, 
     passivePerception: 9,
     spellSave: null,
     spellAttack: null,
     features: [
-      { name: 'Nimble Escape', desc: 'The goblins can take the Disengage or Hide action as a Bonus Action on each of their turns.' }, // [cite: 411]
-      { name: 'Spiteful Strike', desc: 'Leeta automatically deals 1 point of spite damage to Screwbeard before combat starts.' }, // [cite: 419]
-      { name: 'Self-Preservation', desc: 'If the player is struggling, she will use her Nimble Escape to run away on round 2 or 3, muttering that she isn\'t paid enough.' } // [cite: 420]
+      { name: 'Nimble Escape', desc: 'The goblins can take the Disengage or Hide action as a Bonus Action on each of their turns.' }, 
+      { name: 'Spiteful Strike', desc: 'Leeta automatically deals 1 point of spite damage to Screwbeard before combat starts.' }, 
+      { name: 'Self-Preservation', desc: 'If the player is struggling, she will use her Nimble Escape to run away on round 2 or 3, muttering that she isn\'t paid enough.' } 
     ],
     actions: [
-      { name: 'Shiv', desc: 'Melee Weapon Attack. +4 to hit. Hit: 3 (1d4 + 1) piercing damage.' } // [cite: 418]
+      { name: 'Shiv', desc: 'Melee Weapon Attack. +4 to hit. Hit: 3 (1d4 + 1) piercing damage.' } 
     ]
   },
   {
     id: 'geepo',
     name: 'Geepo',
-    flavor: '“The Black Eye.” A bickering cowardly grunt.', // [cite: 405, 413]
-    ac: 12, // [cite: 406]
-    hp: 7, // [cite: 407]
-    speed: '30 ft.', // [cite: 408]
-    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' }, // [cite: 409]
+    flavor: '“The Black Eye.” A bickering cowardly grunt.', 
+    ac: 12, 
+    hp: 7, 
+    speed: '30 ft.', 
+    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' }, 
     passivePerception: 9,
     spellSave: null,
     spellAttack: null,
     features: [
-      { name: 'Nimble Escape', desc: 'The goblins can take the Disengage or Hide action as a Bonus Action on each of their turns.' }, // [cite: 411]
-      { name: 'Swollen Eye', desc: 'Geepo has Disadvantage on all Perception checks because his good eye is swollen shut from Loof the Baker punching him.' } // [cite: 415]
+      { name: 'Nimble Escape', desc: 'The goblins can take the Disengage or Hide action as a Bonus Action on each of their turns.' }, 
+      { name: 'Swollen Eye', desc: 'Geepo has Disadvantage on all Perception checks because his good eye is swollen shut from Loof the Baker punching him.' } 
     ],
     actions: [
-      { name: 'Pointed Stick', desc: 'Melee Weapon Attack. +4 to hit. Hit: 3 (1d4 + 1) piercing damage.' } // [cite: 413, 414]
-    ]
-  },
-  {
-    id: 'goblin_boss',
-    name: 'Goblin Boss',
-    flavor: 'A slightly larger, significantly meaner goblin shouting orders from the back.',
-    ac: 17,
-    hp: 21,
-    speed: '30 ft.',
-    stats: { STR: '+0', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '+0' },
-    passivePerception: 9,
-    spellSave: null,
-    spellAttack: null,
-    features: [
-      { name: 'Nimble Escape', desc: 'Can take the Disengage or Hide action as a bonus action on each of its turns.' }
-    ],
-    actions: [
-      { name: 'Multiattack', desc: 'The goblin makes two attacks with its scimitar. The second attack has disadvantage.' },
-      { name: 'Scimitar', desc: 'Melee Weapon Attack: +4 to hit. Hit: 1d6 + 2 slashing damage.' },
-      { name: 'Javelin', desc: 'Melee or Ranged Weapon Attack: +4 to hit, range 30/120 ft. Hit: 1d6 + 2 piercing damage.' },
-      { name: 'Redirect Attack (Reaction)', desc: 'When a creature the goblin can see targets it with an attack, the goblin chooses another goblin within 5 ft. The two swap places, and the chosen goblin becomes the target instead.' }
-    ]
-  },
-  {
-    id: 'goblin_sneak',
-    name: 'Goblin Sneak',
-    flavor: 'A small, malicious humanoid that rapidly darts between shadows.',
-    ac: 15,
-    hp: 7,
-    speed: '30 ft.',
-    stats: { STR: '-1', DEX: '+2', CON: '+0', INT: '+0', WIS: '-1', CHA: '-1' },
-    passivePerception: 9,
-    spellSave: null,
-    spellAttack: null,
-    features: [
-      { name: 'Nimble Escape', desc: 'Can take the Disengage or Hide action as a bonus action on each of its turns.' }
-    ],
-    actions: [
-      { name: 'Scimitar', desc: 'Melee Weapon Attack: +4 to hit. Hit: 1d6 + 2 slashing damage.' },
-      { name: 'Shortbow', desc: 'Ranged Weapon Attack: +4 to hit, range 80/320 ft. Hit: 1d6 + 2 piercing damage.' }
-    ]
-  },
-  {
-    id: 'orc_mercenary',
-    name: 'Orc Mercenary',
-    flavor: 'A brutish warrior fighting for coin, wielding jagged weapons with deadly strength.',
-    ac: 13,
-    hp: 15,
-    speed: '30 ft.',
-    stats: { STR: '+3', DEX: '+1', CON: '+3', INT: '-1', WIS: '+0', CHA: '+0' },
-    passivePerception: 10,
-    spellSave: null,
-    spellAttack: null,
-    features: [
-      { name: 'Aggressive', desc: 'As a bonus action, the orc can move up to its speed toward a hostile creature that it can see.' }
-    ],
-    actions: [
-      { name: 'Greataxe', desc: 'Melee Weapon Attack: +5 to hit. Hit: 1d12 + 3 slashing damage.' },
-      { name: 'Javelin', desc: 'Melee or Ranged Weapon Attack: +5 to hit, range 30/120 ft. Hit: 1d6 + 3 piercing damage.' }
-    ]
-  },
-  {
-    id: 'bandit_captain',
-    name: 'Bandit Captain',
-    flavor: 'A rugged, experienced fighter who survives by outmaneuvering their foes.',
-    ac: 15,
-    hp: 65,
-    speed: '30 ft.',
-    stats: { STR: '+2', DEX: '+3', CON: '+2', INT: '+2', WIS: '+0', CHA: '+2' },
-    passivePerception: 10,
-    spellSave: null,
-    spellAttack: null,
-    features: [
-      { name: 'Parry', desc: 'The captain adds 2 to its AC against one melee attack that would hit it. To do so, the captain must see the attacker and be wielding a melee weapon. (Reaction)' }
-    ],
-    actions: [
-      { name: 'Multiattack', desc: 'The captain makes three melee attacks: two with its scimitar and one with its dagger. Or the captain makes two ranged attacks with its daggers.' },
-      { name: 'Scimitar', desc: 'Melee Weapon Attack: +5 to hit. Hit: 1d6 + 3 slashing damage.' },
-      { name: 'Dagger', desc: 'Melee or Ranged Weapon Attack: +5 to hit. Hit: 1d4 + 3 piercing damage.' }
-    ]
-  },
-  {
-    id: 'thug',
-    name: 'Thug',
-    flavor: 'A ruthless enforcer hired to crack skulls and intimidate commoners.',
-    ac: 11,
-    hp: 32,
-    speed: '30 ft.',
-    stats: { STR: '+2', DEX: '+0', CON: '+2', INT: '-1', WIS: '+0', CHA: '+0' },
-    passivePerception: 10,
-    spellSave: null,
-    spellAttack: null,
-    features: [
-      { name: 'Pack Tactics', desc: 'The thug has advantage on attack rolls against a creature if at least one of the thug\'s allies is within 5 ft of the creature and the ally isn\'t incapacitated.' }
-    ],
-    actions: [
-      { name: 'Multiattack', desc: 'The thug makes two melee attacks.' },
-      { name: 'Mace', desc: 'Melee Weapon Attack: +4 to hit. Hit: 1d6 + 2 bludgeoning damage.' },
-      { name: 'Heavy Crossbow', desc: 'Ranged Weapon Attack: +2 to hit, range 100/400 ft. Hit: 1d10 piercing damage.' }
-    ]
-  },
-  {
-    id: 'veteran',
-    name: 'Veteran',
-    flavor: 'A battle-hardened soldier wearing dented plate armor, wielding multiple weapons with lethal precision.',
-    ac: 17,
-    hp: 58,
-    speed: '30 ft.',
-    stats: { STR: '+3', DEX: '+1', CON: '+2', INT: '+0', WIS: '+0', CHA: '-1' },
-    passivePerception: 10,
-    spellSave: null,
-    spellAttack: null,
-    features: [],
-    actions: [
-      { name: 'Multiattack', desc: 'The veteran makes two longsword attacks. If it has a shortsword drawn, it can also make a shortsword attack.' },
-      { name: 'Longsword', desc: 'Melee Weapon Attack: +5 to hit. Hit: 1d8 + 3 slashing damage.' },
-      { name: 'Shortsword', desc: 'Melee Weapon Attack: +5 to hit. Hit: 1d6 + 3 piercing damage.' },
-      { name: 'Heavy Crossbow', desc: 'Ranged Weapon Attack: +3 to hit, range 100/400 ft. Hit: 1d10 + 1 piercing damage.' }
-    ]
-  },
-  {
-    id: 'dire_wolf',
-    name: 'Dire Wolf',
-    flavor: 'An enormous, fierce beast that hunts in packs and easily knocks prey to the ground.',
-    ac: 14,
-    hp: 37,
-    speed: '50 ft.',
-    stats: { STR: '+3', DEX: '+2', CON: '+2', INT: '-4', WIS: '+1', CHA: '-2' },
-    passivePerception: 13,
-    spellSave: null,
-    spellAttack: null,
-    features: [
-      { name: 'Keen Hearing and Smell', desc: 'The wolf has advantage on Wisdom (Perception) checks that rely on hearing or smell.' },
-      { name: 'Pack Tactics', desc: 'The wolf has advantage on attack rolls against a creature if at least one of the wolf\'s allies is within 5 ft. of the creature and the ally isn\'t incapacitated.' }
-    ],
-    actions: [
-      { name: 'Bite', desc: 'Melee Weapon Attack: +5 to hit. Hit: 2d6 + 3 piercing damage. If the target is a creature, it must succeed on a DC 13 Strength saving throw or be knocked prone.' }
-    ]
-  },
-  {
-    id: 'brown_bear',
-    name: 'Brown Bear',
-    flavor: 'A massive, territorial bear that fiercely guards its den.',
-    ac: 11,
-    hp: 34,
-    speed: '40 ft., climb 30 ft.',
-    stats: { STR: '+4', DEX: '+0', CON: '+3', INT: '-4', WIS: '+1', CHA: '-2' },
-    passivePerception: 13,
-    spellSave: null,
-    spellAttack: null,
-    features: [
-      { name: 'Keen Smell', desc: 'The bear has advantage on Wisdom (Perception) checks that rely on smell.' }
-    ],
-    actions: [
-      { name: 'Multiattack', desc: 'The bear makes two attacks: one with its bite and one with its claws.' },
-      { name: 'Bite', desc: 'Melee Weapon Attack: +5 to hit. Hit: 1d8 + 4 piercing damage.' },
-      { name: 'Claws', desc: 'Melee Weapon Attack: +5 to hit. Hit: 2d6 + 4 slashing damage.' }
-    ]
-  },
-  {
-    id: 'giant_boar',
-    name: 'Giant Boar',
-    flavor: 'A bad-tempered, massive swine capable of trampling enemies with its tusks.',
-    ac: 12,
-    hp: 42,
-    speed: '40 ft.',
-    stats: { STR: '+3', DEX: '+0', CON: '+3', INT: '-4', WIS: '-2', CHA: '-3' },
-    passivePerception: 8,
-    spellSave: null,
-    spellAttack: null,
-    features: [
-      { name: 'Charge', desc: 'If the boar moves at least 20 ft straight toward a target and then hits it with a tusk attack on the same turn, the target takes an extra 7 (2d6) slashing damage. If the target is a creature, it must succeed on a DC 13 Strength saving throw or be knocked prone.' },
-      { name: 'Relentless (Recharges after Short/Long Rest)', desc: 'If the boar takes 14 damage or less that would reduce it to 0 HP, it is reduced to 1 HP instead.' }
-    ],
-    actions: [
-      { name: 'Tusk', desc: 'Melee Weapon Attack: +5 to hit. Hit: 2d6 + 3 slashing damage.' }
-    ]
-  },
-  {
-    id: 'giant_crocodile',
-    name: 'Giant Crocodile',
-    flavor: 'A massive, ancient reptile that ambushes prey near the water\'s edge.',
-    ac: 14,
-    hp: 85,
-    speed: '30 ft., swim 50 ft.',
-    stats: { STR: '+5', DEX: '-1', CON: '+3', INT: '-4', WIS: '+0', CHA: '-2' },
-    passivePerception: 10,
-    spellSave: null,
-    spellAttack: null,
-    features: [
-      { name: 'Hold Breath', desc: 'The crocodile can hold its breath for 15 minutes.' }
-    ],
-    actions: [
-      { name: 'Multiattack', desc: 'The crocodile makes two attacks: one with its bite and one with its tail.' },
-      { name: 'Bite', desc: 'Melee Weapon Attack: +8 to hit. Hit: 3d10 + 5 piercing damage, and the target is grappled (escape DC 16).' },
-      { name: 'Tail', desc: 'Melee Weapon Attack: +8 to hit. Hit: 2d8 + 5 bludgeoning damage. If the target is a creature, it must succeed on a DC 16 Strength saving throw or be knocked prone.' }
+      { name: 'Pointed Stick', desc: 'Melee Weapon Attack. +4 to hit. Hit: 3 (1d4 + 1) piercing damage.' } 
     ]
   }
 ];

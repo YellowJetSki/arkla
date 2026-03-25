@@ -1,25 +1,25 @@
 import { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Tent, X, Heart, ShieldPlus, CheckCircle2, Dices, Info } from 'lucide-react';
+import { Tent, X, Heart, ShieldPlus, CheckCircle2, Dices, Info, Sparkles } from 'lucide-react';
 
 export default function ShortRestModal({ char, charId, onClose }) {
   const [isResting, setIsResting] = useState(false);
   const [spentDice, setSpentDice] = useState('');
   const [hpRegained, setHpRegained] = useState('');
 
-  // Safe fallbacks for character data
   const currentHp = char.hp ?? 0;
   const maxHp = char.maxHp || 10;
   const currentDice = char.hitDice?.current ?? char.level;
   const diceType = char.hitDice?.type || 'd8';
   
-  // Calculate CON Mod to remind the player
   const conMod = Math.floor(((char.stats?.CON || 10) - 10) / 2);
   const formattedConMod = conMod >= 0 ? `+${conMod}` : `${conMod}`;
 
-  // Dynamic preview math
   const previewHp = Math.min(maxHp, currentHp + (parseInt(hpRegained, 10) || 0));
+
+  // Phase 3: Auto-detect items that recharge on Short Rest
+  const shortRestResources = (char.resources || []).filter(r => r.recharge === 'short' || (r.desc || '').toLowerCase().includes('short rest'));
 
   const handleConfirmRest = async () => {
     setIsResting(true);
@@ -33,17 +33,27 @@ export default function ShortRestModal({ char, charId, onClose }) {
         'hitDice.current': currentDice - boundedSpent,
       };
 
-      // If they healed from 0, wipe their death saves
       if (previewHp > 0 && currentHp === 0) {
         updates['deathSaves.successes'] = 0;
         updates['deathSaves.failures'] = 0;
+      }
+
+      // Auto-recharge valid resources
+      if (shortRestResources.length > 0) {
+        const updatedResources = char.resources.map(res => {
+          if (shortRestResources.some(sr => sr.name === res.name)) {
+            return { ...res, current: res.max };
+          }
+          return res;
+        });
+        updates.resources = updatedResources;
       }
 
       await updateDoc(doc(db, 'characters', charId), updates);
       
       setTimeout(() => {
         onClose();
-      }, 1500); // Give them a second to see the success state
+      }, 2000); 
       
     } catch (error) {
       console.error("Short Rest Failed:", error);
@@ -55,7 +65,6 @@ export default function ShortRestModal({ char, charId, onClose }) {
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh]">
       <div className="bg-slate-900 border border-emerald-500/50 rounded-2xl w-full max-w-md shadow-[0_0_50px_rgba(16,185,129,0.2)] flex flex-col relative overflow-hidden">
         
-        {/* Header */}
         <div className="p-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-900/90 relative z-10">
           <h2 className="text-xl font-bold text-emerald-400 flex items-center gap-2">
             <Tent className="w-5 h-5" /> Short Rest
@@ -72,7 +81,16 @@ export default function ShortRestModal({ char, charId, onClose }) {
             <div className="animate-in fade-in zoom-in duration-500 flex flex-col items-center py-8 text-center">
               <CheckCircle2 className="w-16 h-16 text-emerald-400 mb-4 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]" />
               <h3 className="text-2xl font-black text-white mb-2">Rested & Ready</h3>
-              <p className="text-sm text-slate-400">Your health and Hit Dice have been updated.</p>
+              <p className="text-sm text-slate-400 mb-4">Your health and Hit Dice have been updated.</p>
+              
+              {shortRestResources.length > 0 && (
+                <div className="bg-emerald-950/30 border border-emerald-900/50 rounded-lg p-3 w-full text-left">
+                  <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider block mb-2">Resources Recovered:</span>
+                  <ul className="text-sm text-emerald-200/80 space-y-1">
+                    {shortRestResources.map(r => <li key={r.name} className="flex items-center gap-2"><Sparkles className="w-3 h-3 text-emerald-400"/> {r.name}</li>)}
+                  </ul>
+                </div>
+              )}
             </div>
           ) : (
             <div className="animate-in fade-in duration-300">
@@ -84,7 +102,6 @@ export default function ShortRestModal({ char, charId, onClose }) {
                 </p>
               </div>
 
-              {/* The "Don't Forget" Alert */}
               <div className="bg-emerald-900/20 border border-emerald-500/30 p-3 rounded-lg flex items-start gap-3 mb-6">
                 <Info className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                 <p className="text-xs text-emerald-100/80 leading-relaxed">
@@ -92,7 +109,6 @@ export default function ShortRestModal({ char, charId, onClose }) {
                 </p>
               </div>
 
-              {/* Inputs */}
               <div className="space-y-4 mb-8">
                 <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-inner flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
@@ -126,7 +142,6 @@ export default function ShortRestModal({ char, charId, onClose }) {
                 </div>
               </div>
 
-              {/* Dynamic Preview & Submit */}
               <div className="flex items-center justify-between border-t border-slate-700/50 pt-5">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">New HP</span>
