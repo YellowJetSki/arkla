@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Shield, Settings, BrainCircuit, Hammer, X, Filter, Trash2 } from 'lucide-react';
 import CollapsibleSection from './shared/CollapsibleSection';
@@ -49,9 +49,30 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     setSpellToCast(null);
   };
 
+  // --- TOKEN SYNC HOOK FOR CONCENTRATION ---
   const toggleConcentration = async () => {
     if (isDM) return;
-    await updateDoc(doc(db, 'characters', charId), { isConcentrating: !char.isConcentrating });
+    try {
+      await runTransaction(db, async (transaction) => {
+        const charRef = doc(db, 'characters', charId);
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        
+        const newConcState = !char.isConcentrating;
+        
+        // 1. Update Character Sheet
+        transaction.update(charRef, { isConcentrating: newConcState });
+        
+        // 2. Sync to Map Token
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+          const mapTokens = mapDoc.data().tokens;
+          mapTokens[charId].isConcentrating = newConcState;
+          transaction.update(mapRef, { tokens: mapTokens });
+        }
+      });
+    } catch (err) {
+      console.error("Concentration sync failed:", err);
+    }
   };
 
   const addSpellToGrimoire = async (newSpell) => {

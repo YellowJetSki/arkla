@@ -3,6 +3,7 @@ import { doc, onSnapshot, writeBatch, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Shield, Eye, Maximize2, UserX, ChevronDown, ChevronUp, Sword, Zap, Sparkles } from 'lucide-react';
 import CharacterCard from './CharacterCard';
+import { parseAndScaleAttack } from '../services/arklaEngine';
 
 export default function DMPlayerCard({ charId }) {
   const [char, setChar] = useState(null);
@@ -40,10 +41,11 @@ export default function DMPlayerCard({ charId }) {
   const hpColor = hpPercent > 50 ? 'bg-emerald-500' : hpPercent > 20 ? 'bg-yellow-500' : 'bg-red-500';
   const isUnconscious = (char.hp || 0) <= 0;
   
-  // REQ 8: Correct Passive Perception Calculation
+  const totalLevel = char.classes ? char.classes.reduce((sum, c) => sum + c.level, 0) : (char.level || 1);
+
   const wisScore = char.stats?.WIS || 10;
   const wisMod = Math.floor((wisScore - 10) / 2);
-  const proficiencyBonus = Math.ceil(((char.level || 1) / 4) + 1);
+  const proficiencyBonus = Math.ceil((totalLevel / 4) + 1);
   const hasPerception = (char.proficiencies?.skills || '').toLowerCase().includes('perception');
   const passivePerception = 10 + wisMod + (hasPerception ? proficiencyBonus : 0);
 
@@ -54,6 +56,9 @@ export default function DMPlayerCard({ charId }) {
     !f.desc.toLowerCase().includes('bonus action') && 
     !f.desc.toLowerCase().includes('reaction')
   );
+
+  // Use the engine to ensure the DM sees the exact same attack numbers the player sees
+  const dynamicAttacks = (char.attacks || []).map(atk => parseAndScaleAttack(atk, char.stats, totalLevel));
 
   return (
     <>
@@ -123,13 +128,13 @@ export default function DMPlayerCard({ charId }) {
             <div className="mb-3">
               <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Sword className="w-3 h-3" /> Attacks / Actions</h4>
               <div className="space-y-1.5">
-                {(char.attacks || []).map((atk, i) => (
+                {dynamicAttacks.map((atk, i) => (
                   <div key={i} className="flex justify-between items-center text-xs bg-slate-900 p-1.5 rounded border border-slate-800">
                     <span className="font-bold text-slate-300 truncate">{atk.name}</span>
                     <span className="text-slate-400 font-mono shrink-0">{atk.hit} • {atk.damage}</span>
                   </div>
                 ))}
-                {(!char.attacks || char.attacks.length === 0) && <p className="text-[10px] text-slate-500 italic">No weapon attacks.</p>}
+                {dynamicAttacks.length === 0 && <p className="text-[10px] text-slate-500 italic">No weapon attacks.</p>}
               </div>
             </div>
 

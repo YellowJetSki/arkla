@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, doc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Skull, RefreshCw, Book, PackagePlus, Users, 
@@ -17,7 +17,7 @@ import DMBattleMap from './battlemap/DMBattleMap';
 import DMReferenceModal from './DMReferenceModal';
 import DialogModal from './shared/DialogModal';
 import ApiBestiaryImport from './ApiBestiaryImport';
-import DebouncedTextarea from './shared/DebouncedTextarea'; // NEW
+import DebouncedTextarea from './shared/DebouncedTextarea';
 
 export default function DMDashboard({ onLogout }) {
   const [unlockedCharacters, setUnlockedCharacters] = useState([]);
@@ -114,6 +114,7 @@ export default function DMDashboard({ onLogout }) {
     });
   };
 
+  // --- TOKEN SYNC HOOK FOR SWEEP ---
   const confirmClearConditions = () => {
     setDialog({
       isOpen: true,
@@ -123,14 +124,31 @@ export default function DMDashboard({ onLogout }) {
       onConfirm: async () => {
         try {
           const batch = writeBatch(db);
+          
+          // 1. Sweep Player Sheets
           for (const charId of unlockedCharacters) {
             const charRef = doc(db, 'characters', charId);
             batch.update(charRef, { conditions: [], isConcentrating: false });
           }
+          
+          // 2. Sweep Enemy Sheets
           const enemyDocs = await getDocs(collection(db, 'active_enemies'));
           enemyDocs.forEach((docSnap) => {
             batch.update(docSnap.ref, { conditions: [] });
           });
+
+          // 3. Sweep Map Tokens
+          const mapRef = doc(db, 'campaign', 'battlemap');
+          const mapSnap = await getDoc(mapRef);
+          if (mapSnap.exists() && mapSnap.data().tokens) {
+            const mapTokens = mapSnap.data().tokens;
+            Object.keys(mapTokens).forEach(tokenId => {
+               mapTokens[tokenId].conditions = [];
+               mapTokens[tokenId].isConcentrating = false;
+            });
+            batch.update(mapRef, { tokens: mapTokens });
+          }
+
           await batch.commit();
           closeDialog();
           showToast('All Conditions Swept');
@@ -141,6 +159,7 @@ export default function DMDashboard({ onLogout }) {
     });
   };
 
+  // --- TOKEN SYNC HOOK FOR MASS MATH ---
   const handleMassMath = async (isDamage) => {
     const amt = parseInt(massMathAmount, 10);
     if (isNaN(amt) || amt <= 0 || activeEnemies.length === 0) return;
@@ -151,13 +170,30 @@ export default function DMDashboard({ onLogout }) {
         ? activeEnemies.filter(e => selectedEnemies.includes(e.id))
         : activeEnemies;
 
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      const mapSnap = await getDoc(mapRef);
+      let mapTokens = mapSnap.exists() ? mapSnap.data().tokens || {} : {};
+      let tokensChanged = false;
+
       targets.forEach(enemy => {
         const ref = doc(db, 'active_enemies', enemy.id);
         const current = enemy.currentHp ?? enemy.hp;
         const newHp = isDamage ? Math.max(0, current - amt) : Math.min(enemy.hp, current + amt);
+        
+        // 1. Update Enemy Sheet
         batch.update(ref, { currentHp: newHp });
+        
+        // 2. Update Map Token
+        if (mapTokens[enemy.id]) {
+           mapTokens[enemy.id].hp = newHp;
+           tokensChanged = true;
+        }
       });
       
+      if (tokensChanged) {
+         batch.update(mapRef, { tokens: mapTokens });
+      }
+
       await batch.commit();
       setMassMathAmount('');
       setSelectedEnemies([]); 

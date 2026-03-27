@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Moon, Bed, CheckCircle2, X, Activity, Flame, ShieldPlus } from 'lucide-react';
 
@@ -15,37 +15,56 @@ export default function LongRestModal({ char, charId, onClose }) {
     setIsResting(true);
 
     try {
-      let updates = {};
+      await runTransaction(db, async (transaction) => {
+        const charRef = doc(db, 'characters', charId);
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        
+        let updates = {};
 
-      updates.hp = char.maxHp || 10;
-      updates.tempHp = 0;
-      updates['deathSaves.successes'] = 0;
-      updates['deathSaves.failures'] = 0;
-      updates.isConcentrating = false;
-      updates['hitDice.current'] = newHD;
+        updates.hp = char.maxHp || 10;
+        updates.tempHp = 0;
+        updates['deathSaves.successes'] = 0;
+        updates['deathSaves.failures'] = 0;
+        updates.isConcentrating = false;
+        updates['hitDice.current'] = newHD;
 
-      if (char.spellSlots) {
-        const resetSlots = { ...char.spellSlots };
-        Object.keys(resetSlots).forEach(level => {
-          resetSlots[level].current = resetSlots[level].max;
-        });
-        updates.spellSlots = resetSlots;
-      }
+        if (char.spellSlots) {
+          const resetSlots = { ...char.spellSlots };
+          Object.keys(resetSlots).forEach(level => {
+            resetSlots[level].current = resetSlots[level].max;
+          });
+          updates.spellSlots = resetSlots;
+        }
 
-      if (char.resources && char.resources.length > 0) {
-        const resetResources = char.resources.map(res => ({
-          ...res,
-          current: res.max
-        }));
-        updates.resources = resetResources;
-      }
+        if (char.resources && char.resources.length > 0) {
+          const resetResources = char.resources.map(res => ({
+            ...res,
+            current: res.max
+          }));
+          updates.resources = resetResources;
+        }
 
-      if (char.conditions && char.conditions.length > 0) {
-        const clearedConditions = ['Unconscious', 'Prone'];
-        updates.conditions = char.conditions.filter(c => !clearedConditions.includes(c));
-      }
+        if (char.conditions && char.conditions.length > 0) {
+          const clearedConditions = ['Unconscious', 'Prone'];
+          updates.conditions = char.conditions.filter(c => !clearedConditions.includes(c));
+        } else {
+          updates.conditions = [];
+        }
 
-      await updateDoc(doc(db, 'characters', charId), updates);
+        // 1. Update Character Sheet
+        transaction.update(charRef, updates);
+
+        // 2. Sync to Battle Map
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+          const mapTokens = mapDoc.data().tokens;
+          mapTokens[charId].hp = updates.hp;
+          mapTokens[charId].tempHp = 0;
+          mapTokens[charId].isConcentrating = false;
+          mapTokens[charId].conditions = updates.conditions;
+          transaction.update(mapRef, { tokens: mapTokens });
+        }
+      });
       
       setTimeout(() => {
         onClose();

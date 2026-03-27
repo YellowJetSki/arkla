@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Shield, Heart, Skull, Trash2, Swords, Calculator, CheckSquare, Square, Plus } from 'lucide-react';
 import { CONDITIONS_LIST, PREMADE_ENEMIES } from '../data/campaignData';
@@ -15,18 +15,50 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
   const [mathInput, setMathInput] = useState('');
   const [showConditionPicker, setShowConditionPicker] = useState(false);
   
-  // Replaced window.confirm with DialogModal state
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
+  // --- TOKEN SYNC HOOKS FOR ENEMIES ---
   const updateHp = async (newHp) => {
     const boundedHp = Math.max(0, Math.min(newHp, fullEnemy.hp));
-    await updateDoc(doc(db, 'active_enemies', fullEnemy.id), { currentHp: boundedHp });
+    try {
+      await runTransaction(db, async (transaction) => {
+        const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        
+        transaction.update(enemyRef, { currentHp: boundedHp });
+        
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
+          const mapTokens = mapDoc.data().tokens;
+          mapTokens[fullEnemy.id].hp = boundedHp;
+          transaction.update(mapRef, { tokens: mapTokens });
+        }
+      });
+    } catch (err) {
+      console.error("Enemy HP Sync Failed:", err);
+    }
   };
 
   const adjustHp = async (amount) => {
     const newHp = Math.max(0, Math.min((fullEnemy.currentHp ?? fullEnemy.hp) + amount, fullEnemy.hp));
-    await updateDoc(doc(db, 'active_enemies', fullEnemy.id), { currentHp: newHp });
+    try {
+      await runTransaction(db, async (transaction) => {
+        const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        
+        transaction.update(enemyRef, { currentHp: newHp });
+        
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
+          const mapTokens = mapDoc.data().tokens;
+          mapTokens[fullEnemy.id].hp = newHp;
+          transaction.update(mapRef, { tokens: mapTokens });
+        }
+      });
+    } catch (err) {
+      console.error("Enemy HP Sync Failed:", err);
+    }
   };
 
   const handleQuickMath = (e, isDamage) => {
@@ -41,12 +73,48 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
 
   const handleAddCondition = async (condition) => {
     if (!condition) return;
-    await updateDoc(doc(db, 'active_enemies', fullEnemy.id), { conditions: arrayUnion(condition) });
+    try {
+      await runTransaction(db, async (transaction) => {
+        const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        
+        transaction.update(enemyRef, { conditions: arrayUnion(condition) });
+        
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
+          const mapTokens = mapDoc.data().tokens;
+          const currentConds = mapTokens[fullEnemy.id].conditions || [];
+          if (!currentConds.includes(condition)) {
+            mapTokens[fullEnemy.id].conditions = [...currentConds, condition];
+            transaction.update(mapRef, { tokens: mapTokens });
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Enemy Condition Sync Failed:", err);
+    }
     setShowConditionPicker(false);
   };
 
   const handleRemoveCondition = async (condition) => {
-    await updateDoc(doc(db, 'active_enemies', fullEnemy.id), { conditions: arrayRemove(condition) });
+    try {
+      await runTransaction(db, async (transaction) => {
+        const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        
+        transaction.update(enemyRef, { conditions: arrayRemove(condition) });
+        
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
+          const mapTokens = mapDoc.data().tokens;
+          const currentConds = mapTokens[fullEnemy.id].conditions || [];
+          mapTokens[fullEnemy.id].conditions = currentConds.filter(c => c !== condition);
+          transaction.update(mapRef, { tokens: mapTokens });
+        }
+      });
+    } catch (err) {
+      console.error("Enemy Condition Sync Failed:", err);
+    }
   };
 
   const handleDelete = () => {
@@ -56,7 +124,23 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
       message: `Are you sure you want to remove ${fullEnemy.name} from the active board?`,
       type: 'confirm',
       onConfirm: async () => {
-        await deleteDoc(doc(db, 'active_enemies', fullEnemy.id));
+        try {
+          await runTransaction(db, async (transaction) => {
+            const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+            const mapRef = doc(db, 'campaign', 'battlemap');
+            
+            transaction.delete(enemyRef);
+            
+            const mapDoc = await transaction.get(mapRef);
+            if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
+              const mapTokens = mapDoc.data().tokens;
+              delete mapTokens[fullEnemy.id];
+              transaction.update(mapRef, { tokens: mapTokens });
+            }
+          });
+        } catch (err) {
+          console.error("Enemy Deletion Sync Failed:", err);
+        }
         closeDialog();
       }
     });

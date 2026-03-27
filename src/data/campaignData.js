@@ -35,7 +35,8 @@ export const PREMADE_CHARACTERS = {
   'wendy': {
     name: 'Wendy Warmwind',
     race: 'Rock Gnome',
-    class: 'Monk (Way of the Kolari)',
+    class: 'Monk 1',
+    classes: [{ name: 'Monk', level: 1 }],
     level: 1,
     exp: 0,
     alignment: 'Chaotic Good',
@@ -44,7 +45,7 @@ export const PREMADE_CHARACTERS = {
     tempHp: 0,
     hitDice: { current: 1, max: 1, type: 'd8' },
     ac: 16,
-    initiative: 3,
+    initiative: '--', 
     spellSave: '--',
     spellAttack: '--',
     combatInitiative: null,
@@ -58,14 +59,14 @@ export const PREMADE_CHARACTERS = {
     currency: { assarions: 5, quadrans: 10, leptons: 15 },
     imageUrl: '', 
     deathSaves: { successes: 0, failures: 0 },
-    resources: [], // Monks get Ki at level 2 (which recharges on short rest!)
+    resources: [], 
     spellSlots: {},
     spells: [],
     dmNotes: '',
     attacks: [
-      { name: 'Unarmed Strike', hit: '+5', damage: '1d4 + 3', type: 'Bludgeoning', notes: '' },
-      { name: 'Quarterstaff', hit: '+5', damage: '1d6 + 3', type: 'Bludgeoning', notes: '' },
-      { name: 'Shurikens', hit: '+5', damage: '1d4 + 3', type: 'Piercing', notes: 'Range: 20/60ft' }
+      { name: 'Unarmed Strike', hit: '--', damage: '1d4', type: 'Bludgeoning', notes: 'Finesse' },
+      { name: 'Quarterstaff', hit: '--', damage: '1d6', type: 'Bludgeoning', notes: 'Finesse' },
+      { name: 'Shurikens', hit: '--', damage: '1d4', type: 'Piercing', notes: 'Range: 20/60ft, Finesse' }
     ],
     proficiencies: {
       skills: 'Acrobatics (+5), Insight (+5), Investigation (+4), Stealth (+5)',
@@ -97,7 +98,8 @@ export const PREMADE_CHARACTERS = {
   'kehrfuffle': {
     name: 'Kehrfuffle Songroot',
     race: 'Wood Elf',
-    class: 'Bard',
+    class: 'Bard 1',
+    classes: [{ name: 'Bard', level: 1 }],
     level: 1,
     exp: 0,
     alignment: 'Chaotic Neutral',
@@ -106,9 +108,9 @@ export const PREMADE_CHARACTERS = {
     tempHp: 0,
     hitDice: { current: 1, max: 1, type: 'd8' },
     ac: 14,
-    initiative: 3,
-    spellSave: 13,
-    spellAttack: '+5',
+    initiative: '--', 
+    spellSave: '--', 
+    spellAttack: '--', 
     combatInitiative: null,
     speed: 35,
     inspiration: false,
@@ -125,7 +127,7 @@ export const PREMADE_CHARACTERS = {
         name: 'Bardic Inspiration', 
         max: 3, 
         current: 3, 
-        recharge: 'long', // Won't recharge on short rest until Font of Inspiration at Level 5!
+        recharge: 'long', 
         desc: 'Use a Bonus Action to give an ally within 60 ft a 1d6 to add to an attack roll, saving throw, or skill check. Regains all uses on a Long Rest.' 
       }
     ],    
@@ -172,8 +174,8 @@ export const PREMADE_CHARACTERS = {
     ],
     dmNotes: '',
     attacks: [
-      { name: 'The Great Sickle (Finesse)', hit: '+5', damage: '1d6 + 3', type: 'Slashing', notes: '' },
-      { name: 'Dagger', hit: '+5', damage: '1d4 + 3', type: 'Piercing', notes: 'Range: 20/60ft' }
+      { name: 'The Great Sickle', hit: '--', damage: '1d6', type: 'Slashing', notes: 'Finesse' },
+      { name: 'Dagger', hit: '--', damage: '1d4', type: 'Piercing', notes: 'Range: 20/60ft, Finesse' }
     ],
     proficiencies: {
       skills: 'Insight (+5), Investigation (+2), Perception (+5), Performance (+5), Persuasion (+5), Survival (+5)',

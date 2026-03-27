@@ -43,6 +43,8 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
   };
 
+  // --- TOKEN SYNC HOOK START ---
+  // Any manual typed input to HP syncs to the Battle Map Token
   const submitHpUpdate = async (newHpVal, newTempVal = null) => {
     const boundedHp = Math.max(0, Math.min(parseInt(newHpVal, 10) || 0, char.maxHp || 10));
     let updates = { hp: boundedHp };
@@ -52,11 +54,31 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
       updates['deathSaves.successes'] = 0;
       updates['deathSaves.failures'] = 0;
     }
+    
+    // 1. Update the character sheet
     await updateDoc(doc(db, 'characters', charId), updates);
+
+    // 2. Sync to the Battle Map if they are staged
+    try {
+      await runTransaction(db, async (transaction) => {
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+           const mapTokens = mapDoc.data().tokens;
+           mapTokens[charId].hp = boundedHp;
+           if (newTempVal !== null) mapTokens[charId].tempHp = updates.tempHp;
+           transaction.update(mapRef, { tokens: mapTokens });
+        }
+      });
+    } catch (err) {
+       console.log("Could not sync HP to map (token probably not staged).");
+    }
   };
 
+  // The Plus/Minus buttons sync to the Battle Map Token
   const adjustHp = async (amount) => {
     const charRef = doc(db, 'characters', charId);
+    const mapRef = doc(db, 'campaign', 'battlemap');
     
     // QoL: The Concentration Safety Net
     if (amount < 0 && char.isConcentrating) {
@@ -94,12 +116,23 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
           updates['deathSaves.failures'] = 0;
         }
         
+        // 1. Update Character
         transaction.update(charRef, updates);
+
+        // 2. Sync to Battle Map
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+           const mapTokens = mapDoc.data().tokens;
+           mapTokens[charId].hp = currentHp;
+           mapTokens[charId].tempHp = currentTemp;
+           transaction.update(mapRef, { tokens: mapTokens });
+        }
       });
     } catch (err) {
       console.error("HP Transaction Failed:", err);
     }
   };
+  // --- TOKEN SYNC HOOK END ---
 
   const handleSpendHitDie = async () => {
     const currentHD = char.hitDice?.current ?? char.level;

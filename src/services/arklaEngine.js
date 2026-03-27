@@ -1,11 +1,167 @@
 // ==========================================
-// ⚙️ THE ARKLA ENGINE (FULL 5E INTEGRATION)
-// Connects to D&D 5e API, applies Sanctuary Filters, and maps mechanics.
+// ⚙️ THE ARKLA ENGINE (FULL 5E INTEGRATION & MATH)
+// Connects to D&D 5e API, applies Sanctuary Filters, maps mechanics, and handles multi-classing.
 // ==========================================
 
-export const getProficiencyBonus = (level) => Math.floor((level - 1) / 4) + 2;
+// --- CORE MATH & DERIVATIONS ---
+export const getProficiencyBonus = (totalLevel) => Math.floor((totalLevel - 1) / 4) + 2;
 export const getModifier = (score) => Math.floor((score - 10) / 2);
 
+export const calculateInitiative = (dexScore) => {
+  const mod = getModifier(dexScore || 10);
+  return mod >= 0 ? `+${mod}` : `${mod}`;
+};
+
+export const calculateSpellcastingStats = (classesArray, stats) => {
+  // Finds the primary casting stat based on the highest level caster class
+  let primaryCastingStat = 'CHA'; 
+  let highestCasterLevel = 0;
+
+  (classesArray || []).forEach(cls => {
+    const cleanName = cls.name.split(' ')[0].toLowerCase();
+    const castingStat = SPELLCASTING_STATS[cleanName];
+    if (castingStat && cls.level > highestCasterLevel) {
+      highestCasterLevel = cls.level;
+      primaryCastingStat = castingStat;
+    }
+  });
+
+  const totalLevel = (classesArray || []).reduce((sum, cls) => sum + cls.level, 0) || 1;
+  const pb = getProficiencyBonus(totalLevel);
+  const mod = getModifier(stats[primaryCastingStat] || 10);
+
+  return {
+    spellSave: 8 + pb + mod,
+    spellAttack: `+${pb + mod}`,
+    primaryStat: primaryCastingStat
+  };
+};
+
+export const parseAndScaleAttack = (attack, stats, totalLevel) => {
+  if (!attack.notes && attack.notes !== '') return attack;
+
+  const strMod = getModifier(stats?.STR || 10);
+  const dexMod = getModifier(stats?.DEX || 10);
+  const pb = getProficiencyBonus(totalLevel || 1);
+
+  const properties = attack.notes.toLowerCase();
+  const isFinesse = properties.includes('finesse');
+  const isRanged = properties.includes('ammunition') || properties.includes('thrown') || properties.includes('range');
+  
+  let useStatMod = strMod;
+  if (isRanged) useStatMod = dexMod;
+  if (isFinesse) useStatMod = Math.max(strMod, dexMod);
+
+  const toHit = pb + useStatMod;
+  const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
+
+  const baseDiceMatch = attack.damage.match(/(\d+d\d+)/);
+  const baseDice = baseDiceMatch ? baseDiceMatch[0] : '';
+  
+  let formattedDamage = attack.damage; 
+  if (baseDice) {
+     formattedDamage = useStatMod === 0 ? baseDice : 
+                       useStatMod > 0 ? `${baseDice} + ${useStatMod}` : 
+                       `${baseDice} - ${Math.abs(useStatMod)}`;
+  }
+
+  return { ...attack, hit: formattedHit, damage: formattedDamage };
+};
+
+// --- MULTI-CLASS SPELL SLOT CALCULATOR ---
+const FULL_CASTERS = ['bard', 'cleric', 'druid', 'sorcerer', 'wizard'];
+const HALF_CASTERS = ['paladin', 'ranger'];
+const ARTIFICER = ['artificer']; 
+
+const MULTICLASS_SLOT_TABLE = [
+  [], // 0
+  [2], // 1
+  [3], // 2
+  [4, 2], // 3
+  [4, 3], // 4
+  [4, 3, 2], // 5
+  [4, 3, 3], // 6
+  [4, 3, 3, 1], // 7
+  [4, 3, 3, 2], // 8
+  [4, 3, 3, 3, 1], // 9
+  [4, 3, 3, 3, 2], // 10
+  [4, 3, 3, 3, 2, 1], // 11
+  [4, 3, 3, 3, 2, 1], // 12
+  [4, 3, 3, 3, 2, 1, 1], // 13
+  [4, 3, 3, 3, 2, 1, 1], // 14
+  [4, 3, 3, 3, 2, 1, 1, 1], // 15
+  [4, 3, 3, 3, 2, 1, 1, 1], // 16
+  [4, 3, 3, 3, 2, 1, 1, 1, 1], // 17
+  [4, 3, 3, 3, 3, 1, 1, 1, 1], // 18
+  [4, 3, 3, 3, 3, 2, 1, 1, 1], // 19
+  [4, 3, 3, 3, 3, 2, 2, 1, 1]  // 20
+];
+
+export const calculateCombinedSpellSlots = (classesArray) => {
+  let casterLevel = 0;
+  let warlockSlots = null; // Warlocks use Pact Magic, tracked separately
+
+  classesArray.forEach(cls => {
+    const cleanName = cls.name.split(' ')[0].toLowerCase();
+    
+    if (FULL_CASTERS.includes(cleanName)) {
+      casterLevel += cls.level;
+    } else if (HALF_CASTERS.includes(cleanName)) {
+      casterLevel += Math.floor(cls.level / 2);
+    } else if (ARTIFICER.includes(cleanName)) {
+      casterLevel += Math.ceil(cls.level / 2);
+    } else if (cleanName === 'warlock' || cleanName === 'dealt') {
+      // Warlocks handles their own slots via the API progression later
+    }
+    // Note: Arcane Tricksters / Eldritch Knights would be Math.floor(level / 3), 
+    // requiring subclass tracking to implement perfectly.
+  });
+
+  if (casterLevel === 0) return {};
+
+  const slotArray = MULTICLASS_SLOT_TABLE[Math.min(casterLevel, 20)];
+  let slots = {};
+  
+  slotArray.forEach((maxSlots, index) => {
+    if (maxSlots > 0) {
+      const levelString = (index + 1).toString();
+      slots[levelString] = { max: maxSlots, current: maxSlots };
+    }
+  });
+
+  return slots;
+};
+
+// --- CONDITION AUTOMATION HOOKS ---
+export const getConditionMechanics = (activeConditions) => {
+  let mechanics = {
+    speedMultiplier: 1,
+    speedOverride: null,
+    attackDisadvantage: false,
+    attackAdvantage: false,
+    autoFailStrDex: false
+  };
+
+  if (!activeConditions || activeConditions.length === 0) return mechanics;
+
+  if (activeConditions.includes('Grappled') || activeConditions.includes('Restrained')) {
+    mechanics.speedOverride = 0;
+  }
+  if (activeConditions.includes('Paralyzed') || activeConditions.includes('Stunned') || activeConditions.includes('Unconscious') || activeConditions.includes('Petrified')) {
+    mechanics.speedOverride = 0;
+    mechanics.autoFailStrDex = true;
+  }
+  if (activeConditions.includes('Poisoned') || activeConditions.includes('Frightened') || activeConditions.includes('Prone')) {
+    mechanics.attackDisadvantage = true;
+  }
+  if (activeConditions.includes('Invisible')) {
+    mechanics.attackAdvantage = true;
+  }
+
+  return mechanics;
+};
+
+// --- API MAPS & CONSTANTS ---
 const CLASS_API_MAP = {
   'dealt': 'warlock',     
   'mage': 'sorcerer',     
@@ -22,9 +178,21 @@ const CLASS_API_MAP = {
 };
 
 const SPECIES_API_MAP = {
-  'dragonborn': 'dragonborn', 'dwarf': 'dwarf', 'elf': 'elf', 'gnome': 'gnome',
-  'half-elf': 'half-elf', 'half-orc': 'half-orc', 'halfling': 'halfling', 
-  'human': 'human', 'tiefling': 'tiefling'
+  'dragonborn': { type: 'races', index: 'dragonborn' },
+  'dwarf': { type: 'races', index: 'dwarf' },
+  'elf': { type: 'races', index: 'elf' },
+  'gnome': { type: 'races', index: 'gnome' },
+  'half-elf': { type: 'races', index: 'half-elf' },
+  'half-orc': { type: 'races', index: 'half-orc' },
+  'halfling': { type: 'races', index: 'halfling' },
+  'human': { type: 'races', index: 'human' },
+  'tiefling': { type: 'races', index: 'tiefling' },
+  'wood': { type: 'subraces', index: 'wood-elf', parent: 'elf' },
+  'high': { type: 'subraces', index: 'high-elf', parent: 'elf' },
+  'rock': { type: 'subraces', index: 'rock-gnome', parent: 'gnome' },
+  'forest': { type: 'subraces', index: 'forest-gnome', parent: 'gnome' },
+  'hill': { type: 'subraces', index: 'hill-dwarf', parent: 'dwarf' },
+  'mountain': { type: 'subraces', index: 'mountain-dwarf', parent: 'dwarf' }
 };
 
 const HIT_DICE_MAP = {
@@ -71,21 +239,6 @@ export const applySanctuaryFilter = (text) => {
   return safeText;
 };
 
-export const calculateSpellcastingStats = (className, level, stats) => {
-  const cleanName = (className || '').split(' ')[0].toLowerCase();
-  const castingStat = SPELLCASTING_STATS[cleanName];
-  
-  if (!castingStat) return { spellSave: '--', spellAttack: '--' };
-
-  const pb = getProficiencyBonus(level);
-  const mod = getModifier(stats[castingStat] || 10);
-
-  return {
-    spellSave: 8 + pb + mod,
-    spellAttack: `+${pb + mod}`
-  };
-};
-
 const RESOURCE_HOOKS = {
   'Rage': { maxType: 'API_RAGE', recharge: 'long' },
   'Bardic Inspiration': { maxType: 'CHA', recharge: 'long' }, 
@@ -94,10 +247,10 @@ const RESOURCE_HOOKS = {
   'Action Surge': { maxType: 1, recharge: 'short' }, 
   'Second Wind': { maxType: 1, recharge: 'short' },
   'Indomitable': { maxType: 'API_INDOMITABLE', recharge: 'long' },
-  'Ki': { maxType: 'LEVEL', recharge: 'short' },
+  'Ki': { maxType: 'CLASS_LEVEL', recharge: 'short' }, // Updated for multiclass
   'Lay on Hands': { maxType: 'PALADIN_HP', recharge: 'long' }, 
   'Divine Sense': { maxType: 'API_CD', recharge: 'long' }, 
-  'Font of Magic': { maxType: 'LEVEL', recharge: 'long', rename: 'Sorcery Points' }, 
+  'Font of Magic': { maxType: 'CLASS_LEVEL', recharge: 'long', rename: 'Sorcery Points' }, // Updated for multiclass
   'Tides of Chaos': { maxType: 1, recharge: 'long' }, 
   'Hexblade\'s Curse': { maxType: 1, recharge: 'short', filterRename: 'Dealt\'s Curse' } 
 };
@@ -126,7 +279,6 @@ const HOMEBREW_CLASSES = {
   }
 };
 
-// --- CHUNK LOADING & DISCOVERY CACHES ---
 let cachedSpellStubs = null;
 let cachedFeatStubs = null;
 let cachedEquipmentStubs = null;
@@ -141,7 +293,6 @@ export const getSpellStubs = async () => {
 
 export const getFeatStubs = async () => {
   if (cachedFeatStubs) return cachedFeatStubs;
-  // Note: The free SRD only has 1 feat (Grappler). We fetch it anyway to merge with Homebrew.
   const res = await fetch('https://www.dnd5eapi.co/api/feats');
   const data = await res.json();
   cachedFeatStubs = data.results;
@@ -176,17 +327,36 @@ export const fetchDetailedStubs = async (stubs) => {
 };
 
 export const fetchSpeciesTraits = async (rawSpeciesName) => {
-  const cleanName = rawSpeciesName.split(' ')[0].toLowerCase();
-  const apiSpecies = SPECIES_API_MAP[cleanName];
-  if (!apiSpecies) return { traits: [], error: 'Species not found in SRD.' };
+  const words = rawSpeciesName.toLowerCase().split(' ');
+  const firstWord = words[0];
+  const secondWord = words.length > 1 ? words[1] : '';
+
+  let apiPointer = SPECIES_API_MAP[firstWord];
+  if (!apiPointer && secondWord) apiPointer = SPECIES_API_MAP[secondWord];
+
+  if (!apiPointer) return { traits: [], error: 'Species not found in SRD.' };
 
   try {
-    const res = await fetch(`https://www.dnd5eapi.co/api/races/${apiSpecies}`);
-    const data = await res.json();
-    
-    if (!data.traits) return { traits: [] };
+    let baseData = null;
+    let subData = null;
 
-    const traitPromises = data.traits.map(async (traitStub) => {
+    if (apiPointer.type === 'subraces') {
+      const parentRes = await fetch(`https://www.dnd5eapi.co/api/races/${apiPointer.parent}`);
+      baseData = await parentRes.json();
+      
+      const subRes = await fetch(`https://www.dnd5eapi.co/api/subraces/${apiPointer.index}`);
+      subData = await subRes.json();
+    } else {
+      const res = await fetch(`https://www.dnd5eapi.co/api/races/${apiPointer.index}`);
+      baseData = await res.json();
+    }
+    
+    let traitStubs = [...(baseData.traits || [])];
+    if (subData && subData.racial_traits) {
+      traitStubs = [...traitStubs, ...subData.racial_traits];
+    }
+
+    const traitPromises = traitStubs.map(async (traitStub) => {
       const traitRes = await fetch(`https://www.dnd5eapi.co${traitStub.url}`);
       const traitDetail = await traitRes.json();
       return {
@@ -196,22 +366,38 @@ export const fetchSpeciesTraits = async (rawSpeciesName) => {
     });
 
     const traits = await Promise.all(traitPromises);
-    return { traits, error: null };
+
+    let mechanics = {
+      speed: baseData.speed || 30,
+      size: baseData.size || 'Medium',
+      languages: (baseData.languages || []).map(l => l.name),
+      abilityBonuses: []
+    };
+
+    if (baseData.ability_bonuses) mechanics.abilityBonuses.push(...baseData.ability_bonuses);
+    if (subData && subData.ability_bonuses) mechanics.abilityBonuses.push(...subData.ability_bonuses);
+
+    if (subData && subData.racial_traits) {
+       const hasFleetOfFoot = subData.racial_traits.some(t => t.index === 'fleet-of-foot');
+       if (hasFleetOfFoot) mechanics.speed = 35;
+    }
+
+    return { traits, mechanics, error: null };
   } catch (error) {
     console.error("Species API Error:", error);
-    return { traits: [], error: 'Failed to fetch species traits.' };
+    return { traits: [], mechanics: null, error: 'Failed to fetch species data.' };
   }
 };
 
-export const fetchClassProgression = async (rawClassName, level) => {
+export const fetchClassProgression = async (rawClassName, classLevel) => {
   const cleanName = rawClassName.split(' ')[0].toLowerCase();
   
   if (HOMEBREW_CLASSES[cleanName]) {
     const hbData = HOMEBREW_CLASSES[cleanName];
     return {
       hitDie: hbData.hitDie,
-      features: hbData.levels[level]?.features || [],
-      resources: hbData.levels[level]?.resources || [],
+      features: hbData.levels[classLevel]?.features || [],
+      resources: hbData.levels[classLevel]?.resources || [],
       spellSlots: null,
       spellcastingInfo: null
     };
@@ -227,7 +413,7 @@ export const fetchClassProgression = async (rawClassName, level) => {
     const classData = await classRes.json();
     const hitDie = classData.hit_die || HIT_DICE_MAP[apiClass] || 8;
 
-    const levelRes = await fetch(`https://www.dnd5eapi.co/api/classes/${apiClass}/levels/${level}`);
+    const levelRes = await fetch(`https://www.dnd5eapi.co/api/classes/${apiClass}/levels/${classLevel}`);
     const levelData = await levelRes.json();
 
     const fetchedFeatures = [];
@@ -235,8 +421,8 @@ export const fetchClassProgression = async (rawClassName, level) => {
     let spellSlots = null;
     let spellcastingInfo = null;
 
-    if (apiClass === 'bard' && level === 5) fetchedResources.push({ name: 'Bardic Inspiration', upgrade: true, recharge: 'short' });
-    if (apiClass === 'fighter' && level === 17) fetchedResources.push({ name: 'Action Surge', upgrade: true, maxType: 2 });
+    if (apiClass === 'bard' && classLevel === 5) fetchedResources.push({ name: 'Bardic Inspiration', upgrade: true, recharge: 'short' });
+    if (apiClass === 'fighter' && classLevel === 17) fetchedResources.push({ name: 'Action Surge', upgrade: true, maxType: 2 });
 
     if (levelData.features && levelData.features.length > 0) {
       const featurePromises = levelData.features.map(async (featStub) => {
@@ -264,7 +450,8 @@ export const fetchClassProgression = async (rawClassName, level) => {
           if (hook.maxType === 'API_RAGE') maxVal = levelData.class_specific?.rage_count || 2;
           else if (hook.maxType === 'API_CD') maxVal = levelData.class_specific?.channel_divinity_charges || 1;
           else if (hook.maxType === 'API_INDOMITABLE') maxVal = levelData.class_specific?.indomitable_uses || 1;
-          else if (hook.maxType === 'PALADIN_HP') maxVal = level * 5;
+          else if (hook.maxType === 'PALADIN_HP') maxVal = classLevel * 5; // Must be class level!
+          else if (hook.maxType === 'CLASS_LEVEL') maxVal = classLevel;
           else maxVal = hook.maxType; 
 
           const resourceName = hook.rename || hook.filterRename || safeName;
@@ -279,11 +466,14 @@ export const fetchClassProgression = async (rawClassName, level) => {
         spellsKnown: levelData.spellcasting.spells_known || 0
       };
       
-      spellSlots = {};
-      for (let i = 1; i <= 9; i++) {
-        const slotsForLevel = levelData.spellcasting[`spell_slots_level_${i}`];
-        if (slotsForLevel > 0) {
-          spellSlots[i.toString()] = { max: slotsForLevel, current: slotsForLevel };
+      // If this is a Warlock, we return the slots directly as they don't merge with normal slots
+      if (apiClass === 'warlock') {
+        spellSlots = {};
+        for (let i = 1; i <= 9; i++) {
+          const slotsForLevel = levelData.spellcasting[`spell_slots_level_${i}`];
+          if (slotsForLevel > 0) {
+            spellSlots[i.toString()] = { max: slotsForLevel, current: slotsForLevel };
+          }
         }
       }
     }
@@ -292,7 +482,7 @@ export const fetchClassProgression = async (rawClassName, level) => {
       hitDie,
       features: fetchedFeatures,
       resources: fetchedResources,
-      spellSlots,
+      spellSlots, // Only populated for warlocks directly, others use combined calculator
       spellcastingInfo
     };
 

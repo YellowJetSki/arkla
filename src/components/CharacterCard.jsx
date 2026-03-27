@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
@@ -73,7 +73,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [isForgingFeat, setIsForgingFeat] = useState(false);
   const [customFeat, setCustomFeat] = useState({ name: '', desc: '', reqLevel: 1 });
 
-  // REQ 4: Unified Dialog Modal State replacing window.alert/prompt
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', inputPlaceholder: '', onConfirm: null });
 
   const showDialog = (options) => setDialog({ ...options, isOpen: true });
@@ -142,14 +141,53 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     }
   };
 
+  // NEW: Token Sync Hook for Conditions
   const handleAddCondition = async (condition) => {
     if (!condition || !char) return;
-    await updateDoc(doc(db, 'characters', currentUser.charId), { conditions: arrayUnion(condition) });
+    
+    try {
+      await runTransaction(db, async (transaction) => {
+        const charRef = doc(db, 'characters', currentUser.charId);
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        
+        transaction.update(charRef, { conditions: arrayUnion(condition) });
+        
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[currentUser.charId]) {
+          const mapTokens = mapDoc.data().tokens;
+          const currentConds = mapTokens[currentUser.charId].conditions || [];
+          if (!currentConds.includes(condition)) {
+            mapTokens[currentUser.charId].conditions = [...currentConds, condition];
+            transaction.update(mapRef, { tokens: mapTokens });
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Condition Sync Failed:", err);
+    }
   };
 
   const handleRemoveCondition = async (condition) => {
     if (!char) return;
-    await updateDoc(doc(db, 'characters', currentUser.charId), { conditions: arrayRemove(condition) });
+    
+    try {
+      await runTransaction(db, async (transaction) => {
+        const charRef = doc(db, 'characters', currentUser.charId);
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        
+        transaction.update(charRef, { conditions: arrayRemove(condition) });
+        
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[currentUser.charId]) {
+          const mapTokens = mapDoc.data().tokens;
+          const currentConds = mapTokens[currentUser.charId].conditions || [];
+          mapTokens[currentUser.charId].conditions = currentConds.filter(c => c !== condition);
+          transaction.update(mapRef, { tokens: mapTokens });
+        }
+      });
+    } catch (err) {
+      console.error("Condition Sync Failed:", err);
+    }
   };
 
   const handleResourceToggle = async (resourceIndex, newCurrentValue) => {
@@ -171,7 +209,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     setTimeout(() => setSaveToast(''), 2500);
   };
 
-  // REQ 1: DM Feature Removal Logic
   const removeFeature = async (featToRemove) => {
     showDialog({
       title: 'Remove Feature?',
@@ -361,21 +398,22 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
           <div className="space-y-6 animate-in fade-in duration-300">
             
-{activeTab === 'combat' && (
-  <CombatTab 
-    char={char} 
-    charId={currentUser.charId}
-    isDM={isDM} 
-    updateField={updateField} 
-    activeTheme={activeTheme} 
-    combatWarnings={combatWarnings}
-    activeConditions={activeConditions}
-    handleAddCondition={(e) => handleAddCondition(e.target.value)}
-    handleRemoveCondition={handleRemoveCondition}
-    handleResourceToggle={handleResourceToggle}
-    showDialog={showDialog} // NEW
-  />
-)}
+            {activeTab === 'combat' && (
+              <CombatTab 
+                char={char} 
+                charId={currentUser.charId}
+                isDM={isDM} 
+                updateField={updateField} 
+                activeTheme={activeTheme} 
+                combatWarnings={combatWarnings}
+                activeConditions={activeConditions}
+                handleAddCondition={(e) => handleAddCondition(e.target.value)}
+                handleRemoveCondition={handleRemoveCondition}
+                handleResourceToggle={handleResourceToggle}
+                showDialog={showDialog}
+              />
+            )}
+
             {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM} showDialog={showDialog} />}
 
             {activeTab === 'features' && (

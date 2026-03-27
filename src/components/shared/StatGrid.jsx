@@ -1,14 +1,27 @@
 import React from 'react';
-import { Shield, Zap, Wind, Activity, BookOpen, Wrench, MessageSquare, Target, Sword } from 'lucide-react';
+import { Shield, Zap, Wind, Activity, BookOpen, Wrench, MessageSquare, Target, Sword, Lock } from 'lucide-react';
+import { getProficiencyBonus, getModifier, getConditionMechanics } from '../../services/arklaEngine';
 
 export default function StatGrid({ char, activeTheme }) {
   const stats = char?.stats || {};
-  const profBonus = Math.floor(((char?.level || 1) - 1) / 4) + 2;
+  const totalLevel = char?.classes ? char.classes.reduce((sum, c) => sum + c.level, 0) : (char?.level || 1);
+  const profBonus = getProficiencyBonus(totalLevel);
 
-  const getModifier = (score) => {
-    const mod = Math.floor((score - 10) / 2);
-    return mod >= 0 ? `+${mod}` : `${mod}`;
-  };
+  // --- AUTOMATED CONDITION MECHANICS ---
+  const activeConditions = char?.conditions || [];
+  const conditionMechanics = getConditionMechanics(activeConditions);
+  
+  // Calculate final dynamic speed
+  const baseSpeed = char?.speed || 30;
+  let displaySpeed = baseSpeed;
+  if (conditionMechanics.speedOverride !== null) {
+     displaySpeed = conditionMechanics.speedOverride;
+  } else {
+     displaySpeed = Math.floor(baseSpeed * conditionMechanics.speedMultiplier);
+  }
+
+  // Calculate final dynamic AC (If paralyzed/unconscious, DEX mod is dropped in 5e rules, but often AC calculation is complex. For now, we leave AC static but we can flag it).
+  const isImmobilized = displaySpeed === 0;
 
   return (
     <div className="space-y-4">
@@ -19,16 +32,23 @@ export default function StatGrid({ char, activeTheme }) {
           <span className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 z-10">Armor</span>
           <span className="text-xl md:text-3xl font-black text-white z-10">{char?.ac || 10}</span>
         </div>
+        
         <div className="bg-slate-900 border border-slate-700 rounded-xl p-2 md:p-3 flex flex-col items-center justify-center shadow-inner relative overflow-hidden">
           <Zap className={`w-8 h-8 ${activeTheme?.text || 'text-indigo-400'} mb-1 opacity-20 absolute -right-2 -bottom-2`} />
           <span className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 z-10">Initiative</span>
-          <span className="text-xl md:text-3xl font-black text-white z-10">{char?.initiative > 0 ? `+${char.initiative}` : (char?.initiative || 0)}</span>
+          <span className="text-xl md:text-3xl font-black text-white z-10">{char?.initiative !== '--' ? char?.initiative : (getModifier(stats.DEX || 10) >= 0 ? `+${getModifier(stats.DEX || 10)}` : getModifier(stats.DEX || 10))}</span>
         </div>
-        <div className="bg-slate-900 border border-slate-700 rounded-xl p-2 md:p-3 flex flex-col items-center justify-center shadow-inner relative overflow-hidden">
-          <Wind className={`w-8 h-8 ${activeTheme?.text || 'text-indigo-400'} mb-1 opacity-20 absolute -right-2 -bottom-2`} />
-          <span className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 z-10">Speed</span>
-          <span className="text-xl md:text-3xl font-black text-white z-10">{char?.speed || 30}<span className="text-xs md:text-sm text-slate-500 ml-0.5">ft</span></span>
+        
+        <div className={`border rounded-xl p-2 md:p-3 flex flex-col items-center justify-center shadow-inner relative overflow-hidden transition-all ${isImmobilized ? 'bg-red-950/40 border-red-900 shadow-[0_0_15px_rgba(220,38,38,0.2)]' : 'bg-slate-900 border-slate-700'}`}>
+          {isImmobilized ? (
+            <Lock className="w-8 h-8 text-red-500 mb-1 opacity-20 absolute -right-2 -bottom-2 animate-pulse" />
+          ) : (
+            <Wind className={`w-8 h-8 ${activeTheme?.text || 'text-indigo-400'} mb-1 opacity-20 absolute -right-2 -bottom-2`} />
+          )}
+          <span className={`text-[9px] md:text-xs font-bold uppercase tracking-widest mb-1 z-10 ${isImmobilized ? 'text-red-400' : 'text-slate-400'}`}>Speed</span>
+          <span className={`text-xl md:text-3xl font-black z-10 ${isImmobilized ? 'text-red-400' : 'text-white'}`}>{displaySpeed}<span className={`text-xs md:text-sm ml-0.5 ${isImmobilized ? 'text-red-500/50' : 'text-slate-500'}`}>ft</span></span>
         </div>
+        
         <div className="bg-slate-900 border border-slate-700 rounded-xl p-2 md:p-3 flex flex-col items-center justify-center shadow-inner relative overflow-hidden">
           <Activity className={`w-8 h-8 ${activeTheme?.text || 'text-indigo-400'} mb-1 opacity-20 absolute -right-2 -bottom-2`} />
           <span className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 z-10">Prof Bonus</span>
@@ -42,7 +62,9 @@ export default function StatGrid({ char, activeTheme }) {
           <div key={stat} className="relative group bg-slate-900 border border-slate-700 rounded-xl flex flex-col items-center justify-center p-3 shadow-[0_4px_15px_rgba(0,0,0,0.2)] hover:border-indigo-500/50 transition-all">
             <span className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">{stat}</span>
             <div className="relative w-12 h-12 md:w-14 md:h-14 bg-slate-800 rounded-xl border-t border-slate-600 shadow-inner flex items-center justify-center mb-1.5 group-hover:bg-slate-700 transition-colors">
-              <span className="text-xl md:text-2xl font-black text-white drop-shadow-md">{getModifier(score)}</span>
+              <span className={`text-xl md:text-2xl font-black drop-shadow-md ${conditionMechanics.autoFailStrDex && (stat === 'STR' || stat === 'DEX') ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                {getModifier(score) >= 0 ? `+${getModifier(score)}` : getModifier(score)}
+              </span>
             </div>
             <div className="bg-slate-950 px-3 py-0.5 rounded-full border border-slate-800">
               <span className="text-[10px] md:text-xs font-bold text-slate-500">{score}</span>

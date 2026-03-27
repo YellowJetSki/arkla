@@ -36,7 +36,6 @@ export default function DMBattleMap() {
   const [editingHp, setEditingHp] = useState("");
   const [isEditingHpFocus, setIsEditingHpFocus] = useState(false);
 
-  // Modal Replacements for System Alerts
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
   
@@ -169,7 +168,7 @@ export default function DMBattleMap() {
       for (const enemy of presetEnemies) {
          const enemyRef = doc(db, 'active_enemies', enemy.id);
          batch.set(enemyRef, {
-            ...(enemy.entityData || {}), // Restores Flavor, Actions, Ac, etc.
+            ...(enemy.entityData || {}), 
             name: enemy.name,
             hp: enemy.hp || 10,
             maxHp: enemy.maxHp || enemy.hp || 10,
@@ -324,12 +323,21 @@ export default function DMBattleMap() {
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
   };
 
+  // --- TOKEN SYNC HOOK FOR CONCENTRATION ---
   const handleToggleConcentration = async (tokenId) => {
     const targetId = tokenId || selectedTokenId;
     if (!targetId || !tokens[targetId]) return;
-    const current = tokens[targetId].isConcentrating || false;
-    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], isConcentrating: !current } };
+    
+    const t = tokens[targetId];
+    const newConcState = !t.isConcentrating;
+    
+    // 1. Update Map Token
+    const updatedTokens = { ...tokens, [targetId]: { ...t, isConcentrating: newConcState } };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    
+    // 2. Update Character/Enemy Sheet
+    const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
+    await updateDoc(doc(db, collectionName, targetId), { isConcentrating: newConcState });
   };
 
   const toggleCondition = async (tokenId, cond) => {
