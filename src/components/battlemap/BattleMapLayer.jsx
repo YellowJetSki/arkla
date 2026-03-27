@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc, collection } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, collection, runTransaction } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map as MapIcon, X, AlertTriangle, Zap } from 'lucide-react';
 import MapGrid from './MapGrid';
+import { getConditionMechanics } from '../../services/arklaEngine';
 
 export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
@@ -66,9 +67,20 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
     }
   };
 
+  // Engine Integration: Calculate true speed based on active conditions
+  const myToken = tokens[charId];
+  const conditionMechanics = myToken ? getConditionMechanics(myToken.conditions || []) : null;
+  let dynamicSpeed = myToken ? myToken.speed || 30 : 30;
+  
+  if (conditionMechanics) {
+     if (conditionMechanics.speedOverride !== null) {
+       dynamicSpeed = conditionMechanics.speedOverride;
+     } else {
+       dynamicSpeed = Math.floor(dynamicSpeed * conditionMechanics.speedMultiplier);
+     }
+  }
+
   const handleTileClick = (targetX, targetY) => {
-    const myToken = tokens[charId];
-    
     if (!myToken) {
       setDialog({ isOpen: true, title: 'Token Not Placed', message: 'The DM has not placed your character on the map yet.', type: 'alert' });
       return;
@@ -101,14 +113,17 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
 
     if (distance === 0) return;
 
-    const baseSpeed = myToken.speed || 30;
-
-    if (distance > baseSpeed * 2) {
-      setDialog({ isOpen: true, title: 'Out of Range', message: `That tile is ${distance}ft away. Even with a Dash, you can only reach ${baseSpeed * 2}ft.`, type: 'alert' });
+    if (dynamicSpeed === 0) {
+      setDialog({ isOpen: true, title: 'Immobilized', message: 'You cannot move. Your speed is currently 0ft due to an active condition.', type: 'alert' });
       return;
     }
 
-    if (distance > baseSpeed) {
+    if (distance > dynamicSpeed * 2) {
+      setDialog({ isOpen: true, title: 'Out of Range', message: `That tile is ${distance}ft away. Even with a Dash, you can only reach ${dynamicSpeed * 2}ft.`, type: 'alert' });
+      return;
+    }
+
+    if (distance > dynamicSpeed) {
       setPendingMove({ x: targetX, y: targetY }); 
       setDialog({
         isOpen: true,
@@ -129,11 +144,20 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
 
   const moveToken = async (newX, newY) => {
     try {
-      const updatedTokens = {
-        ...tokens,
-        [charId]: { ...tokens[charId], x: newX, y: newY }
-      };
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+      // Replaced standard updateDoc with a transaction to prevent race conditions 
+      // where the player moving overwrites a DM's simultaneous HP change
+      await runTransaction(db, async (transaction) => {
+        const mapRef = doc(db, 'campaign', 'battlemap');
+        const mapDoc = await transaction.get(mapRef);
+        
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+          const mapTokens = mapDoc.data().tokens;
+          mapTokens[charId].x = newX;
+          mapTokens[charId].y = newY;
+          transaction.update(mapRef, { tokens: mapTokens });
+        }
+      });
+      
       setShowRange(false); 
       setHasMovedThisTurn(true); 
       setPendingMove(null);
@@ -214,15 +238,15 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
         )}
       </div>
 
-      {tokens[charId] && (
+      {myToken && (
         <div className="bg-slate-900 border-t border-slate-700 p-4 shrink-0 flex justify-center gap-6">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Move: {tokens[charId].speed}ft</span>
+            <span className={`text-[10px] font-black uppercase tracking-widest ${dynamicSpeed === 0 ? 'text-red-500' : 'text-slate-400'}`}>Move: {dynamicSpeed}ft</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dash: {tokens[charId].speed * 2}ft</span>
+            <span className={`text-[10px] font-black uppercase tracking-widest ${dynamicSpeed === 0 ? 'text-red-500' : 'text-slate-400'}`}>Dash: {dynamicSpeed * 2}ft</span>
           </div>
         </div>
       )}

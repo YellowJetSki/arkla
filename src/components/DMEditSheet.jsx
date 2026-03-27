@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Save, X, AlertTriangle } from 'lucide-react';
+import { calculateSpellcastingStats } from '../services/arklaEngine';
 
 export default function DMEditSheet({ char, charId, onCancel }) {
-  // Clone character data into local state for editing
   const [formData, setFormData] = useState({
     name: char.name,
     class: char.class,
@@ -34,19 +34,51 @@ export default function DMEditSheet({ char, charId, onCancel }) {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const charRef = doc(db, 'characters', charId);
-      await updateDoc(charRef, {
-        name: formData.name,
-        class: formData.class,
-        race: formData.race,
-        level: Number(formData.level),
-        ac: Number(formData.ac),
-        speed: Number(formData.speed),
-        initiative: Number(formData.initiative),
-        maxHp: Number(formData.maxHp),
-        stats: formData.stats
+      await runTransaction(db, async (transaction) => {
+        const charRef = doc(db, 'characters', charId);
+        const mapRef = doc(db, 'campaign', 'battlemap');
+
+        const newMaxHp = Number(formData.maxHp);
+        const newSpeed = Number(formData.speed);
+
+        // Optional recalculation of casting stats in case ability scores changed
+        const classesToPass = char.classes || [{ name: formData.class, level: Number(formData.level) }];
+        const spellStats = calculateSpellcastingStats(classesToPass, formData.stats);
+
+        let updates = {
+          name: formData.name,
+          class: formData.class,
+          race: formData.race,
+          level: Number(formData.level),
+          ac: Number(formData.ac),
+          speed: newSpeed,
+          initiative: char.initiative === '--' ? '--' : Number(formData.initiative),
+          maxHp: newMaxHp,
+          stats: formData.stats
+        };
+
+        if (spellStats.spellSave !== '--') {
+          updates.spellSave = spellStats.spellSave;
+          updates.spellAttack = spellStats.spellAttack;
+        }
+
+        // 1. Update Character Sheet
+        transaction.update(charRef, updates);
+
+        // 2. Sync to Battle Map Token
+        const mapDoc = await transaction.get(mapRef);
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+          const mapTokens = mapDoc.data().tokens;
+          mapTokens[charId].maxHp = newMaxHp;
+          mapTokens[charId].speed = newSpeed;
+          // Bound current HP if the DM lowered the Max HP below current
+          if (mapTokens[charId].hp > newMaxHp) {
+             mapTokens[charId].hp = newMaxHp;
+          }
+          transaction.update(mapRef, { tokens: mapTokens });
+        }
       });
-      onCancel(); // Close editor on success
+      onCancel(); 
     } catch (error) {
       console.error("Error saving character:", error);
       setIsSaving(false);
@@ -65,14 +97,13 @@ export default function DMEditSheet({ char, charId, onCancel }) {
       </div>
 
       <div className="space-y-6 flex-1">
-        {/* Core Identity */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Character Name</label>
             <input type="text" value={formData.name} onChange={e => handleChange('name', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Level</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Level (Total)</label>
             <input type="number" value={formData.level} onChange={e => handleChange('level', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
           </div>
           <div>
@@ -85,7 +116,6 @@ export default function DMEditSheet({ char, charId, onCancel }) {
           </div>
         </div>
 
-        {/* Combat Vitals */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Max HP</label>
@@ -97,7 +127,7 @@ export default function DMEditSheet({ char, charId, onCancel }) {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Initiative Mod</label>
-            <input type="number" value={formData.initiative} onChange={e => handleChange('initiative', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
+            <input type="text" value={formData.initiative} onChange={e => handleChange('initiative', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Speed</label>
@@ -105,7 +135,6 @@ export default function DMEditSheet({ char, charId, onCancel }) {
           </div>
         </div>
 
-        {/* Base Stats */}
         <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
           <label className="block text-xs font-bold text-slate-400 uppercase mb-3">Base Ability Scores</label>
           <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
@@ -116,7 +145,7 @@ export default function DMEditSheet({ char, charId, onCancel }) {
                   type="number" 
                   value={formData.stats[stat]} 
                   onChange={e => handleStatChange(stat, e.target.value)} 
-                  className="w-full bg-transparent text-center text-white font-bold text-xl focus:outline-none" 
+                  className="w-full bg-transparent text-center text-white font-bold text-xl focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" 
                 />
               </div>
             ))}
@@ -124,7 +153,6 @@ export default function DMEditSheet({ char, charId, onCancel }) {
         </div>
       </div>
 
-      {/* Save / Confirmation Action Footer */}
       <div className="mt-8 shrink-0 bg-slate-900/80 p-4 rounded-xl border border-slate-700 flex justify-end items-center gap-4">
         {isConfirming ? (
           <>

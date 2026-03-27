@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Swords, Trash2, ArrowDown, Play, Users, X, RotateCcw, Plus, AlertTriangle } from 'lucide-react';
+import { Swords, Trash2, ArrowDown, Play, Users, X, RotateCcw, Plus, AlertTriangle, Dices } from 'lucide-react';
+import { getModifier } from '../services/arklaEngine';
 
 export default function InitiativeTracker({ unlockedCharacters, activeEnemies, isBattleMode, onLaunchBattle, onExitBattle }) {
   const [initiative, setInitiative] = useState([]);
@@ -11,6 +12,9 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
   
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [newCustomName, setNewCustomName] = useState('');
+  
+  // NEW: State to hold the live snapshot of the active player to track their conditions
+  const [activePlayerSnap, setActivePlayerSnap] = useState(null);
 
   const missingIdsTracker = useRef(new Set());
 
@@ -27,6 +31,19 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
     });
     return () => unsub();
   }, []);
+
+  // NEW: Live listener for the active player's conditions
+  useEffect(() => {
+    const activeActor = initiative[activeTurn];
+    if (activeActor && activeActor.type === 'player') {
+      const unsub = onSnapshot(doc(db, 'characters', activeActor.id), (snap) => {
+        if (snap.exists()) setActivePlayerSnap(snap.data());
+      });
+      return () => unsub();
+    } else {
+      setActivePlayerSnap(null);
+    }
+  }, [activeTurn, initiative]);
 
   useEffect(() => {
     const autoSync = async () => {
@@ -110,6 +127,29 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
     saveInitiative(resetOrder, -1, 1);
   };
 
+  // NEW: Engine-powered Auto-Roll for NPCs
+  const autoRollEnemies = () => {
+    const newOrder = [...initiative];
+    let changed = false;
+    
+    newOrder.forEach(actor => {
+      if (actor.type === 'enemy') {
+        const eData = activeEnemies.find(e => e.id === actor.id);
+        if (eData) {
+          const dexMod = getModifier(eData.stats?.DEX || 10);
+          const roll = Math.floor(Math.random() * 20) + 1 + dexMod;
+          actor.value = roll;
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      newOrder.sort((a, b) => b.value - a.value);
+      saveInitiative(newOrder, activeTurn, round);
+    }
+  };
+
   const nextTurn = () => {
     if (initiative.length === 0) return;
     
@@ -173,12 +213,16 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
 
   const activeActorData = initiative[activeTurn];
   const activeEnemyData = activeActorData?.type === 'enemy' ? activeEnemies.find(e => e.id === activeActorData.id) : null;
-  const activeConditions = activeEnemyData?.conditions || [];
+  
+  // NEW: Dynamically pull conditions for BOTH players and enemies
+  let activeConditions = [];
+  if (activeActorData?.type === 'enemy' && activeEnemyData) activeConditions = activeEnemyData.conditions || [];
+  if (activeActorData?.type === 'player' && activePlayerSnap) activeConditions = activePlayerSnap.conditions || [];
+
   const showConditionWarning = activeConditions.length > 0;
 
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-2xl p-4 shadow-lg h-full flex flex-col">
-      {/* UI FIX: Wrapped buttons and optimized flexbox to prevent bounds overflow */}
       <div className="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center gap-3 mb-4">
         <div>
           <h2 className="text-xl font-black text-white flex items-center gap-2"><Swords className="w-5 h-5 text-fuchsia-500" /> Initiative</h2>
@@ -188,6 +232,11 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
         </div>
         <div className="flex flex-wrap gap-2 justify-start 2xl:justify-end w-full 2xl:w-auto">
           
+          {/* NEW: Auto-Roll Button */}
+          <button onClick={autoRollEnemies} className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/50 p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5" title="Auto-Roll NPC Initiative">
+            <Dices className="w-4 h-4 md:w-3 md:h-3" /> <span className="hidden md:inline">Roll NPCs</span>
+          </button>
+
           <button onClick={() => setShowCustomForm(!showCustomForm)} className="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5" title="Add Custom Actor">
             <Plus className="w-4 h-4 md:w-3 md:h-3" /> <span className="hidden md:inline">Add</span>
           </button>

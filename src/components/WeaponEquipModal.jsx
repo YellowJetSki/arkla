@@ -15,12 +15,13 @@ export default function WeaponEquipModal({ char, charId, weaponData, onComplete,
   const strMod = getModifier(char.stats?.STR || 10);
   const dexMod = getModifier(char.stats?.DEX || 10);
   
-  // Auto-determine the optimal stat
+  // Auto-determine the optimal stat for the UI Preview
   const useDex = isRanged || (isFinesse && dexMod > strMod);
   const activeMod = useDex ? dexMod : strMod;
   const statName = useDex ? 'DEX' : 'STR';
 
-  const pb = getProficiencyBonus(char.level || 1);
+  const totalLevel = char.classes ? char.classes.reduce((sum, c) => sum + c.level, 0) : (char.level || 1);
+  const pb = getProficiencyBonus(totalLevel);
   const totalToHit = activeMod + (isProficient ? pb : 0);
   const formattedToHit = totalToHit >= 0 ? `+${totalToHit}` : `${totalToHit}`;
 
@@ -31,10 +32,12 @@ export default function WeaponEquipModal({ char, charId, weaponData, onComplete,
   const handleEquip = async () => {
     setIsEquipping(true);
     
+    // Engine Integration: We only save the RAW base dice and properties to the database.
+    // The arklaEngine will do the math dynamically in the Combat Tab!
     const newAttack = {
       name: weaponData.name,
-      hit: formattedToHit,
-      damage: formattedDamage,
+      hit: '--', // Leave blank for dynamic scaling
+      damage: baseDice, // Save ONLY the base dice, e.g., "1d8"
       type: dmgType,
       notes: weaponData.properties?.map(p => p.name).join(', ') || ''
     };
@@ -109,7 +112,7 @@ export default function WeaponEquipModal({ char, charId, weaponData, onComplete,
                 </div>
                 
                 <div className="text-[10px] text-slate-500 text-center pt-2">
-                  *Calculated using your <strong className="text-slate-300">{statName}</strong> modifier.
+                  *Preview calculated using your <strong className="text-slate-300">{statName}</strong> modifier.
                 </div>
               </div>
 
