@@ -29,6 +29,11 @@ export default function LevelUpModal({ char, charId, onClose }) {
   const currentSpellsKnown = (char.spells || []).filter(s => s.level > 0).length;
   const currentCantripsKnown = (char.spells || []).filter(s => s.level === 0).length;
 
+  // NEW: Calculate the max spell level dynamically from the engine's fetched spell slots
+  const maxSpellLevel = engineData.spellSlots 
+    ? Math.max(0, ...Object.keys(engineData.spellSlots).map(Number)) 
+    : 0;
+
   const handleProceedToStep2 = async () => {
     setIsLoadingMechanics(true);
     setStep(2); 
@@ -77,7 +82,6 @@ export default function LevelUpModal({ char, charId, onClose }) {
       'hitDice.type': `d${engineData.hitDie}`
     };
 
-    // Update Spell Save DC & Attack automatically based on new stats and level
     const spellStats = calculateSpellcastingStats(classPath.trim(), newLevel, pendingStats);
     if (spellStats.spellSave !== '--') {
       updates.spellSave = spellStats.spellSave;
@@ -254,7 +258,7 @@ export default function LevelUpModal({ char, charId, onClose }) {
                       ))}
                     </div>
                   )}
-                  {newFeats.length === 0 && <FeatDiscovery onAddFeat={(feat) => setNewFeats([feat])} />}
+                  {newFeats.length === 0 && <FeatDiscovery onAddFeat={(feat) => setNewFeats([feat])} charLevel={newLevel} />}
                 </div>
               )}
             </div>
@@ -294,7 +298,7 @@ export default function LevelUpModal({ char, charId, onClose }) {
                 </div>
               )}
 
-              <SpellDiscovery onAddSpell={(spell) => setNewSpells(prev => [...prev, spell])} />
+              <SpellDiscovery onAddSpell={(spell) => setNewSpells(prev => [...prev, spell])} maxSpellLevel={maxSpellLevel} />
             </div>
           )}
 

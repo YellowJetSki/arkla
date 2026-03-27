@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Shield, Settings, BrainCircuit, Hammer, X, Filter } from 'lucide-react';
+import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Shield, Settings, BrainCircuit, Hammer, X, Filter, Trash2 } from 'lucide-react';
 import CollapsibleSection from './shared/CollapsibleSection';
 import SpellDiscovery from './SpellDiscovery';
 
 const SPELL_FILTERS = ['All', 'Cantrips', 'Leveled', 'Concentration', 'Action', 'Bonus', 'Reaction'];
 
-export default function Spellbook({ char, charId, isDM }) {
+export default function Spellbook({ char, charId, isDM, showDialog }) {
   const [showSearch, setShowSearch] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false); 
   const [isForgingSpell, setIsForgingSpell] = useState(false);
@@ -18,6 +18,10 @@ export default function Spellbook({ char, charId, isDM }) {
 
   const spellSlots = char.spellSlots || {};
   const spells = char.spells || [];
+
+  const currentMaxSpellLevel = Object.keys(spellSlots).length > 0 
+    ? Math.max(...Object.keys(spellSlots).map(Number)) 
+    : 0;
 
   const handleSlotToggle = async (level, currentIndex, max) => {
     if (isDM) return; 
@@ -53,6 +57,22 @@ export default function Spellbook({ char, charId, isDM }) {
   const addSpellToGrimoire = async (newSpell) => {
     await updateDoc(doc(db, 'characters', charId), {
       spells: arrayUnion(newSpell)
+    });
+  };
+
+  // NEW: DM Delete Spell Function using the unified DialogModal
+  const removeSpellFromGrimoire = async (spellToRemove) => {
+    showDialog({
+      title: 'Remove Spell?',
+      message: `Are you sure you want to permanently delete ${spellToRemove.name} from this spellbook?`,
+      type: 'confirm',
+      onConfirm: async () => {
+        await updateDoc(doc(db, 'characters', charId), {
+          spells: arrayRemove(spellToRemove)
+        });
+        showDialog({ isOpen: false });
+      },
+      onCancel: () => showDialog({ isOpen: false })
     });
   };
 
@@ -105,7 +125,6 @@ export default function Spellbook({ char, charId, isDM }) {
     return acc;
   }, {});
 
-  // Determine highest spell level to default open
   const highestLevelName = Object.keys(groupedSpells)
     .filter(k => k !== 'Cantrips')
     .sort((a, b) => parseInt(a.replace('Level ', '')) - parseInt(b.replace('Level ', '')))
@@ -286,7 +305,7 @@ export default function Spellbook({ char, charId, isDM }) {
           </form>
         )}
 
-        {showSearch && !isDM && <SpellDiscovery onAddSpell={addSpellToGrimoire} allowAdd={isDM} />}
+        {showSearch && !isDM && <SpellDiscovery onAddSpell={addSpellToGrimoire} allowAdd={isDM} maxSpellLevel={isDM ? 9 : currentMaxSpellLevel} />}
 
         {Object.keys(groupedSpells).length === 0 ? (
           <div className="bg-slate-800 border border-slate-700 border-dashed rounded-xl p-8 text-center text-slate-500">
@@ -304,10 +323,22 @@ export default function Spellbook({ char, charId, isDM }) {
                 {levelSpells.map((spell, idx) => {
                   const canCastAny = levelName === 'Cantrips' || Object.values(spellSlots).some(s => s.current > 0);
                   return (
-                    <div key={idx} className="bg-slate-900 border border-slate-700 rounded-lg p-4">
+                    <div key={idx} className="bg-slate-900 border border-slate-700 rounded-lg p-4 group">
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h4 className="font-bold text-fuchsia-300 text-lg">{spell.name}</h4>
+                          <h4 className="font-bold text-fuchsia-300 text-lg flex items-center gap-2">
+                            {spell.name}
+                            {/* NEW: DM Delete Spell Button */}
+                            {isDM && (
+                              <button 
+                                onClick={() => removeSpellFromGrimoire(spell)}
+                                className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all p-1"
+                                title="Remove Spell"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </h4>
                           <span className="text-xs font-bold text-slate-400 bg-slate-800 px-2 py-1 rounded border border-slate-700 mt-1 inline-block">{spell.castTime || '1 Action'}</span>
                         </div>
                         

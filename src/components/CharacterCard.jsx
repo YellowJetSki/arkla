@@ -3,7 +3,7 @@ import { doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from 'fir
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
-  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Search, Hammer
+  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Search, Hammer, Trash2
 } from 'lucide-react';
 
 import { PREMADE_CHARACTERS } from '../data/campaignData';
@@ -12,6 +12,7 @@ import QuickTraits from './shared/QuickTraits';
 import CollapsibleSection from './shared/CollapsibleSection';
 import ImageModal from './shared/ImageModal'; 
 import GlobalLoader from './shared/GlobalLoader';
+import DialogModal from './shared/DialogModal';
 
 import CharacterHeader from './character/CharacterHeader';
 import LevelUpModal from './LevelUpModal';
@@ -70,7 +71,13 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
   const [showFeatSearch, setShowFeatSearch] = useState(false);
   const [isForgingFeat, setIsForgingFeat] = useState(false);
-  const [customFeat, setCustomFeat] = useState({ name: '', desc: '' });
+  const [customFeat, setCustomFeat] = useState({ name: '', desc: '', reqLevel: 1 });
+
+  // REQ 4: Unified Dialog Modal State replacing window.alert/prompt
+  const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', inputPlaceholder: '', onConfirm: null });
+
+  const showDialog = (options) => setDialog({ ...options, isOpen: true });
+  const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     localStorage.setItem(`activeTab_${currentUser.charId}`, activeTab);
@@ -164,11 +171,27 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     setTimeout(() => setSaveToast(''), 2500);
   };
 
+  // REQ 1: DM Feature Removal Logic
+  const removeFeature = async (featToRemove) => {
+    showDialog({
+      title: 'Remove Feature?',
+      message: `Are you sure you want to permanently delete ${featToRemove.name} from this character?`,
+      type: 'confirm',
+      onConfirm: async () => {
+        await updateDoc(doc(db, 'characters', currentUser.charId), {
+          features: arrayRemove(featToRemove)
+        });
+        closeDialog();
+      },
+      onCancel: closeDialog
+    });
+  };
+
   const handleForgeCustomFeat = async (e) => {
     e.preventDefault();
     if (!customFeat.name || !customFeat.desc) return;
     
-    const newFeat = { name: customFeat.name, desc: customFeat.desc };
+    const newFeat = { name: customFeat.name, desc: customFeat.desc, reqLevel: Number(customFeat.reqLevel) };
     
     await setDoc(doc(db, 'custom_feats', 'feat_' + Date.now()), newFeat);
     
@@ -177,7 +200,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     });
     
     setIsForgingFeat(false);
-    setCustomFeat({ name: '', desc: '' });
+    setCustomFeat({ name: '', desc: '', reqLevel: 1 });
     setSaveToast('Feat Forged & Added!');
     setTimeout(() => setSaveToast(''), 2500);
   };
@@ -206,7 +229,12 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
       setTimeout(() => setSaveToast(''), 3000);
     } catch (error) {
       console.error("Restore failed", error);
-      alert("Failed to restore character to the database.");
+      showDialog({
+        title: 'Error',
+        message: 'Failed to restore character to the database.',
+        type: 'alert',
+        onConfirm: closeDialog
+      });
     }
   };
 
@@ -234,6 +262,16 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     <CardWrapper>
       <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} pb-24 relative`}>
         
+        <DialogModal 
+          isOpen={dialog.isOpen} 
+          title={dialog.title} 
+          message={dialog.message} 
+          type={dialog.type} 
+          inputPlaceholder={dialog.inputPlaceholder}
+          onConfirm={dialog.onConfirm} 
+          onCancel={closeDialog} 
+        />
+
         {!isDM && (
           <>
             <BattleMapLayer char={char} charId={currentUser.charId} isOpen={isBattleMapOpen} onClose={() => setIsBattleMapOpen(false)} />
@@ -257,7 +295,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         <ImageModal isOpen={!!activeLoot} url={activeLoot?.url} alt={activeLoot?.name} onClose={() => setActiveLoot(null)} />
         {isDM && isEditMode && <DMEditSheet char={char} charId={currentUser.charId} onCancel={() => setIsEditMode(false)} />}
 
-        <div className={`${isDM ? 'p-6' : 'max-w-4xl mx-auto p-3 md:p-8 min-h-[100dvh]'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'}`}>
+        <div className={`${isDM ? 'p-6' : 'max-w-4xl mx-auto p-3 md:p-8 min-h-[100dvh]'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'}`}>
           
           {isDM ? (
             <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-4 sticky top-0 bg-slate-900 z-40 pt-2">
@@ -285,6 +323,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             charId={currentUser.charId} 
             isDM={isDM} 
             activeTheme={activeTheme} 
+            showDialog={showDialog}
             onOpenImage={() => setIsImageOpen(true)}
             onOpenShortRest={() => setIsShortRestOpen(true)}
             onOpenLongRest={() => setIsLongRestOpen(true)}
@@ -337,7 +376,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
               />
             )}
 
-            {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM} />}
+            {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM} showDialog={showDialog} />}
 
             {activeTab === 'features' && (
               <div className="space-y-6">
@@ -364,9 +403,15 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 {isDM && isForgingFeat && (
                   <form onSubmit={handleForgeCustomFeat} className="bg-slate-900/80 p-4 md:p-5 rounded-xl border border-fuchsia-500/30 shadow-inner mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
                     <h4 className="text-sm font-bold text-fuchsia-400 flex items-center gap-2"><Hammer className="w-4 h-4" /> Homebrew Feat Forge</h4>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Feat Name</label>
-                      <input type="text" required value={customFeat.name} onChange={e => setCustomFeat({...customFeat, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-fuchsia-500" placeholder="e.g. Sharpshooter" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Feat Name</label>
+                        <input type="text" required value={customFeat.name} onChange={e => setCustomFeat({...customFeat, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-fuchsia-500" placeholder="e.g. Sharpshooter" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Prerequisite Level</label>
+                        <input type="number" min="1" required value={customFeat.reqLevel} onChange={e => setCustomFeat({...customFeat, reqLevel: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-fuchsia-500" />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
@@ -378,11 +423,28 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                   </form>
                 )}
 
-                {showFeatSearch && !isDM && <FeatDiscovery onAddFeat={addFeature} />}
+                {showFeatSearch && !isDM && <FeatDiscovery onAddFeat={addFeature} allowAdd={isDM} charLevel={char.level} />}
 
                 <div className="space-y-4">
                   {(char.features || []).map((feat, i) => (
-                    <CollapsibleSection key={`feat-${i}`} title={feat.name} defaultOpen={i === 0}>
+                    <CollapsibleSection 
+                      key={`feat-${i}`} 
+                      title={
+                        <div className="flex items-center gap-2">
+                          {feat.name}
+                          {isDM && (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); removeFeature(feat); }}
+                              className="text-slate-500 hover:text-red-400 p-1 transition-colors"
+                              title="Delete Feature"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      } 
+                      defaultOpen={i === 0}
+                    >
                       <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
                     </CollapsibleSection>
                   ))}
@@ -390,9 +452,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
               </div>
             )}
 
-            {activeTab === 'inventory' && <InventoryTab char={char} isDM={isDM} updateField={updateField} activeTheme={activeTheme} />}
+            {activeTab === 'inventory' && <InventoryTab char={char} isDM={isDM} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
 
-            {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} />}
+            {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} />}
 
             {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
 

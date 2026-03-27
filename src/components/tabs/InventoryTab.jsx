@@ -17,7 +17,7 @@ const parseInventory = (text) => {
   });
 };
 
-export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
+export default function InventoryTab({ char, isDM, updateField, activeTheme, showDialog }) {
   const [showItemSearch, setShowItemSearch] = useState(false);
   const [isForgingItem, setIsForgingItem] = useState(false);
   const [customItem, setCustomItem] = useState({ name: '', type: 'Wondrous Item', stats: '', desc: '' });
@@ -69,7 +69,12 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
         const charRef = doc(db, 'characters', charId);
         transaction.update(charRef, { attacks: arrayUnion(newAttack) });
       });
-      alert(`${weaponData.name} has been added to your bags AND equipped to your Combat Tab!`);
+      showDialog({
+        title: 'Weapon Equipped',
+        message: `${weaponData.name} has been added to your bags AND equipped to your Combat Tab!`,
+        type: 'alert',
+        onConfirm: () => showDialog({ isOpen: false })
+      });
     }
   };
 
@@ -87,28 +92,35 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
   };
 
   const handleShareToParty = async (itemString, index) => {
-    if (!window.confirm("Send this item to the Shared Party Loot? It will be removed from your personal inventory.")) return;
-    
-    const blocks = (char.inventory || '').split(/^(?=•|-|\d+x)/m).filter(b => b.trim());
-    blocks.splice(index, 1);
-    await updateField('inventory', blocks.join('\n\n'));
+    showDialog({
+      title: 'Share with Party?',
+      message: 'Send this item to the Shared Party Loot? It will be removed from your personal inventory.',
+      type: 'confirm',
+      onConfirm: async () => {
+        const blocks = (char.inventory || '').split(/^(?=•|-|\d+x)/m).filter(b => b.trim());
+        blocks.splice(index, 1);
+        await updateField('inventory', blocks.join('\n\n'));
 
-    const cleanName = itemString.replace(/^•\s*/, '').split('(')[0].trim() || 'Shared Item';
-    const newItem = {
-      id: 'loot_' + Date.now(),
-      name: cleanName,
-      desc: itemString,
-      source: char.name
-    };
-    
-    const lootRef = doc(db, 'campaign', 'shared_loot');
-    const lootSnap = await getDoc(lootRef);
-    let items = [];
-    if (lootSnap.exists()) {
-       items = lootSnap.data().items || [];
-    }
-    items.push(newItem);
-    await setDoc(lootRef, { items, latestShareId: newItem.id }, { merge: true });
+        const cleanName = itemString.replace(/^•\s*/, '').split('(')[0].trim() || 'Shared Item';
+        const newItem = {
+          id: `loot_${Date.now()}`,
+          name: cleanName,
+          desc: itemString,
+          source: char.name
+        };
+        
+        const lootRef = doc(db, 'campaign', 'shared_loot');
+        const lootSnap = await getDoc(lootRef);
+        let items = [];
+        if (lootSnap.exists()) {
+           items = lootSnap.data().items || [];
+        }
+        items.push(newItem);
+        await setDoc(lootRef, { items, latestShareId: newItem.id }, { merge: true });
+        showDialog({ isOpen: false });
+      },
+      onCancel: () => showDialog({ isOpen: false })
+    });
   };
 
   const adjustCurrency = async (type, amount) => {
@@ -178,8 +190,16 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
       });
       setTransactionAmount('');
     } catch (error) {
-       if (error === "Not enough funds") alert("Not enough total wealth to cover this transaction.");
-       else console.error(error);
+       if (error === "Not enough funds") {
+         showDialog({
+           title: 'Insufficient Funds',
+           message: 'Not enough total wealth to cover this transaction.',
+           type: 'alert',
+           onConfirm: () => showDialog({ isOpen: false })
+         });
+       } else {
+         console.error(error);
+       }
     }
   };
 
@@ -194,16 +214,18 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
       <div className="md:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-5">
         <div className="flex justify-between items-center border-b border-slate-700 pb-2 mb-4">
           <h3 className="text-lg font-bold text-white flex items-center gap-2"><Backpack className={`w-5 h-5 ${activeTheme.text}`} /> Equipment & Items</h3>
-          <div className="flex gap-2">
-            {isDM && (
+          
+          {/* REQ 5: Only DM can Search/Add to Player Inventory */}
+          {isDM && (
+            <div className="flex gap-2">
               <button onClick={() => setIsForgingItem(!isForgingItem)} className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${isForgingItem ? 'bg-indigo-700 border-indigo-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}>
                 <Hammer className="w-3 h-3" /> {isForgingItem ? 'Close Forge' : 'Forge Custom'}
               </button>
-            )}
-            <button onClick={() => setShowItemSearch(!showItemSearch)} className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${showItemSearch ? 'bg-slate-700 border-slate-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}>
-              <Search className="w-3 h-3" /> {showItemSearch ? 'Close Search' : 'API Search'}
-            </button>
-          </div>
+              <button onClick={() => setShowItemSearch(!showItemSearch)} className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${showItemSearch ? 'bg-slate-700 border-slate-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}>
+                <Search className="w-3 h-3" /> {showItemSearch ? 'Close Search' : 'API Search'}
+              </button>
+            </div>
+          )}
         </div>
         
         {isDM && isForgingItem && (
@@ -231,7 +253,7 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
           </form>
         )}
 
-        {showItemSearch && <EquipmentDiscovery onAddEquipment={addEquipmentToInventory} onEquipWeapon={handleEquipWeapon} />}
+        {showItemSearch && isDM && <EquipmentDiscovery onAddEquipment={addEquipmentToInventory} onEquipWeapon={handleEquipWeapon} />}
 
         {isDM ? (
           <div className="w-full min-h-[300px] h-[300px] relative rounded-xl overflow-hidden border border-slate-700 focus-within:border-slate-500 transition-colors">

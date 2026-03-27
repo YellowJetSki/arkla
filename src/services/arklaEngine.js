@@ -33,7 +33,6 @@ const HIT_DICE_MAP = {
   'mage': 6, 'sorcerer': 6, 'wizard': 6
 };
 
-// NEW: Maps classes to their primary casting stat
 export const SPELLCASTING_STATS = {
   'bard': 'CHA', 'cleric': 'WIS', 'druid': 'WIS', 'paladin': 'CHA',
   'ranger': 'WIS', 'sorcerer': 'CHA', 'warlock': 'CHA', 'wizard': 'INT',
@@ -125,6 +124,55 @@ const HOMEBREW_CLASSES = {
       }
     }
   }
+};
+
+// --- CHUNK LOADING & DISCOVERY CACHES ---
+let cachedSpellStubs = null;
+let cachedFeatStubs = null;
+let cachedEquipmentStubs = null;
+
+export const getSpellStubs = async () => {
+  if (cachedSpellStubs) return cachedSpellStubs;
+  const res = await fetch('https://www.dnd5eapi.co/api/spells');
+  const data = await res.json();
+  cachedSpellStubs = data.results;
+  return cachedSpellStubs;
+};
+
+export const getFeatStubs = async () => {
+  if (cachedFeatStubs) return cachedFeatStubs;
+  // Note: The free SRD only has 1 feat (Grappler). We fetch it anyway to merge with Homebrew.
+  const res = await fetch('https://www.dnd5eapi.co/api/feats');
+  const data = await res.json();
+  cachedFeatStubs = data.results;
+  return cachedFeatStubs;
+};
+
+export const getEquipmentStubs = async () => {
+  if (cachedEquipmentStubs) return cachedEquipmentStubs;
+  const res = await fetch('https://www.dnd5eapi.co/api/equipment');
+  const data = await res.json();
+  cachedEquipmentStubs = data.results;
+  return cachedEquipmentStubs;
+};
+
+export const fetchDetailedStubs = async (stubs) => {
+  const promises = stubs.map(async (stub) => {
+    try {
+      const res = await fetch(`https://www.dnd5eapi.co${stub.url}`);
+      const detail = await res.json();
+      return {
+        ...detail,
+        name: applySanctuaryFilter(detail.name),
+        desc: applySanctuaryFilter(Array.isArray(detail.desc) ? detail.desc.join('\n') : detail.desc)
+      };
+    } catch (e) {
+      console.error(`Failed to fetch details for ${stub.url}`);
+      return null;
+    }
+  });
+  const results = await Promise.all(promises);
+  return results.filter(r => r !== null);
 };
 
 export const fetchSpeciesTraits = async (rawSpeciesName) => {
