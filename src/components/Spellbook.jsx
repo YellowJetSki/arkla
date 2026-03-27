@@ -60,7 +60,6 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     });
   };
 
-  // NEW: DM Delete Spell Function using the unified DialogModal
   const removeSpellFromGrimoire = async (spellToRemove) => {
     showDialog({
       title: 'Remove Spell?',
@@ -188,7 +187,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
         
         <div className="flex justify-between items-center mb-4 relative z-10">
           <h3 className="text-lg font-bold text-white flex items-center gap-2"><Flame className="w-5 h-5 text-fuchsia-400" /> Spell Slots</h3>
-          {!isDM && (
+          {isDM && (
             <button 
               onClick={() => setIsEditingSlots(!isEditingSlots)} 
               className={`text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${isEditingSlots ? 'bg-fuchsia-600 border-fuchsia-500 text-white' : 'bg-slate-900 border-slate-700 text-fuchsia-400 hover:text-fuchsia-300 hover:bg-slate-700'}`}
@@ -198,7 +197,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
           )}
         </div>
         
-        {isEditingSlots ? (
+        {isEditingSlots && isDM ? (
           <div className="space-y-3 relative z-10 animate-in fade-in">
             <p className="text-xs text-slate-400 mb-2">Set your maximum spell slots per level. Set to 0 to remove.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -218,7 +217,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
           </div>
         ) : (
           Object.keys(spellSlots).length === 0 ? (
-            <p className="text-sm text-slate-500 italic relative z-10">No spell slots configured for this character. Click Edit to add them.</p>
+            <p className="text-sm text-slate-500 italic relative z-10">No spell slots configured for this character. {isDM ? "Click Edit to add them." : "Slots are gained upon leveling up."}</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 relative z-10">
               {Object.entries(spellSlots).map(([level, data]) => (
@@ -328,7 +327,6 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
                         <div>
                           <h4 className="font-bold text-fuchsia-300 text-lg flex items-center gap-2">
                             {spell.name}
-                            {/* NEW: DM Delete Spell Button */}
                             {isDM && (
                               <button 
                                 onClick={() => removeSpellFromGrimoire(spell)}

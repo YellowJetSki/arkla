@@ -361,21 +361,21 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
           <div className="space-y-6 animate-in fade-in duration-300">
             
-            {activeTab === 'combat' && (
-              <CombatTab 
-                char={char} 
-                charId={currentUser.charId}
-                isDM={isDM} 
-                updateField={updateField} 
-                activeTheme={activeTheme} 
-                combatWarnings={combatWarnings}
-                activeConditions={activeConditions}
-                handleAddCondition={(e) => handleAddCondition(e.target.value)}
-                handleRemoveCondition={handleRemoveCondition}
-                handleResourceToggle={handleResourceToggle}
-              />
-            )}
-
+{activeTab === 'combat' && (
+  <CombatTab 
+    char={char} 
+    charId={currentUser.charId}
+    isDM={isDM} 
+    updateField={updateField} 
+    activeTheme={activeTheme} 
+    combatWarnings={combatWarnings}
+    activeConditions={activeConditions}
+    handleAddCondition={(e) => handleAddCondition(e.target.value)}
+    handleRemoveCondition={handleRemoveCondition}
+    handleResourceToggle={handleResourceToggle}
+    showDialog={showDialog} // NEW
+  />
+)}
             {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM} showDialog={showDialog} />}
 
             {activeTab === 'features' && (

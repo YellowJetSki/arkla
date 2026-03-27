@@ -1,15 +1,20 @@
 import React from 'react';
-import { Zap, Sword, RotateCcw, AlertTriangle, Crosshair, Sparkles, Battery, Heart } from 'lucide-react';
+import { Zap, Sword, RotateCcw, AlertTriangle, Crosshair, Sparkles, Battery, Heart, Trash2 } from 'lucide-react';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { getModifier, getProficiencyBonus } from '../../services/arklaEngine';
 
 export default function CombatTab({ 
-  char, 
+  char,
+  charId, 
   isDM, 
   activeTheme,
   combatWarnings,
   activeConditions,
   handleAddCondition,
   handleRemoveCondition,
-  handleResourceToggle
+  handleResourceToggle,
+  showDialog
 }) {
   
   const bonusActions = (char.features || []).filter(f => f.desc.toLowerCase().includes('bonus action'));
@@ -18,10 +23,60 @@ export default function CombatTab({
   
   const resources = char.resources || [];
 
+  const handleRemoveAttack = (attack, index) => {
+    if (!showDialog) return;
+    showDialog({
+      title: 'Remove Attack?',
+      message: `Are you sure you want to delete ${attack.name}?`,
+      type: 'confirm',
+      onConfirm: async () => {
+        const newAttacks = [...(char.attacks || [])];
+        newAttacks.splice(index, 1);
+        await updateDoc(doc(db, 'characters', charId), {
+          attacks: newAttacks
+        });
+        showDialog({ isOpen: false });
+      },
+      onCancel: () => showDialog({ isOpen: false })
+    });
+  };
+
+  const calculateDynamicAttack = (attack) => {
+    if (!attack.notes && attack.notes !== '') return attack;
+
+    const strMod = getModifier(char.stats?.STR || 10);
+    const dexMod = getModifier(char.stats?.DEX || 10);
+    const pb = getProficiencyBonus(char.level || 1);
+
+    const properties = attack.notes.toLowerCase();
+    const isFinesse = properties.includes('finesse');
+    const isRanged = properties.includes('ammunition') || properties.includes('thrown');
+    
+    let useStatMod = strMod;
+    if (isRanged) useStatMod = dexMod;
+    if (isFinesse) useStatMod = Math.max(strMod, dexMod);
+
+    const toHit = pb + useStatMod;
+    const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
+
+    const baseDiceMatch = attack.damage.match(/(\d+d\d+)/);
+    const baseDice = baseDiceMatch ? baseDiceMatch[0] : '';
+    
+    let formattedDamage = attack.damage; 
+    if (baseDice) {
+       formattedDamage = useStatMod === 0 ? baseDice : 
+                         useStatMod > 0 ? `${baseDice} + ${useStatMod}` : 
+                         `${baseDice} - ${Math.abs(useStatMod)}`;
+    }
+
+    return { ...attack, hit: formattedHit, damage: formattedDamage };
+  };
+
+  const dynamicAttacks = (char.attacks || []).map(calculateDynamicAttack);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       
-      {/* STATUS WARNINGS */}
       {(combatWarnings.length > 0 || isDM) && (
         <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-sm">
           <div className="flex justify-between items-center mb-4">
@@ -57,7 +112,6 @@ export default function CombatTab({
         </div>
       )}
 
-      {/* CLASS RESOURCES (Auto-populated by Arkla Engine) */}
       {resources.length > 0 && (
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-5 shadow-xl relative overflow-hidden">
           <div className={`absolute top-0 right-0 w-32 h-32 ${activeTheme.bg} blur-[50px] opacity-10 rounded-full -mr-10 -mt-10 pointer-events-none`}></div>
@@ -106,10 +160,8 @@ export default function CombatTab({
         </div>
       )}
 
-      {/* ACTION ECONOMY DASHBOARD */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* MAIN ACTIONS */}
         <div className="space-y-4">
           <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest border-b border-emerald-900/50 pb-2 flex items-center gap-2">
             <Sword className="w-4 h-4" /> Action
@@ -128,10 +180,18 @@ export default function CombatTab({
               </div>
             )}
 
-            {(char.attacks || []).map((attack, i) => (
-              <div key={i} className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-sm hover:border-emerald-500/30 transition-colors">
+            {dynamicAttacks.map((attack, i) => (
+              <div key={i} className="bg-slate-900 border border-slate-700 rounded-xl p-3 shadow-sm hover:border-emerald-500/30 transition-colors group relative">
+                {isDM && (
+                  <button 
+                    onClick={() => handleRemoveAttack(attack, i)}
+                    className="absolute top-2 right-2 p-1.5 opacity-0 group-hover:opacity-100 bg-slate-900 text-slate-500 hover:text-red-400 rounded transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
                 <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-white text-sm">{attack.name}</span>
+                  <span className="font-bold text-white text-sm pr-6">{attack.name}</span>
                   <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded border border-slate-600">{attack.type}</span>
                 </div>
                 <div className="flex items-center gap-4">
@@ -150,7 +210,6 @@ export default function CombatTab({
           </div>
         </div>
 
-        {/* BONUS ACTIONS */}
         <div className="space-y-4">
           <h3 className="text-xs font-black text-amber-400 uppercase tracking-widest border-b border-amber-900/50 pb-2 flex items-center gap-2">
             <Zap className="w-4 h-4" /> Bonus Action
@@ -169,7 +228,6 @@ export default function CombatTab({
           </div>
         </div>
 
-        {/* REACTIONS */}
         <div className="space-y-4">
           <h3 className="text-xs font-black text-purple-400 uppercase tracking-widest border-b border-purple-900/50 pb-2 flex items-center gap-2">
             <RotateCcw className="w-4 h-4" /> Reaction
