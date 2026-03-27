@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
@@ -36,12 +36,13 @@ import FeatDiscovery from './FeatDiscovery';
 import BattleMapLayer from './battlemap/BattleMapLayer';
 import StickyBattleNav from './battlemap/StickyBattleNav';
 
+// Upgraded themes with ambient background glows and rich accents
 const THEMES = {
-  indigo: { text: 'text-indigo-400', bg: 'bg-indigo-600', border: 'border-indigo-500/50', ring: 'ring-indigo-500', shadow: 'shadow-[0_0_15px_rgba(99,102,241,0.5)]' },
-  emerald: { text: 'text-emerald-400', bg: 'bg-emerald-600', border: 'border-emerald-500/50', ring: 'ring-emerald-500', shadow: 'shadow-[0_0_15px_rgba(16,185,129,0.5)]' },
-  rose: { text: 'text-rose-400', bg: 'bg-rose-600', border: 'border-rose-500/50', ring: 'ring-rose-500', shadow: 'shadow-[0_0_15px_rgba(244,63,94,0.5)]' },
-  amber: { text: 'text-amber-400', bg: 'bg-amber-600', border: 'border-amber-500/50', ring: 'ring-amber-500', shadow: 'shadow-[0_0_15px_rgba(245,158,11,0.5)]' },
-  sky: { text: 'text-sky-400', bg: 'bg-sky-600', border: 'border-sky-500/50', ring: 'ring-sky-500', shadow: 'shadow-[0_0_15px_rgba(14,165,233,0.5)]' },
+  indigo: { text: 'text-indigo-400', bg: 'bg-indigo-600', border: 'border-indigo-500/50', ring: 'ring-indigo-500', shadow: 'shadow-[0_0_15px_rgba(99,102,241,0.5)]', ambient: 'from-indigo-950/40 via-slate-950', accent: 'bg-indigo-500/10' },
+  emerald: { text: 'text-emerald-400', bg: 'bg-emerald-600', border: 'border-emerald-500/50', ring: 'ring-emerald-500', shadow: 'shadow-[0_0_15px_rgba(16,185,129,0.5)]', ambient: 'from-emerald-950/40 via-slate-950', accent: 'bg-emerald-500/10' },
+  rose: { text: 'text-rose-400', bg: 'bg-rose-600', border: 'border-rose-500/50', ring: 'ring-rose-500', shadow: 'shadow-[0_0_15px_rgba(244,63,94,0.5)]', ambient: 'from-rose-950/40 via-slate-950', accent: 'bg-rose-500/10' },
+  amber: { text: 'text-amber-400', bg: 'bg-amber-600', border: 'border-amber-500/50', ring: 'ring-amber-500', shadow: 'shadow-[0_0_15px_rgba(245,158,11,0.5)]', ambient: 'from-amber-950/40 via-slate-950', accent: 'bg-amber-500/10' },
+  sky: { text: 'text-sky-400', bg: 'bg-sky-600', border: 'border-sky-500/50', ring: 'ring-sky-500', shadow: 'shadow-[0_0_15px_rgba(14,165,233,0.5)]', ambient: 'from-sky-950/40 via-slate-950', accent: 'bg-sky-500/10' },
 };
 
 export default function CharacterCard({ currentUser, onLogout, isDM = false, onClose = null }) {
@@ -141,53 +142,14 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     }
   };
 
-  // NEW: Token Sync Hook for Conditions
   const handleAddCondition = async (condition) => {
     if (!condition || !char) return;
-    
-    try {
-      await runTransaction(db, async (transaction) => {
-        const charRef = doc(db, 'characters', currentUser.charId);
-        const mapRef = doc(db, 'campaign', 'battlemap');
-        
-        transaction.update(charRef, { conditions: arrayUnion(condition) });
-        
-        const mapDoc = await transaction.get(mapRef);
-        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[currentUser.charId]) {
-          const mapTokens = mapDoc.data().tokens;
-          const currentConds = mapTokens[currentUser.charId].conditions || [];
-          if (!currentConds.includes(condition)) {
-            mapTokens[currentUser.charId].conditions = [...currentConds, condition];
-            transaction.update(mapRef, { tokens: mapTokens });
-          }
-        }
-      });
-    } catch (err) {
-      console.error("Condition Sync Failed:", err);
-    }
+    await updateDoc(doc(db, 'characters', currentUser.charId), { conditions: arrayUnion(condition) });
   };
 
   const handleRemoveCondition = async (condition) => {
     if (!char) return;
-    
-    try {
-      await runTransaction(db, async (transaction) => {
-        const charRef = doc(db, 'characters', currentUser.charId);
-        const mapRef = doc(db, 'campaign', 'battlemap');
-        
-        transaction.update(charRef, { conditions: arrayRemove(condition) });
-        
-        const mapDoc = await transaction.get(mapRef);
-        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[currentUser.charId]) {
-          const mapTokens = mapDoc.data().tokens;
-          const currentConds = mapTokens[currentUser.charId].conditions || [];
-          mapTokens[currentUser.charId].conditions = currentConds.filter(c => c !== condition);
-          transaction.update(mapRef, { tokens: mapTokens });
-        }
-      });
-    } catch (err) {
-      console.error("Condition Sync Failed:", err);
-    }
+    await updateDoc(doc(db, 'characters', currentUser.charId), { conditions: arrayRemove(condition) });
   };
 
   const handleResourceToggle = async (resourceIndex, newCurrentValue) => {
@@ -297,6 +259,11 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
   return (
     <CardWrapper>
+      {/* Ambient Theme Background */}
+      {!isDM && (
+         <div className={`fixed inset-0 bg-gradient-to-b ${activeTheme.ambient} to-slate-950 pointer-events-none -z-10 transition-colors duration-1000`}></div>
+      )}
+
       <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} pb-24 relative`}>
         
         <DialogModal 
@@ -345,12 +312,14 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           ) : (
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
-                <img src="/icon.png" alt="App Icon" className="w-8 h-8 rounded-md shadow-lg" />
+                <div className={`w-8 h-8 rounded-md shadow-lg ${activeTheme.accent} border border-white/10 flex items-center justify-center p-1`}>
+                  <img src="/icon.png" alt="App Icon" className="w-full h-full object-cover rounded-sm" />
+                </div>
                 <h1 className="text-lg font-bold text-slate-300 tracking-wider hidden sm:block">CAMPAIGN COMPANION</h1>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setIsGuideOpen(true)} className={`flex items-center justify-center w-9 h-9 ${activeTheme.text} hover:text-white transition-colors bg-slate-900/30 rounded-lg border ${activeTheme.border} hover:${activeTheme.bg} shadow-sm`}><HelpCircle className="w-4 h-4" /></button>
-                <button onClick={onLogout} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors bg-slate-800 px-3 py-1.5 h-9 rounded-lg border border-slate-700 text-sm"><LogOut className="w-3 h-3" /> Exit</button>
+                <button onClick={() => setIsGuideOpen(true)} className={`flex items-center justify-center w-9 h-9 ${activeTheme.text} hover:text-white transition-colors bg-slate-900/50 rounded-lg border ${activeTheme.border} hover:${activeTheme.bg} shadow-sm backdrop-blur-sm`}><HelpCircle className="w-4 h-4" /></button>
+                <button onClick={onLogout} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors bg-slate-900/50 backdrop-blur-sm px-3 py-1.5 h-9 rounded-lg border border-slate-700 text-sm shadow-sm"><LogOut className="w-3 h-3" /> Exit</button>
               </div>
             </div>
           )}
@@ -371,8 +340,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             <QuickTraits features={char.features} />
           </div>
 
-          <div className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur-xl pt-1 pb-3 -mx-3 px-3 md:-mx-8 md:px-8 border-b border-slate-800 shadow-md mb-6">
-            <div className="bg-slate-900 p-1.5 rounded-xl border border-slate-800 flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-1 sm:gap-2 justify-between snap-x snap-mandatory">
+          {/* Styled navigation matching the new ambient theme */}
+          <div className={`sticky top-0 z-30 pt-1 pb-3 -mx-3 px-3 md:-mx-8 md:px-8 border-b border-slate-800/80 shadow-md mb-6 ${isDM ? 'bg-slate-950/90 backdrop-blur-xl' : 'bg-slate-950/60 backdrop-blur-2xl'}`}>
+            <div className={`bg-slate-900/80 p-1.5 rounded-xl border border-slate-800/80 shadow-inner flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-1 sm:gap-2 justify-between snap-x snap-mandatory backdrop-blur-md`}>
               {[
                 { id: 'combat', icon: Swords, label: 'Combat' }, 
                 { id: 'spells', icon: Flame, label: 'Spells' }, 
@@ -385,7 +355,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
               ].map(tab => (
                 <button 
                   key={tab.id} id={`tab-btn-${tab.id}`} onClick={() => setActiveTab(tab.id)} 
-                  className={`snap-center flex-1 min-w-[50px] sm:min-w-[70px] flex items-center justify-center gap-2 px-2 py-2.5 rounded-lg font-medium text-xs md:text-sm whitespace-nowrap transition-all relative ${activeTab === tab.id ? `${activeTheme.bg} text-white shadow-md` : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+                  className={`snap-center flex-1 min-w-[50px] sm:min-w-[70px] flex items-center justify-center gap-2 px-2 py-2.5 rounded-lg font-medium text-xs md:text-sm whitespace-nowrap transition-all relative ${activeTab === tab.id ? `${activeTheme.bg} text-white shadow-md` : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'}`}
                 >
                   <tab.icon className="w-4 h-4" /> 
                   <span className="hidden sm:inline">{tab.label}</span>
@@ -396,7 +366,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             </div>
           </div>
 
-          <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="space-y-6 animate-in fade-in duration-500">
             
             {activeTab === 'combat' && (
               <CombatTab 
@@ -410,7 +380,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 handleAddCondition={(e) => handleAddCondition(e.target.value)}
                 handleRemoveCondition={handleRemoveCondition}
                 handleResourceToggle={handleResourceToggle}
-                showDialog={showDialog}
               />
             )}
 
@@ -424,14 +393,14 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                   {!isDM ? (
                     <button 
                       onClick={() => setShowFeatSearch(!showFeatSearch)}
-                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${showFeatSearch ? 'bg-slate-700 border-slate-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
+                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${showFeatSearch ? 'bg-slate-700 border-slate-500 text-white' : `bg-slate-800/80 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
                     >
                       <Search className="w-3 h-3" /> {showFeatSearch ? 'Close' : 'Discover Feats'}
                     </button>
                   ) : (
                     <button 
                       onClick={() => setIsForgingFeat(!isForgingFeat)}
-                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${isForgingFeat ? 'bg-fuchsia-700 border-fuchsia-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
+                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isForgingFeat ? 'bg-fuchsia-700 border-fuchsia-500 text-white' : `bg-slate-800/80 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
                     >
                       <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Cancel Forge' : 'Forge Custom Feat'}
                     </button>
