@@ -85,9 +85,11 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
 
   return (
     <>
+      {/* Moved DialogModal to the top level of this return to prevent z-index issues */}
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
-      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      {/* Main Modal Overlay */}
+      <div className="fixed inset-0 z-[99990] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden">
           
           <div className="flex justify-between items-center p-5 border-b border-slate-800 bg-slate-900 shrink-0">

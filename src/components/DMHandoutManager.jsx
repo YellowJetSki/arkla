@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Image as ImageIcon, X, Send, Trash2, Eye, AlertTriangle } from 'lucide-react';
+import ImageSelector from './shared/ImageSelector';
 
 export default function DMHandoutManager({ onClose }) {
   const [handouts, setHandouts] = useState([]);
@@ -44,11 +45,9 @@ export default function DMHandoutManager({ onClose }) {
     setIsSubmitting(false);
   };
 
-  // NEW: Force an already uploaded image back to everyone's screen
   const handleRebroadcast = async (item) => {
     try {
       const lootRef = doc(db, 'campaign', 'shared_loot');
-      // Append a timestamp so the local storage treats it as a "new" popup event
       await updateDoc(lootRef, { 
         latestShareId: `${item.id}_${Date.now()}` 
       });
@@ -90,7 +89,7 @@ export default function DMHandoutManager({ onClose }) {
                 <Send className="w-4 h-4 text-emerald-400" /> Broadcast New Image
               </h3>
               <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                Paste an image URL here. It will immediately pop up in full screen for all active players and save to their Party Vault.
+                Paste an image URL here or select a local file. It will immediately pop up in full screen for all active players and save to their Party Vault.
               </p>
               
               <form onSubmit={handleShare} className="space-y-4">
@@ -114,6 +113,10 @@ export default function DMHandoutManager({ onClose }) {
                     onChange={e => setNewHandout({...newHandout, url: e.target.value})} 
                     className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" 
                     placeholder="https://example.com/map.jpg" 
+                  />
+                  <ImageSelector 
+                    value={newHandout.url} 
+                    onChange={(url) => setNewHandout({...newHandout, url})} 
                   />
                 </div>
 

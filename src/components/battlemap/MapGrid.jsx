@@ -2,7 +2,7 @@ import {
   User, ZoomIn, ZoomOut, Target, 
   EyeOff, Heart, EarOff, Flame, Ghost, Link, 
   Ban, Cloud, Lock, Mountain, Skull, ArrowDown, 
-  Stars, Moon, AlertCircle, BrainCircuit, Maximize, Ruler, CircleDashed, ArrowUpCircle, Image as ImageIcon, Trash2, X, Activity, Eye
+  Stars, Moon, AlertCircle, BrainCircuit, Maximize, Ruler, CircleDashed, ArrowUpCircle, Image as ImageIcon, Trash2, X, Activity, Eye, Hand
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import MapDrawings from './MapDrawings';
@@ -84,6 +84,12 @@ export default function MapGrid({
 
   const [pingMenu, setPingMenu] = useState(null);
   const [dragMeasure, setDragMeasure] = useState(null);
+  
+  // Panning & Pinching State
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
+  const [initialPinchDist, setInitialPinchDist] = useState(null);
+  const [initialPinchZoom, setInitialPinchZoom] = useState(null);
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -154,6 +160,86 @@ export default function MapGrid({
     }
     setPingMenu(null);
   };
+  
+  // Desktop Handlers for Pan Tool
+  const handleMapMouseDown = (e) => {
+    if (isDisplayMode || isDrawingMode || pingMenu) return;
+    setIsPanning(true);
+    setPanStart({
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: scrollRef.current.scrollLeft,
+      scrollTop: scrollRef.current.scrollTop
+    });
+  };
+
+  const handleMapMouseMove = (e) => {
+    if (!isPanning || !scrollRef.current) return;
+    const dx = e.clientX - panStart.x;
+    const dy = e.clientY - panStart.y;
+    scrollRef.current.scrollLeft = panStart.scrollLeft - dx;
+    scrollRef.current.scrollTop = panStart.scrollTop - dy;
+  };
+
+  const handleMapMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  // Mobile Handlers for Touch Pan & Pinch to Zoom
+  const getPinchDistance = (touches) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleTouchStart = (e) => {
+    if (isDisplayMode || pingMenu) return;
+    
+    if (e.touches.length === 2) {
+      // Begin Pinch Zoom
+      setIsPanning(false);
+      setInitialPinchDist(getPinchDistance(e.touches));
+      setInitialPinchZoom(zoom);
+    } else if (e.touches.length === 1 && !isDrawingMode) {
+      // Begin Touch Pan
+      setIsPanning(true);
+      setPanStart({
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+        scrollLeft: scrollRef.current.scrollLeft,
+        scrollTop: scrollRef.current.scrollTop
+      });
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (!scrollRef.current || isDisplayMode) return;
+
+    if (e.touches.length === 2 && initialPinchDist) {
+      // Prevent browser from doing a native page zoom
+      if (e.cancelable) e.preventDefault(); 
+      
+      const currentDist = getPinchDistance(e.touches);
+      const scale = currentDist / initialPinchDist;
+      const newZoom = Math.min(Math.max(initialPinchZoom * scale, 0.5), 3);
+      setZoom(newZoom);
+    } else if (e.touches.length === 1 && isPanning) {
+      const dx = e.touches[0].clientX - panStart.x;
+      const dy = e.touches[0].clientY - panStart.y;
+      scrollRef.current.scrollLeft = panStart.scrollLeft - dx;
+      scrollRef.current.scrollTop = panStart.scrollTop - dy;
+    }
+  };
+
+  const handleTouchEnd = (e) => {
+    if (e.touches.length < 2) {
+      setInitialPinchDist(null);
+      setInitialPinchZoom(null);
+    }
+    if (e.touches.length === 0) {
+      setIsPanning(false);
+    }
+  };
 
   const activeToken = mapData?.activeTokenId ? tokens[mapData.activeTokenId] : null;
   const gridColor = mapData?.gridColor || 'rgba(255,255,255,0.35)';
@@ -175,6 +261,16 @@ export default function MapGrid({
     if (!cellGroups[key]) cellGroups[key] = [];
     cellGroups[key].push(t.id);
   });
+
+  // Determine cursor
+  let mapCursorClass = 'cursor-auto';
+  if (!isDisplayMode) {
+     if (isDrawingMode) {
+       mapCursorClass = 'cursor-crosshair touch-none'; // Prevent touch scrolling while drawing
+     } else {
+       mapCursorClass = isPanning ? 'cursor-grabbing' : 'cursor-grab';
+     }
+  }
 
   return (
     <div className={`relative w-full flex flex-col overflow-hidden ${isDisplayMode ? 'h-[100dvh] rounded-none border-0 bg-black' : 'h-[75vh] md:max-h-[70vh] rounded-xl border border-slate-700 bg-slate-950 shadow-inner'}`} onClick={() => setPingMenu(null)}>
@@ -212,7 +308,18 @@ export default function MapGrid({
         <div className="absolute inset-0 z-[100] pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.8)_85%,_rgba(0,0,0,1)_100%)]"></div>
       )}
 
-      <div ref={scrollRef} className={`${isDisplayMode ? 'overflow-hidden flex-1 w-full' : 'overflow-auto flex-1 custom-scrollbar'} relative`}>
+      <div 
+        ref={scrollRef} 
+        onMouseDown={handleMapMouseDown}
+        onMouseMove={handleMapMouseMove}
+        onMouseUp={handleMapMouseUp}
+        onMouseLeave={handleMapMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        className={`${isDisplayMode ? 'overflow-hidden flex-1 w-full' : 'overflow-auto flex-1 custom-scrollbar'} relative ${mapCursorClass}`}
+      >
         <div 
           className="relative transition-all duration-700 origin-top-left ease-in-out"
           style={{ width: cols * currentCellSize, height: rows * currentCellSize, backgroundImage: mapData?.imageUrl ? `url(${mapData.imageUrl})` : 'none', backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'top left', imageRendering: 'crisp-edges' }}
@@ -251,9 +358,16 @@ export default function MapGrid({
               return (
                 <div 
                   key={`click-${tile.x},${tile.y}`}
-                  onMouseDown={(e) => { e.preventDefault(); if(isDisplayMode) return; }}
-                  onClick={() => { if(!isDisplayMode && onTileClick) onTileClick(tile.x, tile.y); }}
-                  onContextMenu={(e) => handleContextMenuPing(e, tile.x, tile.y)}
+                  onMouseDown={(e) => { 
+                    if(isDisplayMode) { e.preventDefault(); return; } 
+                    // Let panning handle mousedown unless it's drawing mode
+                    if(isDrawingMode) e.stopPropagation(); 
+                  }}
+                  onClick={(e) => { 
+                    if(isPanning) return; // Ignore click if we were just panning
+                    if(!isDisplayMode && onTileClick) onTileClick(tile.x, tile.y); 
+                  }}
+                  onContextMenu={(e) => { e.stopPropagation(); handleContextMenuPing(e, tile.x, tile.y); }}
                   onDragOver={(e) => { 
                     if(isDisplayMode) return;
                     e.preventDefault(); 
@@ -270,7 +384,7 @@ export default function MapGrid({
                     const dragId = e.dataTransfer.getData('tokenId');
                     if (dragId && onTokenDrop) onTokenDrop(dragId, tile.x, tile.y);
                   }}
-                  className={`w-full h-full transition-colors ${isDisplayMode ? '' : 'cursor-crosshair'} ${tileClass}`}
+                  className={`w-full h-full transition-colors ${tileClass}`}
                 />
               );
             })}
