@@ -70,13 +70,19 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
   };
 
   const handleDeploy = (name, data) => {
+    // Safely handle legacy preset formats missing tokens or mapData
+    const safeData = {
+      mapData: data.mapData || { cols: 20, rows: 15, imageUrl: '' },
+      tokens: data.tokens || {}
+    };
+
     setDialog({
       isOpen: true,
       title: 'Deploy Preset',
       message: `Deploying "${name}" will wipe the current active enemies and replace them with this preset's enemies. Proceed?`,
       type: 'confirm',
       onConfirm: () => {
-        onRestorePreset(data);
+        onRestorePreset(safeData);
         closeDialog();
         onClose();
       }
@@ -85,10 +91,9 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
 
   return (
     <>
-      {/* Moved DialogModal to the top level of this return to prevent z-index issues */}
+      {/* Moved DialogModal to the very top to ensure it never gets buried by z-index */}
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
-      {/* Main Modal Overlay */}
       <div className="fixed inset-0 z-[99990] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
         <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl shadow-2xl flex flex-col max-h-[85dvh] overflow-hidden">
           
@@ -133,7 +138,8 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
                     <div key={name} className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800 group hover:border-slate-600 transition-colors">
                       <div>
                         <h4 className="font-bold text-slate-200">{name}</h4>
-                        <p className="text-[10px] text-slate-500">{Object.keys(data.tokens).length} Enemies • {data.mapData.cols}x{data.mapData.rows} Grid</p>
+                        {/* Safe fallback for older preset formats missing tokens or mapData */}
+                        <p className="text-[10px] text-slate-500">{Object.keys(data.tokens || {}).length} Enemies • {data.mapData?.cols || 20}x{data.mapData?.rows || 15} Grid</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
