@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import EquipmentDiscovery from '../EquipmentDiscovery';
+import { getModifier, getProficiencyBonus } from '../../services/arklaEngine';
+import DebouncedTextarea from '../shared/DebouncedTextarea';
 
-// Phase 3 Helper: Parse text block into Name and Description
 const parseInventory = (text) => {
   if (!text) return [];
   const blocks = text.split(/^(?=•|-|\d+x)/m).filter(b => b.trim());
@@ -23,13 +24,53 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
   
   const [transactionAmount, setTransactionAmount] = useState('');
   const [transactionType, setTransactionType] = useState('assarions'); 
-  const [openItems, setOpenItems] = useState({}); // Track expanded cards
+  const [openItems, setOpenItems] = useState({}); 
 
   const addEquipmentToInventory = async (formattedItemText) => {
     const currentInventory = char.inventory || '';
     const newInventory = currentInventory.trim() ? `${currentInventory}\n\n${formattedItemText}` : formattedItemText;
     await updateField('inventory', newInventory);
     setShowItemSearch(false);
+  };
+
+  const handleEquipWeapon = async (weaponData) => {
+    if (!weaponData.damage) return; 
+    
+    const strMod = getModifier(char.stats?.STR || 10);
+    const dexMod = getModifier(char.stats?.DEX || 10);
+    const pb = getProficiencyBonus(char.level || 1);
+
+    const isFinesse = weaponData.properties?.some(p => p.name.toLowerCase() === 'finesse');
+    const isRanged = weaponData.weapon_range === 'Ranged' || weaponData.properties?.some(p => p.name.toLowerCase() === 'thrown');
+    
+    let useStatMod = strMod;
+    if (isRanged) useStatMod = dexMod;
+    if (isFinesse) useStatMod = Math.max(strMod, dexMod);
+
+    const toHit = pb + useStatMod;
+    const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
+    
+    let damageBonus = useStatMod;
+    const formattedDamage = damageBonus === 0 ? weaponData.damage.damage_dice : 
+                            damageBonus > 0 ? `${weaponData.damage.damage_dice} + ${damageBonus}` : 
+                            `${weaponData.damage.damage_dice} - ${Math.abs(damageBonus)}`;
+
+    const newAttack = {
+      name: weaponData.name,
+      hit: formattedHit,
+      damage: formattedDamage,
+      type: weaponData.damage.damage_type?.name || 'Slashing',
+      notes: weaponData.properties?.map(p => p.name).join(', ') || ''
+    };
+
+    const charId = localStorage.getItem('charId');
+    if (charId) {
+      await runTransaction(db, async (transaction) => {
+        const charRef = doc(db, 'characters', charId);
+        transaction.update(charRef, { attacks: arrayUnion(newAttack) });
+      });
+      alert(`${weaponData.name} has been added to your bags AND equipped to your Combat Tab!`);
+    }
   };
 
   const handleForgeCustomItem = async (e) => {
@@ -48,7 +89,6 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
   const handleShareToParty = async (itemString, index) => {
     if (!window.confirm("Send this item to the Shared Party Loot? It will be removed from your personal inventory.")) return;
     
-    // Using string manipulation to accurately remove the block we just parsed
     const blocks = (char.inventory || '').split(/^(?=•|-|\d+x)/m).filter(b => b.trim());
     blocks.splice(index, 1);
     await updateField('inventory', blocks.join('\n\n'));
@@ -71,48 +111,76 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
     await setDoc(lootRef, { items, latestShareId: newItem.id }, { merge: true });
   };
 
-  const adjustCurrency = (type, amount) => {
-    const current = char.currency?.[type] || 0;
-    updateField(`currency.${type}`, Math.max(0, current + amount));
+  const adjustCurrency = async (type, amount) => {
+    const charId = localStorage.getItem('charId');
+    if (!charId) return;
+    const charRef = doc(db, 'characters', charId);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const sfDoc = await transaction.get(charRef);
+        if (!sfDoc.exists()) return;
+        const data = sfDoc.data();
+        const current = data.currency?.[type] || 0;
+        const newAmt = Math.max(0, current + amount);
+        transaction.update(charRef, { [`currency.${type}`]: newAmt });
+      });
+    } catch (err) {
+      console.error("Currency transaction failed: ", err);
+    }
   };
 
-  const handleTransaction = (isAdding) => {
+  const handleTransaction = async (isAdding) => {
     const amount = parseInt(transactionAmount, 10);
     if (isNaN(amount) || amount <= 0) return;
     
-    if (isAdding) {
-      adjustCurrency(transactionType, amount);
-    } else {
-      const currentGold = char.currency?.assarions || 0;
-      const currentSilver = char.currency?.quadrans || 0;
-      const currentCopper = char.currency?.leptons || 0;
+    const charId = localStorage.getItem('charId');
+    if (!charId) return;
+    const charRef = doc(db, 'characters', charId);
 
-      let costInCopper = 0;
-      if (transactionType === 'assarions') costInCopper = amount * 100;
-      if (transactionType === 'quadrans') costInCopper = amount * 10;
-      if (transactionType === 'leptons') costInCopper = amount;
+    try {
+      await runTransaction(db, async (transaction) => {
+        const sfDoc = await transaction.get(charRef);
+        if (!sfDoc.exists()) return;
+        const data = sfDoc.data();
+        const currency = data.currency || { assarions: 0, quadrans: 0, leptons: 0 };
 
-      const totalCopper = (currentGold * 100) + (currentSilver * 10) + currentCopper;
+        if (isAdding) {
+          const current = currency[transactionType] || 0;
+          transaction.update(charRef, { [`currency.${transactionType}`]: current + amount });
+        } else {
+          const currentGold = currency.assarions || 0;
+          const currentSilver = currency.quadrans || 0;
+          const currentCopper = currency.leptons || 0;
 
-      if (totalCopper < costInCopper) {
-        alert("Not enough total wealth to cover this transaction.");
-        return;
-      }
+          let costInCopper = 0;
+          if (transactionType === 'assarions') costInCopper = amount * 100;
+          if (transactionType === 'quadrans') costInCopper = amount * 10;
+          if (transactionType === 'leptons') costInCopper = amount;
 
-      const remainingCopperTotal = totalCopper - costInCopper;
-      const newGold = Math.floor(remainingCopperTotal / 100);
-      const newSilver = Math.floor((remainingCopperTotal % 100) / 10);
-      const newCopper = remainingCopperTotal % 10;
+          const totalCopper = (currentGold * 100) + (currentSilver * 10) + currentCopper;
 
-      updateField('currency', { 
-        ...char.currency,
-        assarions: newGold, 
-        quadrans: newSilver, 
-        leptons: newCopper 
+          if (totalCopper < costInCopper) {
+            return Promise.reject("Not enough funds");
+          }
+
+          const remainingCopperTotal = totalCopper - costInCopper;
+          const newGold = Math.floor(remainingCopperTotal / 100);
+          const newSilver = Math.floor((remainingCopperTotal % 100) / 10);
+          const newCopper = remainingCopperTotal % 10;
+
+          transaction.update(charRef, {
+            'currency.assarions': newGold,
+            'currency.quadrans': newSilver,
+            'currency.leptons': newCopper
+          });
+        }
       });
+      setTransactionAmount('');
+    } catch (error) {
+       if (error === "Not enough funds") alert("Not enough total wealth to cover this transaction.");
+       else console.error(error);
     }
-    
-    setTransactionAmount('');
   };
 
   const toggleItemOpen = (idx) => {
@@ -126,16 +194,16 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
       <div className="md:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-5">
         <div className="flex justify-between items-center border-b border-slate-700 pb-2 mb-4">
           <h3 className="text-lg font-bold text-white flex items-center gap-2"><Backpack className={`w-5 h-5 ${activeTheme.text}`} /> Equipment & Items</h3>
-          {isDM && (
-            <div className="flex gap-2">
+          <div className="flex gap-2">
+            {isDM && (
               <button onClick={() => setIsForgingItem(!isForgingItem)} className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${isForgingItem ? 'bg-indigo-700 border-indigo-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}>
                 <Hammer className="w-3 h-3" /> {isForgingItem ? 'Close Forge' : 'Forge Custom'}
               </button>
-              <button onClick={() => setShowItemSearch(!showItemSearch)} className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${showItemSearch ? 'bg-slate-700 border-slate-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}>
-                <Search className="w-3 h-3" /> {showItemSearch ? 'Close Search' : 'API Search'}
-              </button>
-            </div>
-          )}
+            )}
+            <button onClick={() => setShowItemSearch(!showItemSearch)} className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${showItemSearch ? 'bg-slate-700 border-slate-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}>
+              <Search className="w-3 h-3" /> {showItemSearch ? 'Close Search' : 'API Search'}
+            </button>
+          </div>
         </div>
         
         {isDM && isForgingItem && (
@@ -163,10 +231,16 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
           </form>
         )}
 
-        {showItemSearch && isDM && <EquipmentDiscovery onAddEquipment={addEquipmentToInventory} />}
+        {showItemSearch && <EquipmentDiscovery onAddEquipment={addEquipmentToInventory} onEquipWeapon={handleEquipWeapon} />}
 
         {isDM ? (
-          <textarea defaultValue={char.inventory || ''} onBlur={(e) => updateField('inventory', e.target.value)} className={`w-full min-h-[300px] bg-slate-900 border border-slate-700 rounded-xl p-4 text-slate-300 text-sm focus:outline-none focus:${activeTheme.border} resize-y leading-relaxed custom-scrollbar`} />
+          <div className="w-full min-h-[300px] h-[300px] relative rounded-xl overflow-hidden border border-slate-700 focus-within:border-slate-500 transition-colors">
+            <DebouncedTextarea 
+              initialValue={char.inventory || ''} 
+              onSave={(val) => updateField('inventory', val)} 
+              className={`w-full h-full bg-slate-900 p-4 text-slate-300 text-sm focus:outline-none resize-none leading-relaxed custom-scrollbar`} 
+            />
+          </div>
         ) : (
           <div className="space-y-3">
             {parsedItems.length === 0 ? (
@@ -221,7 +295,6 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme }) {
             </div>
           </div>
           
-          {/* Phase 3 Quick Math Buttons */}
           <div className="flex gap-1">
              {[1, 5, 10, 50].map(val => (
                <button key={val} onClick={() => setTransactionAmount(val.toString())} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 rounded py-1 text-xs font-bold transition-colors">

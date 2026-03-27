@@ -82,10 +82,7 @@ export default function MapGrid({
   const currentCellSize = 30 * zoom;
   const scrollRef = useRef(null);
 
-  // Ping Menu State
   const [pingMenu, setPingMenu] = useState(null);
-  
-  // Drag-to-Measure State
   const [dragMeasure, setDragMeasure] = useState(null);
 
   const [now, setNow] = useState(Date.now());
@@ -136,7 +133,6 @@ export default function MapGrid({
     }
   }, [isDisplayMode, cols, rows, mapData?.activeTokenId]);
 
-  // Initiative Auto-Focus
   useEffect(() => {
     if (mapData?.activeTokenId && tokens[mapData.activeTokenId]) {
       setTimeout(() => centerOnToken(mapData.activeTokenId), 500);
@@ -170,6 +166,15 @@ export default function MapGrid({
       default: return 'text-sky-400 border-white bg-sky-500/30';
     }
   };
+
+  // QoL: Group tokens by cell coordinates to prevent perfectly overlapping/hidden tokens
+  const cellGroups = {};
+  Object.values(tokens || {}).forEach(t => {
+    if (t.isHidden && !isDM) return;
+    const key = `${t.x || 0},${t.y || 0}`;
+    if (!cellGroups[key]) cellGroups[key] = [];
+    cellGroups[key].push(t.id);
+  });
 
   return (
     <div className={`relative w-full flex flex-col overflow-hidden ${isDisplayMode ? 'h-[100dvh] rounded-none border-0 bg-black' : 'h-[75vh] md:max-h-[70vh] rounded-xl border border-slate-700 bg-slate-950 shadow-inner'}`} onClick={() => setPingMenu(null)}>
@@ -307,6 +312,11 @@ export default function MapGrid({
 
               const safeX = token.x || 0;
               const safeY = token.y || 0;
+
+              // QoL: Stacking Offset ensures tokens on the same tile remain slightly visible
+              const group = cellGroups[`${safeX},${safeY}`]?.sort() || [];
+              const stackIndex = group.indexOf(token.id);
+              const offsetXY = stackIndex > 0 ? stackIndex * 6 : 0;
               
               return (
                 <div
@@ -331,7 +341,7 @@ export default function MapGrid({
                     }
                   }}
                   className={`absolute transition-all duration-700 ease-in-out flex items-center justify-center ${isDisplayMode || isDrawingMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer hover:scale-105'} ${token.isHidden ? 'opacity-40 grayscale' : ''}`}
-                  style={{ width: currentCellSize * tSize, height: currentCellSize * tSize, transform: `translate(${safeX * currentCellSize}px, ${safeY * currentCellSize}px)` }}
+                  style={{ width: currentCellSize * tSize, height: currentCellSize * tSize, transform: `translate(${safeX * currentCellSize + offsetXY}px, ${safeY * currentCellSize - offsetXY}px)` }}
                 >
                   
                   {token.aura > 0 && !isDead && (
@@ -394,7 +404,6 @@ export default function MapGrid({
                     )}
                   </div>
 
-                  {/* On-Map Health Bars (DM ONLY) */}
                   {isDM && !isDisplayMode && tHp !== undefined && !isDead && (
                     <div className="absolute -bottom-2 left-[10%] w-[80%] h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 z-50 shadow-sm pointer-events-none">
                        {(tTempHp > 0) && (

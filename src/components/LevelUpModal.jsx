@@ -4,7 +4,7 @@ import { db } from '../services/firebase';
 import { ArrowUpCircle, X, Heart, Shield, Sparkles, BookOpen, ChevronRight, ChevronLeft, CheckCircle2, Trash2, Milestone, Dices, Zap, Loader2, Flame } from 'lucide-react';
 import SpellDiscovery from './SpellDiscovery';
 import FeatDiscovery from './FeatDiscovery';
-import { fetchClassProgression, getProficiencyBonus, getModifier } from '../services/arklaEngine';
+import { fetchClassProgression, getProficiencyBonus, getModifier, calculateSpellcastingStats } from '../services/arklaEngine';
 
 export default function LevelUpModal({ char, charId, onClose }) {
   const [step, setStep] = useState(1);
@@ -77,35 +77,37 @@ export default function LevelUpModal({ char, charId, onClose }) {
       'hitDice.type': `d${engineData.hitDie}`
     };
 
-    // Update Stats if ASI
+    // Update Spell Save DC & Attack automatically based on new stats and level
+    const spellStats = calculateSpellcastingStats(classPath.trim(), newLevel, pendingStats);
+    if (spellStats.spellSave !== '--') {
+      updates.spellSave = spellStats.spellSave;
+      updates.spellAttack = spellStats.spellAttack;
+    }
+
     if (asiChoice === 'ASI') {
       const statsChanged = Object.keys(pendingStats).some(k => pendingStats[k] !== char.stats?.[k]);
       if (statsChanged) updates.stats = pendingStats;
     }
     
-    // Inject Custom Feats & Spells the user manually picked
     if (newSpells.length > 0) updates.spells = arrayUnion(...newSpells);
     if (newFeats.length > 0) updates.features = arrayUnion(...newFeats);
 
-    // Inject Mechanical Features from Engine
     if (engineData.features.length > 0) {
       if (!updates.features) updates.features = arrayUnion(...engineData.features);
       else updates.features = arrayUnion(...newFeats, ...engineData.features);
     }
 
-    // Automate Spell Slots (MERGE to avoid deleting custom slots, but update maxes)
     if (engineData.spellSlots) {
       const existingSlots = char.spellSlots ? { ...char.spellSlots } : {};
       Object.keys(engineData.spellSlots).forEach(level => {
         existingSlots[level] = {
           max: engineData.spellSlots[level].max,
-          current: engineData.spellSlots[level].max // Always fill slots on level up
+          current: engineData.spellSlots[level].max 
         };
       });
       updates.spellSlots = existingSlots;
     }
 
-    // Process Class Resources
     const currentResources = char.resources ? [...char.resources] : [];
     let resourcesChanged = false;
 
@@ -176,7 +178,6 @@ export default function LevelUpModal({ char, charId, onClose }) {
 
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1 relative z-10">
           
-          {/* STEP 1: PATH & VITALITY */}
           {step === 1 && (
             <div className="animate-in slide-in-from-right-4 duration-300 space-y-6">
               <div className="text-center">
@@ -192,7 +193,6 @@ export default function LevelUpModal({ char, charId, onClose }) {
             </div>
           )}
 
-          {/* STEP 2: LOAD & FEATS */}
           {step === 2 && isLoadingMechanics && (
             <div className="flex flex-col items-center justify-center py-20 text-indigo-400 animate-in fade-in">
               <Loader2 className="w-12 h-12 animate-spin mb-4" />
@@ -260,7 +260,6 @@ export default function LevelUpModal({ char, charId, onClose }) {
             </div>
           )}
 
-          {/* STEP 3: MAGIC */}
           {step === 3 && (
             <div className="animate-in slide-in-from-right-4 duration-300 space-y-6">
               <div className="text-center mb-6">
@@ -299,7 +298,6 @@ export default function LevelUpModal({ char, charId, onClose }) {
             </div>
           )}
 
-          {/* STEP 4: REVIEW & ASCEND */}
           {step === 4 && (
             <div className="animate-in slide-in-from-right-4 duration-300 space-y-6 text-center">
               <CheckCircle2 className="w-16 h-16 text-emerald-400 mx-auto mb-4" />

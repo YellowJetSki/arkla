@@ -40,7 +40,7 @@ const CLASS_LORE = [
   }
 ];
 
-const CONDITIONS = [
+export const CONDITIONS = [
   { name: "Blinded", desc: "Auto-fail sight checks. Attacks against have Advantage. Own attacks have Disadvantage." },
   { name: "Charmed", desc: "Cannot attack charmer. Charmer has Advantage on social checks." },
   { name: "Deafened", desc: "Auto-fail hearing checks." },
@@ -56,6 +56,40 @@ const CONDITIONS = [
   { name: "Stunned", desc: "Incapacitated, can't move. Auto-fail STR/DEX saves. Attacks against have Advantage." },
   { name: "Unconscious", desc: "Incapacitated, drop items, fall Prone. Auto-fail STR/DEX saves. Attacks against have Advantage. Hits within 5ft are auto-crits." }
 ];
+
+export const ConditionBadge = ({ conditionName, onRemove }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const condition = CONDITIONS.find(c => c.name === conditionName);
+  if (!condition) return null;
+
+  return (
+    <div 
+      className="relative flex items-center group cursor-help w-max"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      onClick={() => setShowTooltip(!showTooltip)}
+    >
+      <div className="bg-fuchsia-900/40 border border-fuchsia-700/50 text-fuchsia-300 text-[10px] uppercase font-bold px-2 py-1 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+        {conditionName}
+        {onRemove && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); onRemove(conditionName); }} 
+            className="text-fuchsia-500 hover:text-fuchsia-300 font-black text-xs leading-none ml-1"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {showTooltip && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-900 border border-fuchsia-500/50 rounded-xl p-3 shadow-2xl z-[1000] animate-in fade-in zoom-in-95 pointer-events-none">
+          <h4 className="font-black text-fuchsia-400 mb-1">{conditionName}</h4>
+          <p className="text-xs text-slate-300 leading-relaxed">{condition.desc}</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function DMReferenceModal({ onClose }) {
   const [activeTab, setActiveTab] = useState('dcs');
@@ -238,9 +272,8 @@ export default function DMReferenceModal({ onClose }) {
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {CONDITIONS.map(cond => (
-                  <div key={cond.name} className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-                    <h4 className="font-black text-fuchsia-400 mb-1">{cond.name}</h4>
-                    <p className="text-sm text-slate-300 leading-relaxed">{cond.desc}</p>
+                  <div key={cond.name} className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex flex-col justify-center">
+                     <ConditionBadge conditionName={cond.name} />
                   </div>
                 ))}
               </div>

@@ -8,7 +8,6 @@ export default function DMHandoutManager({ onClose }) {
   const [newHandout, setNewHandout] = useState({ name: '', url: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Listen to the live shared loot/handout database
   useEffect(() => {
     const lootRef = doc(db, 'campaign', 'shared_loot');
     const unsub = onSnapshot(lootRef, (docSnap) => {
@@ -33,8 +32,6 @@ export default function DMHandoutManager({ onClose }) {
 
       const lootRef = doc(db, 'campaign', 'shared_loot');
       
-      // Update the array and set the 'latestShareId'. 
-      // The player's CharacterCard listens for 'latestShareId' to trigger the fullscreen popup!
       await setDoc(lootRef, {
         items: [newItem, ...handouts],
         latestShareId: newItem.id
@@ -45,6 +42,19 @@ export default function DMHandoutManager({ onClose }) {
       console.error("Error sharing handout:", error);
     }
     setIsSubmitting(false);
+  };
+
+  // NEW: Force an already uploaded image back to everyone's screen
+  const handleRebroadcast = async (item) => {
+    try {
+      const lootRef = doc(db, 'campaign', 'shared_loot');
+      // Append a timestamp so the local storage treats it as a "new" popup event
+      await updateDoc(lootRef, { 
+        latestShareId: `${item.id}_${Date.now()}` 
+      });
+    } catch (error) {
+      console.error("Error rebroadcasting handout:", error);
+    }
   };
 
   const handleRevoke = async (id) => {
@@ -74,7 +84,6 @@ export default function DMHandoutManager({ onClose }) {
 
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 bg-slate-800/30">
           
-          {/* LEFT: Upload Form */}
           <div className="space-y-6">
             <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
               <h3 className="font-bold text-white mb-2 flex items-center gap-2">
@@ -138,30 +147,38 @@ export default function DMHandoutManager({ onClose }) {
             </div>
           </div>
 
-          {/* RIGHT: Active Handouts */}
           <div className="space-y-4 lg:border-l lg:border-slate-700 lg:pl-8">
             <h3 className="font-bold text-white border-b border-slate-700 pb-2 flex items-center gap-2">
               <Eye className="w-5 h-5 text-emerald-400" /> Currently Shared Visuals
             </h3>
 
-            {handouts.length === 0 ? (
+            {handouts.filter(i => i.url).length === 0 ? (
               <p className="text-sm text-slate-500 italic bg-slate-800 p-4 rounded-xl border border-slate-700">No images are currently shared with the party.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
-                {handouts.map((item) => (
-                  <div key={item.id} className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-lg group relative">
+                {handouts.filter(i => i.url).map((item) => (
+                  <div key={item.id} className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-lg group relative flex flex-col">
                     <div className="h-32 w-full overflow-hidden bg-slate-950 relative">
                       <img src={item.url} alt={item.name} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
                     </div>
-                    <div className="p-3 bg-slate-800 flex justify-between items-center">
+                    <div className="p-3 bg-slate-800 flex justify-between items-center mt-auto">
                       <h4 className="font-bold text-white text-sm truncate mr-2">{item.name}</h4>
-                      <button 
-                        onClick={() => handleRevoke(item.id)} 
-                        className="text-slate-500 hover:text-red-400 bg-slate-900 p-1.5 rounded transition-colors shrink-0"
-                        title="Revoke Image"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex gap-1 shrink-0">
+                        <button 
+                          onClick={() => handleRebroadcast(item)} 
+                          className="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white px-2 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1"
+                          title="Force this image to pop up on all screens again"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </button>
+                        <button 
+                          onClick={() => handleRevoke(item.id)} 
+                          className="text-slate-500 hover:text-red-400 bg-slate-900 p-1.5 rounded transition-colors"
+                          title="Revoke Image"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

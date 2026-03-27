@@ -14,8 +14,6 @@ export default function Spellbook({ char, charId, isDM }) {
   const [customSpell, setCustomSpell] = useState({ name: '', level: 0, castTime: '1 Action', desc: '' });
   
   const [activeFilter, setActiveFilter] = useState('All');
-  
-  // Phase 3: Upcast Modal State
   const [spellToCast, setSpellToCast] = useState(null);
 
   const spellSlots = char.spellSlots || {};
@@ -107,12 +105,17 @@ export default function Spellbook({ char, charId, isDM }) {
     return acc;
   }, {});
 
+  // Determine highest spell level to default open
+  const highestLevelName = Object.keys(groupedSpells)
+    .filter(k => k !== 'Cantrips')
+    .sort((a, b) => parseInt(a.replace('Level ', '')) - parseInt(b.replace('Level ', '')))
+    .reverse()[0];
+
   const hasSpellStats = char.spellSave || char.spellAttack;
 
   return (
     <div className="space-y-6">
       
-      {/* Phase 3: Upcast Modal */}
       {spellToCast && !isDM && (
         <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
           <div className="bg-slate-900 border border-fuchsia-500/50 rounded-2xl w-full max-w-sm shadow-[0_0_50px_rgba(217,70,239,0.3)] flex flex-col overflow-hidden">
@@ -283,7 +286,7 @@ export default function Spellbook({ char, charId, isDM }) {
           </form>
         )}
 
-        {showSearch && !isDM && <SpellDiscovery onAddSpell={addSpellToGrimoire} />}
+        {showSearch && !isDM && <SpellDiscovery onAddSpell={addSpellToGrimoire} allowAdd={isDM} />}
 
         {Object.keys(groupedSpells).length === 0 ? (
           <div className="bg-slate-800 border border-slate-700 border-dashed rounded-xl p-8 text-center text-slate-500">
@@ -291,7 +294,12 @@ export default function Spellbook({ char, charId, isDM }) {
           </div>
         ) : (
           Object.entries(groupedSpells).map(([levelName, levelSpells]) => (
-            <CollapsibleSection key={levelName} title={`${levelName} (${levelSpells.length})`} icon={Sparkles} defaultOpen={levelName === 'Cantrips' || activeFilter !== 'All'}>
+            <CollapsibleSection 
+              key={levelName} 
+              title={`${levelName} (${levelSpells.length})`} 
+              icon={Sparkles} 
+              defaultOpen={levelName === 'Cantrips' || levelName === highestLevelName || activeFilter !== 'All'}
+            >
               <div className="grid grid-cols-1 gap-3">
                 {levelSpells.map((spell, idx) => {
                   const canCastAny = levelName === 'Cantrips' || Object.values(spellSlots).some(s => s.current > 0);

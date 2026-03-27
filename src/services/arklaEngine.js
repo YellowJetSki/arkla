@@ -33,6 +33,13 @@ const HIT_DICE_MAP = {
   'mage': 6, 'sorcerer': 6, 'wizard': 6
 };
 
+// NEW: Maps classes to their primary casting stat
+export const SPELLCASTING_STATS = {
+  'bard': 'CHA', 'cleric': 'WIS', 'druid': 'WIS', 'paladin': 'CHA',
+  'ranger': 'WIS', 'sorcerer': 'CHA', 'warlock': 'CHA', 'wizard': 'INT',
+  'monk': 'WIS', 'dealt': 'CHA', 'mage': 'CHA', 'pirate': 'CHA'
+};
+
 const SANCTUARY_REPLACEMENTS = {
   'fiend': 'powerful fey',
   'fiends': 'fey',
@@ -63,6 +70,21 @@ export const applySanctuaryFilter = (text) => {
     });
   });
   return safeText;
+};
+
+export const calculateSpellcastingStats = (className, level, stats) => {
+  const cleanName = (className || '').split(' ')[0].toLowerCase();
+  const castingStat = SPELLCASTING_STATS[cleanName];
+  
+  if (!castingStat) return { spellSave: '--', spellAttack: '--' };
+
+  const pb = getProficiencyBonus(level);
+  const mod = getModifier(stats[castingStat] || 10);
+
+  return {
+    spellSave: 8 + pb + mod,
+    spellAttack: `+${pb + mod}`
+  };
 };
 
 const RESOURCE_HOOKS = {
@@ -165,11 +187,9 @@ export const fetchClassProgression = async (rawClassName, level) => {
     let spellSlots = null;
     let spellcastingInfo = null;
 
-    // Upgrades
     if (apiClass === 'bard' && level === 5) fetchedResources.push({ name: 'Bardic Inspiration', upgrade: true, recharge: 'short' });
     if (apiClass === 'fighter' && level === 17) fetchedResources.push({ name: 'Action Surge', upgrade: true, maxType: 2 });
 
-    // Feature Processing
     if (levelData.features && levelData.features.length > 0) {
       const featurePromises = levelData.features.map(async (featStub) => {
         const featRes = await fetch(`https://www.dnd5eapi.co${featStub.url}`);
@@ -205,7 +225,6 @@ export const fetchClassProgression = async (rawClassName, level) => {
       });
     }
 
-    // Spell Slot & Spells Known Processing
     if (levelData.spellcasting) {
       spellcastingInfo = {
         cantripsKnown: levelData.spellcasting.cantrips_known || 0,
@@ -216,7 +235,6 @@ export const fetchClassProgression = async (rawClassName, level) => {
       for (let i = 1; i <= 9; i++) {
         const slotsForLevel = levelData.spellcasting[`spell_slots_level_${i}`];
         if (slotsForLevel > 0) {
-          // Output Format matches our app's format
           spellSlots[i.toString()] = { max: slotsForLevel, current: slotsForLevel };
         }
       }
