@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Compass } from 'lucide-react';
 
-export default function GlobalLoader({ message, fullScreen = false }) {
+export default function GlobalLoader({ message, fullScreen = false, delayMs = 300 }) {
   const [loadingText, setLoadingText] = useState("Consulting the pirate council...");
+  
+  // NEW: State to track if the delay period has passed
+  const [show, setShow] = useState(false);
+
+  // This effect waits 'delayMs' before flipping show to true.
+  // If the component unmounts (because data loaded) before the timer finishes,
+  // the timeout is cleared and the loader never flashes on screen.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShow(true);
+    }, delayMs);
+    
+    return () => clearTimeout(timer);
+  }, [delayMs]);
 
   useEffect(() => {
     if (message) {
@@ -20,6 +34,9 @@ export default function GlobalLoader({ message, fullScreen = false }) {
     ];
     setLoadingText(phrases[Math.floor(Math.random() * phrases.length)]);
   }, [message]);
+
+  // If the delay hasn't finished yet, render absolutely nothing
+  if (!show) return null;
 
   const containerClasses = fullScreen 
     ? "fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-md w-full h-[100dvh]"
