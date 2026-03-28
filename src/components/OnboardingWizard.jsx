@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { Sparkles, Heart, Zap, Backpack, Tent, ChevronRight, CheckCircle2, ArrowUpCircle, Compass } from 'lucide-react';
 
 const THEMES = {
-  indigo: { name: 'Arcane Indigo', desc: 'The mark of scholars, wizards, and astral wanderers.', bg: 'bg-indigo-600', ring: 'ring-indigo-500', border: 'border-indigo-500/50', text: 'text-indigo-400' },
-  emerald: { name: 'Druidic Emerald', desc: 'Bound to nature, beasts, and the deep forest.', bg: 'bg-emerald-600', ring: 'ring-emerald-500', border: 'border-emerald-500/50', text: 'text-emerald-400' },
-  rose: { name: 'Blood Rose', desc: 'Fueled by passion, combat, and primal rage.', bg: 'bg-rose-600', ring: 'ring-rose-500', border: 'border-rose-500/50', text: 'text-rose-400' },
-  amber: { name: 'Radiant Amber', desc: 'Blessed by divine light and holy restoration.', bg: 'bg-amber-600', ring: 'ring-amber-500', border: 'border-amber-500/50', text: 'text-amber-400' },
-  sky: { name: 'Astral Sky', desc: 'Swift as the wind, masters of agility and focus.', bg: 'bg-sky-600', ring: 'ring-sky-500', border: 'border-sky-500/50', text: 'text-sky-400' },
+  indigo: { name: 'Tenari Void', desc: 'The lingering, arcane resonance of the magic-wielding giants of old.', bg: 'bg-indigo-600', ring: 'ring-indigo-500', border: 'border-indigo-500/50', text: 'text-indigo-400' },
+  emerald: { name: "Smuggler's Emerald", desc: 'The color of the untamed Arkla seas and the secret coves of the pirate crews.', bg: 'bg-emerald-600', ring: 'ring-emerald-500', border: 'border-emerald-500/50', text: 'text-emerald-400' },
+  rose: { name: 'Dragonfire Rose', desc: 'A harsh, primal reminder of the nefarious dragons that once tormented the realm.', bg: 'bg-rose-600', ring: 'ring-rose-500', border: 'border-rose-500/50', text: 'text-rose-400' },
+  amber: { name: "Crown's Radiance", desc: 'The authoritative, golden banner of Emperor Hearn and the Republic.', bg: 'bg-amber-600', ring: 'ring-amber-500', border: 'border-amber-500/50', text: 'text-amber-400' },
+  sky: { name: "Privateer's Sky", desc: 'The boundless horizon sought by port-town rebels raising the black flag.', bg: 'bg-sky-600', ring: 'ring-sky-500', border: 'border-sky-500/50', text: 'text-sky-400' },
 };
 
 export default function OnboardingWizard({ charName, onComplete }) {
