@@ -13,7 +13,6 @@ export const calculateInitiative = (dexScore) => {
 };
 
 export const calculateSpellcastingStats = (classesArray, stats) => {
-  // Finds the primary casting stat based on the highest level caster class
   let primaryCastingStat = 'CHA'; 
   let highestCasterLevel = 0;
 
@@ -37,25 +36,56 @@ export const calculateSpellcastingStats = (classesArray, stats) => {
   };
 };
 
-export const parseAndScaleAttack = (attack, stats, totalLevel) => {
+export const parseAndScaleAttack = (attack, stats, totalLevel, classesArray = []) => {
+  // Pure homebrew attacks without notes are bypassed to preserve DM intent
   if (!attack.notes && attack.notes !== '') return attack;
 
-  const strMod = getModifier(stats?.STR || 10);
-  const dexMod = getModifier(stats?.DEX || 10);
-  const pb = getProficiencyBonus(totalLevel || 1);
+  const mods = {
+    STR: getModifier(stats?.STR || 10),
+    DEX: getModifier(stats?.DEX || 10),
+    CON: getModifier(stats?.CON || 10),
+    INT: getModifier(stats?.INT || 10),
+    WIS: getModifier(stats?.WIS || 10),
+    CHA: getModifier(stats?.CHA || 10)
+  };
 
-  const properties = attack.notes.toLowerCase();
+  const pb = getProficiencyBonus(totalLevel || 1);
+  const properties = (attack.notes || '').toLowerCase();
+  const attackName = (attack.name || '').toLowerCase();
+  
+  // 1. Determine Base Weapon Stat
   const isFinesse = properties.includes('finesse');
   const isRanged = properties.includes('ammunition') || properties.includes('thrown') || properties.includes('range');
-  
-  let useStatMod = strMod;
-  if (isRanged) useStatMod = dexMod;
-  if (isFinesse) useStatMod = Math.max(strMod, dexMod);
+  const isHeavy = properties.includes('heavy');
+  const isTwoHanded = properties.includes('two-handed');
 
+  let activeStat = isRanged ? 'DEX' : 'STR';
+  if (isFinesse && mods.DEX > mods.STR) activeStat = 'DEX';
+
+  // 2. Class Specific Overrides (Monk Martial Arts)
+  const isMonk = classesArray.some(c => c.name.toLowerCase().includes('monk') && c.level >= 1);
+  const isMonkWeapon = isMonk && !isHeavy && !isTwoHanded && (properties.includes('simple') || attackName.includes('shortsword') || attackName.includes('unarmed') || attackName.includes('quarterstaff') || attackName.includes('shuriken') || attackName.includes('dart'));
+  
+  if (isMonkWeapon && mods.DEX > mods[activeStat]) {
+    activeStat = 'DEX';
+  }
+
+  // 3. Homebrew / Subclass / Spell Override (e.g. "Use: CHA" for Hexblades)
+  // Regex looks for "Use: XXX" where XXX is a 3-letter stat code
+  const overrideMatch = properties.match(/use:\s*([a-z]{3})/i);
+  if (overrideMatch) {
+    const forcedStat = overrideMatch[1].toUpperCase();
+    if (mods[forcedStat] !== undefined) {
+      activeStat = forcedStat;
+    }
+  }
+
+  const useStatMod = mods[activeStat];
   const toHit = pb + useStatMod;
   const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
 
-  const baseDiceMatch = attack.damage.match(/(\d+d\d+)/);
+  // Extract base dice from the stored damage string (e.g. "1d8" or "1d8 + 3" -> "1d8")
+  const baseDiceMatch = (attack.damage || '').match(/(\d+d\d+)/);
   const baseDice = baseDiceMatch ? baseDiceMatch[0] : '';
   
   let formattedDamage = attack.damage; 
@@ -99,22 +129,16 @@ const MULTICLASS_SLOT_TABLE = [
 
 export const calculateCombinedSpellSlots = (classesArray) => {
   let casterLevel = 0;
-  let warlockSlots = null; // Warlocks use Pact Magic, tracked separately
 
   classesArray.forEach(cls => {
     const cleanName = cls.name.split(' ')[0].toLowerCase();
-    
     if (FULL_CASTERS.includes(cleanName)) {
       casterLevel += cls.level;
     } else if (HALF_CASTERS.includes(cleanName)) {
       casterLevel += Math.floor(cls.level / 2);
     } else if (ARTIFICER.includes(cleanName)) {
       casterLevel += Math.ceil(cls.level / 2);
-    } else if (cleanName === 'warlock' || cleanName === 'dealt') {
-      // Warlocks handles their own slots via the API progression later
-    }
-    // Note: Arcane Tricksters / Eldritch Knights would be Math.floor(level / 3), 
-    // requiring subclass tracking to implement perfectly.
+    } 
   });
 
   if (casterLevel === 0) return {};
@@ -247,10 +271,10 @@ const RESOURCE_HOOKS = {
   'Action Surge': { maxType: 1, recharge: 'short' }, 
   'Second Wind': { maxType: 1, recharge: 'short' },
   'Indomitable': { maxType: 'API_INDOMITABLE', recharge: 'long' },
-  'Ki': { maxType: 'CLASS_LEVEL', recharge: 'short' }, // Updated for multiclass
+  'Ki': { maxType: 'CLASS_LEVEL', recharge: 'short' }, 
   'Lay on Hands': { maxType: 'PALADIN_HP', recharge: 'long' }, 
   'Divine Sense': { maxType: 'API_CD', recharge: 'long' }, 
-  'Font of Magic': { maxType: 'CLASS_LEVEL', recharge: 'long', rename: 'Sorcery Points' }, // Updated for multiclass
+  'Font of Magic': { maxType: 'CLASS_LEVEL', recharge: 'long', rename: 'Sorcery Points' }, 
   'Tides of Chaos': { maxType: 1, recharge: 'long' }, 
   'Hexblade\'s Curse': { maxType: 1, recharge: 'short', filterRename: 'Dealt\'s Curse' } 
 };
@@ -450,7 +474,7 @@ export const fetchClassProgression = async (rawClassName, classLevel) => {
           if (hook.maxType === 'API_RAGE') maxVal = levelData.class_specific?.rage_count || 2;
           else if (hook.maxType === 'API_CD') maxVal = levelData.class_specific?.channel_divinity_charges || 1;
           else if (hook.maxType === 'API_INDOMITABLE') maxVal = levelData.class_specific?.indomitable_uses || 1;
-          else if (hook.maxType === 'PALADIN_HP') maxVal = classLevel * 5; // Must be class level!
+          else if (hook.maxType === 'PALADIN_HP') maxVal = classLevel * 5; 
           else if (hook.maxType === 'CLASS_LEVEL') maxVal = classLevel;
           else maxVal = hook.maxType; 
 
@@ -466,7 +490,6 @@ export const fetchClassProgression = async (rawClassName, classLevel) => {
         spellsKnown: levelData.spellcasting.spells_known || 0
       };
       
-      // If this is a Warlock, we return the slots directly as they don't merge with normal slots
       if (apiClass === 'warlock') {
         spellSlots = {};
         for (let i = 1; i <= 9; i++) {
@@ -482,7 +505,7 @@ export const fetchClassProgression = async (rawClassName, classLevel) => {
       hitDie,
       features: fetchedFeatures,
       resources: fetchedResources,
-      spellSlots, // Only populated for warlocks directly, others use combined calculator
+      spellSlots, 
       spellcastingInfo
     };
 

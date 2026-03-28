@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp } from 'lucide-react';
 import EquipmentDiscovery from '../EquipmentDiscovery';
-import { getModifier, getProficiencyBonus } from '../../services/arklaEngine';
 import DebouncedTextarea from '../shared/DebouncedTextarea';
 
 const parseInventory = (text) => {
@@ -17,7 +16,7 @@ const parseInventory = (text) => {
   });
 };
 
-export default function InventoryTab({ char, isDM, updateField, activeTheme, showDialog }) {
+export default function InventoryTab({ char, charId, isDM, updateField, activeTheme, showDialog }) {
   const [showItemSearch, setShowItemSearch] = useState(false);
   const [isForgingItem, setIsForgingItem] = useState(false);
   const [customItem, setCustomItem] = useState({ name: '', type: 'Wondrous Item', stats: '', desc: '' });
@@ -34,37 +33,17 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme, sho
   };
 
   const handleEquipWeapon = async (weaponData) => {
-    if (!weaponData.damage) return; 
+    if (!weaponData.damage || !charId) return; 
     
-    const strMod = getModifier(char.stats?.STR || 10);
-    const dexMod = getModifier(char.stats?.DEX || 10);
-    const pb = getProficiencyBonus(char.level || 1);
-
-    const isFinesse = weaponData.properties?.some(p => p.name.toLowerCase() === 'finesse');
-    const isRanged = weaponData.weapon_range === 'Ranged' || weaponData.properties?.some(p => p.name.toLowerCase() === 'thrown');
-    
-    let useStatMod = strMod;
-    if (isRanged) useStatMod = dexMod;
-    if (isFinesse) useStatMod = Math.max(strMod, dexMod);
-
-    const toHit = pb + useStatMod;
-    const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
-    
-    let damageBonus = useStatMod;
-    const formattedDamage = damageBonus === 0 ? weaponData.damage.damage_dice : 
-                            damageBonus > 0 ? `${weaponData.damage.damage_dice} + ${damageBonus}` : 
-                            `${weaponData.damage.damage_dice} - ${Math.abs(damageBonus)}`;
-
     const newAttack = {
       name: weaponData.name,
-      hit: formattedHit,
-      damage: formattedDamage,
+      hit: '--', // Leave blank, the arklaEngine calculates this dynamically
+      damage: weaponData.damage.damage_dice || '1d4', // Save base dice only
       type: weaponData.damage.damage_type?.name || 'Slashing',
       notes: weaponData.properties?.map(p => p.name).join(', ') || ''
     };
 
-    const charId = localStorage.getItem('charId');
-    if (charId) {
+    try {
       await runTransaction(db, async (transaction) => {
         const charRef = doc(db, 'characters', charId);
         transaction.update(charRef, { attacks: arrayUnion(newAttack) });
@@ -75,6 +54,8 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme, sho
         type: 'alert',
         onConfirm: () => showDialog({ isOpen: false })
       });
+    } catch (err) {
+      console.error("Failed to equip weapon:", err);
     }
   };
 
@@ -124,7 +105,6 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme, sho
   };
 
   const adjustCurrency = async (type, amount) => {
-    const charId = localStorage.getItem('charId');
     if (!charId) return;
     const charRef = doc(db, 'characters', charId);
 
@@ -144,10 +124,8 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme, sho
 
   const handleTransaction = async (isAdding) => {
     const amount = parseInt(transactionAmount, 10);
-    if (isNaN(amount) || amount <= 0) return;
+    if (isNaN(amount) || amount <= 0 || !charId) return;
     
-    const charId = localStorage.getItem('charId');
-    if (!charId) return;
     const charRef = doc(db, 'characters', charId);
 
     try {
@@ -215,7 +193,6 @@ export default function InventoryTab({ char, isDM, updateField, activeTheme, sho
         <div className="flex justify-between items-center border-b border-slate-700 pb-2 mb-4">
           <h3 className="text-lg font-bold text-white flex items-center gap-2"><Backpack className={`w-5 h-5 ${activeTheme.text}`} /> Equipment & Items</h3>
           
-          {/* REQ 5: Only DM can Search/Add to Player Inventory */}
           {isDM && (
             <div className="flex gap-2">
               <button onClick={() => setIsForgingItem(!isForgingItem)} className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border ${isForgingItem ? 'bg-indigo-700 border-indigo-500 text-white' : `bg-slate-800 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}>

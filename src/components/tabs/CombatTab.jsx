@@ -2,7 +2,7 @@ import React from 'react';
 import { Zap, Sword, RotateCcw, AlertTriangle, Crosshair, Sparkles, Battery, Heart, Trash2 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { getModifier, getProficiencyBonus } from '../../services/arklaEngine';
+import { parseAndScaleAttack } from '../../services/arklaEngine';
 
 export default function CombatTab({ 
   char,
@@ -41,38 +41,11 @@ export default function CombatTab({
     });
   };
 
-  const calculateDynamicAttack = (attack) => {
-    if (!attack.notes && attack.notes !== '') return attack;
-
-    const strMod = getModifier(char.stats?.STR || 10);
-    const dexMod = getModifier(char.stats?.DEX || 10);
-    const pb = getProficiencyBonus(char.level || 1);
-
-    const properties = attack.notes.toLowerCase();
-    const isFinesse = properties.includes('finesse');
-    const isRanged = properties.includes('ammunition') || properties.includes('thrown');
-    
-    let useStatMod = strMod;
-    if (isRanged) useStatMod = dexMod;
-    if (isFinesse) useStatMod = Math.max(strMod, dexMod);
-
-    const toHit = pb + useStatMod;
-    const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
-
-    const baseDiceMatch = attack.damage.match(/(\d+d\d+)/);
-    const baseDice = baseDiceMatch ? baseDiceMatch[0] : '';
-    
-    let formattedDamage = attack.damage; 
-    if (baseDice) {
-       formattedDamage = useStatMod === 0 ? baseDice : 
-                         useStatMod > 0 ? `${baseDice} + ${useStatMod}` : 
-                         `${baseDice} - ${Math.abs(useStatMod)}`;
-    }
-
-    return { ...attack, hit: formattedHit, damage: formattedDamage };
-  };
-
-  const dynamicAttacks = (char.attacks || []).map(calculateDynamicAttack);
+  const classesArray = char.classes || [{ name: char.class || 'Adventurer', level: char.level || 1 }];
+  const totalLevel = classesArray.reduce((sum, c) => sum + c.level, 0);
+  
+  // Now passing the full classesArray into the engine to support multi-classing Monks and homebrew overrides!
+  const dynamicAttacks = (char.attacks || []).map(atk => parseAndScaleAttack(atk, char.stats, totalLevel, classesArray));
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

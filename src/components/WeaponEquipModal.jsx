@@ -1,26 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Swords, X, Crosshair, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Swords, X, Crosshair, Sparkles, CheckCircle2, Info } from 'lucide-react';
 import { getModifier, getProficiencyBonus } from '../services/arklaEngine';
 
 export default function WeaponEquipModal({ char, charId, weaponData, onComplete, onCancel }) {
   const [isEquipping, setIsEquipping] = useState(false);
   const [isProficient, setIsProficient] = useState(true);
 
-  // Parse weapon properties from the 5e API
-  const isFinesse = weaponData.properties?.some(p => p.name === 'Finesse') || false;
-  const isRanged = weaponData.weapon_range === 'Ranged';
+  const classesArray = char.classes || [{ name: char.class || 'Adventurer', level: char.level || 1 }];
+
+  // Parse weapon properties from the 5e API for the Preview Math
+  const properties = weaponData.properties?.map(p => p.name.toLowerCase()) || [];
+  const weaponName = (weaponData.name || '').toLowerCase();
+  
+  const isFinesse = properties.includes('finesse');
+  const isRanged = weaponData.weapon_range === 'Ranged' || properties.includes('thrown');
+  const isHeavy = properties.includes('heavy');
+  const isTwoHanded = properties.includes('two-handed');
   
   const strMod = getModifier(char.stats?.STR || 10);
   const dexMod = getModifier(char.stats?.DEX || 10);
   
-  // Auto-determine the optimal stat for the UI Preview
-  const useDex = isRanged || (isFinesse && dexMod > strMod);
+  // Smart Monk Detection for the Preview Math
+  const isMonk = classesArray.some(c => c.name.toLowerCase().includes('monk') && c.level >= 1);
+  const isMonkWeapon = isMonk && !isHeavy && !isTwoHanded && (weaponData.weapon_category === 'Simple' || weaponName.includes('shortsword') || weaponName.includes('unarmed') || weaponName.includes('quarterstaff'));
+
+  // Auto-determine the optimal stat
+  const useDex = isRanged || ((isFinesse || isMonkWeapon) && dexMod > strMod);
   const activeMod = useDex ? dexMod : strMod;
   const statName = useDex ? 'DEX' : 'STR';
 
-  const totalLevel = char.classes ? char.classes.reduce((sum, c) => sum + c.level, 0) : (char.level || 1);
+  const totalLevel = classesArray.reduce((sum, c) => sum + c.level, 0);
   const pb = getProficiencyBonus(totalLevel);
   const totalToHit = activeMod + (isProficient ? pb : 0);
   const formattedToHit = totalToHit >= 0 ? `+${totalToHit}` : `${totalToHit}`;
@@ -32,12 +43,11 @@ export default function WeaponEquipModal({ char, charId, weaponData, onComplete,
   const handleEquip = async () => {
     setIsEquipping(true);
     
-    // Engine Integration: We only save the RAW base dice and properties to the database.
-    // The arklaEngine will do the math dynamically in the Combat Tab!
+    // Arkla Engine Logic: Save the RAW values. The engine will dynamically scale this on render.
     const newAttack = {
       name: weaponData.name,
-      hit: '--', // Leave blank for dynamic scaling
-      damage: baseDice, // Save ONLY the base dice, e.g., "1d8"
+      hit: '--', 
+      damage: baseDice, 
       type: dmgType,
       notes: weaponData.properties?.map(p => p.name).join(', ') || ''
     };
@@ -82,6 +92,7 @@ export default function WeaponEquipModal({ char, charId, weaponData, onComplete,
               <div>
                 <h3 className="text-2xl font-black text-white mb-1">{weaponData.name}</h3>
                 <p className="text-sm text-slate-400">{weaponData.weapon_category} Weapon</p>
+                {isMonkWeapon && <span className="inline-block mt-2 bg-emerald-900/40 text-emerald-400 text-[10px] font-bold px-2 py-1 rounded border border-emerald-500/50">Monk Martial Arts Applicable</span>}
               </div>
 
               <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-inner text-left space-y-4">
@@ -111,8 +122,15 @@ export default function WeaponEquipModal({ char, charId, weaponData, onComplete,
                   </div>
                 </div>
                 
-                <div className="text-[10px] text-slate-500 text-center pt-2">
-                  *Preview calculated using your <strong className="text-slate-300">{statName}</strong> modifier.
+                <div className="text-[10px] text-slate-500 text-center pt-2 leading-relaxed">
+                  *Preview calculated using your <strong className="text-slate-300">{statName}</strong> modifier. The engine will scale this dynamically as you level up.
+                </div>
+                
+                <div className="bg-indigo-950/30 border border-indigo-900/50 p-2.5 rounded-lg flex items-start gap-2 mt-2">
+                  <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-indigo-200/80 leading-relaxed">
+                    <strong className="text-indigo-300">Homebrew / Hexblade Tip:</strong> Need this to scale off INT or CHA? Once equipped, edit the attack in your Combat Tab and add <code>Use: CHA</code> to the weapon's notes!
+                  </p>
                 </div>
               </div>
 

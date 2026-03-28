@@ -36,7 +36,6 @@ import FeatDiscovery from './FeatDiscovery';
 import BattleMapLayer from './battlemap/BattleMapLayer';
 import StickyBattleNav from './battlemap/StickyBattleNav';
 
-// Upgraded themes with ambient background glows and rich accents
 const THEMES = {
   indigo: { text: 'text-indigo-400', bg: 'bg-indigo-600', border: 'border-indigo-500/50', ring: 'ring-indigo-500', shadow: 'shadow-[0_0_15px_rgba(99,102,241,0.5)]', ambient: 'from-indigo-950/40 via-slate-950', accent: 'bg-indigo-500/10' },
   emerald: { text: 'text-emerald-400', bg: 'bg-emerald-600', border: 'border-emerald-500/50', ring: 'ring-emerald-500', shadow: 'shadow-[0_0_15px_rgba(16,185,129,0.5)]', ambient: 'from-emerald-950/40 via-slate-950', accent: 'bg-emerald-500/10' },
@@ -259,7 +258,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
   return (
     <CardWrapper>
-      {/* Ambient Theme Background */}
       {!isDM && (
          <div className={`fixed inset-0 bg-gradient-to-b ${activeTheme.ambient} to-slate-950 pointer-events-none -z-10 transition-colors duration-1000`}></div>
       )}
@@ -340,7 +338,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             <QuickTraits features={char.features} />
           </div>
 
-          {/* Styled navigation matching the new ambient theme */}
           <div className={`sticky top-0 z-30 pt-1 pb-3 -mx-3 px-3 md:-mx-8 md:px-8 border-b border-slate-800/80 shadow-md mb-6 ${isDM ? 'bg-slate-950/90 backdrop-blur-xl' : 'bg-slate-950/60 backdrop-blur-2xl'}`}>
             <div className={`bg-slate-900/80 p-1.5 rounded-xl border border-slate-800/80 shadow-inner flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-1 sm:gap-2 justify-between snap-x snap-mandatory backdrop-blur-md`}>
               {[
@@ -380,6 +377,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 handleAddCondition={(e) => handleAddCondition(e.target.value)}
                 handleRemoveCondition={handleRemoveCondition}
                 handleResourceToggle={handleResourceToggle}
+                showDialog={showDialog}
               />
             )}
 
@@ -459,9 +457,10 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
               </div>
             )}
 
-            {activeTab === 'inventory' && <InventoryTab char={char} isDM={isDM} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
+            {/* CHAR ID IS PASSED HERE TO FIX THE INVENTORY TRANSACTIONS */}
+            {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
 
-            {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} />}
+            {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} charId={currentUser.charId} showDialog={showDialog} />}
 
             {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
 

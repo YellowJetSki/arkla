@@ -11,13 +11,17 @@ const parseLootItem = (text) => {
   return { name, desc };
 };
 
-export default function PartyLootTab({ partyLoot, setActiveLoot }) {
+export default function PartyLootTab({ partyLoot, setActiveLoot, charId, showDialog }) {
   const [openItems, setOpenItems] = useState({});
 
   const claimLoot = async (item) => {
-    const charId = localStorage.getItem('charId');
     if (!charId) {
-      alert("No character ID found.");
+      showDialog({
+        title: 'Error',
+        message: 'No character ID found. Cannot claim loot.',
+        type: 'alert',
+        onConfirm: () => showDialog({ isOpen: false })
+      });
       return;
     }
 
@@ -43,26 +47,46 @@ export default function PartyLootTab({ partyLoot, setActiveLoot }) {
           const updatedLoot = currentLoot.filter(i => i.id !== item.id);
           await setDoc(lootRef, { items: updatedLoot }, { merge: true });
         }
+        
+        showDialog({
+          title: 'Loot Claimed!',
+          message: `${parsed.name} has been added to your personal inventory.`,
+          type: 'alert',
+          onConfirm: () => showDialog({ isOpen: false })
+        });
       }
     } catch (err) {
       console.error("Failed to claim loot:", err);
-      alert("Failed to claim loot.");
+      showDialog({
+        title: 'Network Error',
+        message: 'Failed to claim loot. Please try again.',
+        type: 'alert',
+        onConfirm: () => showDialog({ isOpen: false })
+      });
     }
   };
 
-  const deleteLoot = async (itemId) => {
-    if (!window.confirm("Delete this item permanently from the party loot?")) return;
-    try {
-      const lootRef = doc(db, 'campaign', 'shared_loot');
-      const lootSnap = await getDoc(lootRef);
-      if (lootSnap.exists()) {
-        const currentLoot = lootSnap.data().items || [];
-        const updatedLoot = currentLoot.filter(i => i.id !== itemId);
-        await setDoc(lootRef, { items: updatedLoot }, { merge: true });
-      }
-    } catch (err) {
-      console.error("Failed to delete loot:", err);
-    }
+  const deleteLoot = (itemId) => {
+    showDialog({
+      title: 'Destroy Loot?',
+      message: 'Delete this item permanently from the party vault? It will be lost forever.',
+      type: 'confirm',
+      onConfirm: async () => {
+        try {
+          const lootRef = doc(db, 'campaign', 'shared_loot');
+          const lootSnap = await getDoc(lootRef);
+          if (lootSnap.exists()) {
+            const currentLoot = lootSnap.data().items || [];
+            const updatedLoot = currentLoot.filter(i => i.id !== itemId);
+            await setDoc(lootRef, { items: updatedLoot }, { merge: true });
+          }
+        } catch (err) {
+          console.error("Failed to delete loot:", err);
+        }
+        showDialog({ isOpen: false });
+      },
+      onCancel: () => showDialog({ isOpen: false })
+    });
   };
 
   const toggleItemOpen = (id) => {
