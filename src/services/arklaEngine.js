@@ -71,7 +71,6 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, classesArray = []
   }
 
   // 3. Homebrew / Subclass / Spell Override (e.g. "Use: CHA" for Hexblades)
-  // Regex looks for "Use: XXX" where XXX is a 3-letter stat code
   const overrideMatch = properties.match(/use:\s*([a-z]{3})/i);
   if (overrideMatch) {
     const forcedStat = overrideMatch[1].toUpperCase();
@@ -84,7 +83,6 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, classesArray = []
   const toHit = pb + useStatMod;
   const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
 
-  // Extract base dice from the stored damage string (e.g. "1d8" or "1d8 + 3" -> "1d8")
   const baseDiceMatch = (attack.damage || '').match(/(\d+d\d+)/);
   const baseDice = baseDiceMatch ? baseDiceMatch[0] : '';
   
@@ -303,6 +301,29 @@ const HOMEBREW_CLASSES = {
   }
 };
 
+// ==========================================
+// FALLBACK: SRD FEAT DATABASE
+// ==========================================
+// The 5e API only legally contains the "Grappler" feat. We inject the rest manually.
+const CUSTOM_FEATS = [
+  { index: "actor", name: "Actor", desc: "Increase your CHA score by 1. You have advantage on Deception and Performance checks when trying to pass yourself off as a different person. You can mimic the speech of another person or the sounds made by other creatures.", prerequisites: [] },
+  { index: "alert", name: "Alert", desc: "Always on the lookout for danger. You gain +5 to Initiative, can't be surprised while conscious, and unseen attackers don't gain advantage against you.", prerequisites: [] },
+  { index: "athlete", name: "Athlete", desc: "Increase your STR or DEX score by 1. Standing up from prone only costs 5 feet of movement. Climbing doesn't cost extra movement. You can make a running jump after moving only 5 feet.", prerequisites: [] },
+  { index: "charger", name: "Charger", desc: "When you use your action to Dash, you can use a bonus action to make one melee weapon attack or to shove a creature.", prerequisites: [] },
+  { index: "crossbow-expert", name: "Crossbow Expert", desc: "You ignore the loading quality of crossbows. Being within 5 feet of a hostile creature doesn't impose disadvantage on your ranged attack rolls. When you use the Attack action and attack with a one handed weapon, you can use a bonus action to attack with a hand crossbow you are holding.", prerequisites: [] },
+  { index: "dual-wielder", name: "Dual Wielder", desc: "You gain a +1 bonus to AC while wielding a separate melee weapon in each hand. You can use two-weapon fighting even when the one-handed melee weapons aren't light. You can draw or stow two one-handed weapons when you would normally be able to draw or stow only one.", prerequisites: [] },
+  { index: "lucky", name: "Lucky", desc: "You have 3 luck points. Whenever you make an attack roll, an ability check, or a saving throw, you can spend one luck point to roll an additional d20. You can choose to spend one of your luck points after you roll the die, but before the outcome is determined.", prerequisites: [] },
+  { index: "magic-initiate", name: "Magic Initiate", desc: "Choose a class. You learn two cantrips of your choice from that class's spell list. In addition, choose one 1st-level spell to learn from that same list. Using this feat, you can cast the spell once at its lowest level, and you must finish a long rest before you can cast it in this way again.", prerequisites: [] },
+  { index: "mobile", name: "Mobile", desc: "Your speed increases by 10 feet. When you use the Dash action, difficult terrain doesn't cost you extra movement on that turn. When you make a melee attack against a creature, you don't provoke opportunity attacks from that creature for the rest of the turn.", prerequisites: [] },
+  { index: "observant", name: "Observant", desc: "Increase your INT or WIS score by 1. If you can see a creature's mouth while it is speaking a language you understand, you can interpret what it's saying by reading its lips. You have a +5 bonus to your passive Wisdom (Perception) and passive Intelligence (Investigation) scores.", prerequisites: [] },
+  { index: "polearm-master", name: "Polearm Master", desc: "When you take the Attack action and attack with only a glaive, halberd, quarterstaff, or spear, you can use a bonus action to make a melee attack with the opposite end of the weapon. While you are wielding a glaive, halberd, pike, quarterstaff, or spear, other creatures provoke an opportunity attack from you when they enter your reach.", prerequisites: [] },
+  { index: "resilient", name: "Resilient", desc: "Choose one ability score. You increase the chosen ability score by 1, to a maximum of 20. You gain proficiency in saving throws using the chosen ability.", prerequisites: [] },
+  { index: "sentinel", name: "Sentinel", desc: "When you hit a creature with an opportunity attack, the creature's speed becomes 0 for the rest of the turn. Creatures provoke opportunity attacks from you even if they take the Disengage action before leaving your reach. When a creature within 5 feet of you makes an attack against a target other than you, you can use your reaction to make a melee weapon attack against the attacking creature.", prerequisites: [] },
+  { index: "sharpshooter", name: "Sharpshooter", desc: "Attacking at long range doesn't impose disadvantage on your ranged weapon attack rolls. Your ranged weapon attacks ignore half cover and three-quarters cover. Before you make an attack with a ranged weapon that you are proficient with, you can choose to take a -5 penalty to the attack roll. If the attack hits, you add +10 to the attack's damage.", prerequisites: [] },
+  { index: "tough", name: "Tough", desc: "Your hit point maximum increases by an amount equal to twice your level when you gain this feat. Whenever you gain a level thereafter, your hit point maximum increases by an additional 2 hit points.", prerequisites: [] },
+  { index: "war-caster", name: "War Caster", desc: "You have advantage on CON saving throws that you make to maintain your concentration on a spell when you take damage. You can perform the somatic components of spells even when you have weapons or a shield in one or both hands. When a hostile creature's movement provokes an opportunity attack from you, you can use your reaction to cast a spell at the creature, rather than making an opportunity attack.", prerequisites: [] }
+];
+
 let cachedSpellStubs = null;
 let cachedFeatStubs = null;
 let cachedEquipmentStubs = null;
@@ -317,9 +338,19 @@ export const getSpellStubs = async () => {
 
 export const getFeatStubs = async () => {
   if (cachedFeatStubs) return cachedFeatStubs;
-  const res = await fetch('https://www.dnd5eapi.co/api/feats');
-  const data = await res.json();
-  cachedFeatStubs = data.results;
+  try {
+    const res = await fetch('https://www.dnd5eapi.co/api/feats');
+    const data = await res.json();
+    
+    // Inject the custom feats alongside the solitary API Grappler feat
+    const customStubs = CUSTOM_FEATS.map(f => ({ index: f.index, name: f.name, url: 'custom', isCustom: true, ...f }));
+    cachedFeatStubs = [...data.results, ...customStubs];
+  } catch(e) {
+    cachedFeatStubs = CUSTOM_FEATS.map(f => ({ index: f.index, name: f.name, url: 'custom', isCustom: true, ...f }));
+  }
+  
+  // Sort alphabetically so it feels like a native API response
+  cachedFeatStubs.sort((a,b) => a.name.localeCompare(b.name));
   return cachedFeatStubs;
 };
 
@@ -333,6 +364,9 @@ export const getEquipmentStubs = async () => {
 
 export const fetchDetailedStubs = async (stubs) => {
   const promises = stubs.map(async (stub) => {
+    // If it's a custom feat from our fallback array, return it directly!
+    if (stub.isCustom) return stub; 
+
     try {
       const res = await fetch(`https://www.dnd5eapi.co${stub.url}`);
       const detail = await res.json();

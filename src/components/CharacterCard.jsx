@@ -3,7 +3,7 @@ import { doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from 'fir
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
-  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Search, Hammer, Trash2
+  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Search, Hammer, Trash2, Plus
 } from 'lucide-react';
 
 import { PREMADE_CHARACTERS } from '../data/campaignData';
@@ -71,7 +71,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
   const [showFeatSearch, setShowFeatSearch] = useState(false);
   const [isForgingFeat, setIsForgingFeat] = useState(false);
-  const [customFeat, setCustomFeat] = useState({ name: '', desc: '', reqLevel: 1 });
+  
+  // Comprehensive API-matched state
+  const [customFeat, setCustomFeat] = useState({ name: '', prerequisite: '', minScore: 13, desc: '' });
 
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', inputPlaceholder: '', onConfirm: null });
 
@@ -189,7 +191,12 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     e.preventDefault();
     if (!customFeat.name || !customFeat.desc) return;
     
-    const newFeat = { name: customFeat.name, desc: customFeat.desc, reqLevel: Number(customFeat.reqLevel) };
+    // Structure perfectly matching the API object
+    const newFeat = { 
+      name: customFeat.name, 
+      desc: customFeat.desc, 
+      prerequisites: customFeat.prerequisite ? [{ ability_score: { name: customFeat.prerequisite }, minimum_score: customFeat.minScore }] : [] 
+    };
     
     await setDoc(doc(db, 'custom_feats', 'feat_' + Date.now()), newFeat);
     
@@ -198,7 +205,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     });
     
     setIsForgingFeat(false);
-    setCustomFeat({ name: '', desc: '', reqLevel: 1 });
+    setCustomFeat({ name: '', prerequisite: '', minScore: 13, desc: '' });
     setSaveToast('Feat Forged & Added!');
     setTimeout(() => setSaveToast(''), 2500);
   };
@@ -370,7 +377,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 char={char} 
                 charId={currentUser.charId}
                 isDM={isDM} 
-                updateField={updateField} 
                 activeTheme={activeTheme} 
                 combatWarnings={combatWarnings}
                 activeConditions={activeConditions}
@@ -398,32 +404,46 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                   ) : (
                     <button 
                       onClick={() => setIsForgingFeat(!isForgingFeat)}
-                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isForgingFeat ? 'bg-fuchsia-700 border-fuchsia-500 text-white' : `bg-slate-800/80 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
+                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isForgingFeat ? 'bg-amber-700 border-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.3)]' : `bg-slate-800/80 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
                     >
-                      <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Cancel Forge' : 'Forge Custom Feat'}
+                      <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Close Forge' : 'Forge Custom Feat'}
                     </button>
                   )}
                 </div>
 
                 {isDM && isForgingFeat && (
-                  <form onSubmit={handleForgeCustomFeat} className="bg-slate-900/80 p-4 md:p-5 rounded-xl border border-fuchsia-500/30 shadow-inner mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
-                    <h4 className="text-sm font-bold text-fuchsia-400 flex items-center gap-2"><Hammer className="w-4 h-4" /> Homebrew Feat Forge</h4>
+                  <form onSubmit={handleForgeCustomFeat} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-amber-500/30 mb-6 animate-in fade-in slide-in-from-top-2 space-y-4 shadow-inner relative z-10">
+                    <h4 className="text-sm font-black text-amber-400 flex items-center gap-2 uppercase tracking-widest border-b border-amber-900/50 pb-2"><Hammer className="w-4 h-4" /> Homebrew Feat Forge</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Feat Name</label>
-                        <input type="text" required value={customFeat.name} onChange={e => setCustomFeat({...customFeat, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-fuchsia-500" placeholder="e.g. Sharpshooter" />
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Feat Name</label>
+                        <input type="text" required value={customFeat.name} onChange={e => setCustomFeat({...customFeat, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner" placeholder="e.g. Sharpshooter" />
                       </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Prerequisite Level</label>
-                        <input type="number" min="1" required value={customFeat.reqLevel} onChange={e => setCustomFeat({...customFeat, reqLevel: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-fuchsia-500" />
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ability Req.</label>
+                          <select value={customFeat.prerequisite} onChange={e => setCustomFeat({...customFeat, prerequisite: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner">
+                            <option value="">None</option>
+                            <option value="STR">STR</option>
+                            <option value="DEX">DEX</option>
+                            <option value="CON">CON</option>
+                            <option value="INT">INT</option>
+                            <option value="WIS">WIS</option>
+                            <option value="CHA">CHA</option>
+                          </select>
+                        </div>
+                        <div className="w-20">
+                           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Min.</label>
+                           <input type="number" disabled={!customFeat.prerequisite} value={customFeat.minScore} onChange={e => setCustomFeat({...customFeat, minScore: Number(e.target.value)})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner text-center disabled:opacity-50" />
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
+                        <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-amber-500 resize-y shadow-inner leading-relaxed" placeholder="Describe the stat bumps and mechanics..." />
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
-                      <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-slate-300 text-sm focus:outline-none focus:border-fuchsia-500 resize-y" placeholder="Describe the stat bumps and mechanics..." />
-                    </div>
-                    <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2.5 rounded-lg shadow-md transition-colors flex items-center justify-center gap-2">
-                      <Plus className="w-4 h-4" /> Add to Global Database
+                    <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] flex items-center justify-center gap-2 mt-2">
+                      <Plus className="w-4 h-4" /> Add to Character
                     </button>
                   </form>
                 )}
@@ -440,7 +460,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                           {isDM && (
                             <button 
                               onClick={(e) => { e.stopPropagation(); removeFeature(feat); }}
-                              className="text-slate-500 hover:text-red-400 p-1 transition-colors"
+                              className="text-slate-500 hover:text-red-400 bg-slate-900 p-1.5 rounded transition-all shadow-inner ml-2"
                               title="Delete Feature"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -457,10 +477,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
               </div>
             )}
 
-            {/* CHAR ID IS PASSED HERE TO FIX THE INVENTORY TRANSACTIONS */}
             {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
 
-            {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} charId={currentUser.charId} showDialog={showDialog} />}
+            {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} charId={currentUser.charId} />}
 
             {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
 

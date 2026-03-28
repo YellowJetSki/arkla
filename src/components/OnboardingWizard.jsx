@@ -54,9 +54,11 @@ export default function OnboardingWizard({ charName, onComplete }) {
           
           {step === 1 && (
             <div className="animate-in slide-in-from-right-4 duration-500 flex-1 flex flex-col justify-center">
-              <div className="text-center mb-8 h-32 flex flex-col justify-end">
+              <div className="text-center mb-8 flex flex-col items-center justify-center">
                 <Compass className={`w-12 h-12 ${activeTheme.text} mx-auto mb-4 animate-[spin_10s_linear_infinite] opacity-50`} />
-                <h2 className="text-2xl font-black text-white mb-2 min-h-[32px]">{typedWelcome}<span className="animate-pulse">|</span></h2>
+                <div className="min-h-[72px] flex items-end justify-center w-full mb-3">
+                  <h2 className="text-2xl font-black text-white leading-tight">{typedWelcome}<span className="animate-pulse">|</span></h2>
+                </div>
                 <p className="text-slate-400 text-sm opacity-80">Before you enter the realm, claim your signature aura.</p>
               </div>
 

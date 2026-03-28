@@ -105,7 +105,7 @@ export default function SpellDiscovery({ onAddSpell, allowAdd = true, maxSpellLe
           disabled={isSearching}
           className="bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs transition-all shadow-[0_0_15px_rgba(217,70,239,0.3)] hover:shadow-[0_0_25px_rgba(217,70,239,0.5)] flex items-center gap-2 shrink-0"
         >
-          {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Scry'}
+          {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
         </button>
       </form>
       
