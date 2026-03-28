@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, Users, Calculator, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud } from 'lucide-react';
+import { Skull, Users, Calculator, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud, Hammer } from 'lucide-react';
 
 import DMControlNav from './DMControlNav';
 import DMPlayerCard from './DMPlayerCard';
@@ -15,6 +15,7 @@ import DMReferenceModal from './DMReferenceModal';
 import DialogModal from './shared/DialogModal';
 import ApiBestiaryImport from './ApiBestiaryImport';
 import DebouncedTextarea from './shared/DebouncedTextarea';
+import EnemyForge from './EnemyForge';
 
 export default function DMDashboard({ onLogout }) {
   const [unlockedCharacters, setUnlockedCharacters] = useState([]);
@@ -27,6 +28,7 @@ export default function DMDashboard({ onLogout }) {
   
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [showBestiary, setShowBestiary] = useState(false); 
+  const [isForgingEnemy, setIsForgingEnemy] = useState(false);
   const [scratchpad, setScratchpad] = useState(() => localStorage.getItem('dm_scratchpad') || '');
 
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'confirm', onConfirm: null });
@@ -82,6 +84,16 @@ export default function DMDashboard({ onLogout }) {
       setSelectedEnemies([]); 
     } else {
       setSelectedEnemies(activeEnemies.map(e => e.id)); 
+    }
+  };
+
+  const handleSaveCustomEnemy = async (newEnemyObj) => {
+    try {
+      await setDoc(doc(db, 'active_enemies', newEnemyObj.id), newEnemyObj);
+      setIsForgingEnemy(false);
+      showToast('Custom Monster Forged!');
+    } catch (error) {
+      console.error("Failed to add enemy to bestiary:", error);
     }
   };
 
@@ -246,9 +258,9 @@ export default function DMDashboard({ onLogout }) {
   return (
     <div className="relative min-h-[100dvh] overflow-hidden">
       
-      {/* Immersive Forge Background */}
+      {/* Immersive Dark Fantasy Background */}
       <div className="fixed inset-0 bg-gradient-to-b from-indigo-950/40 via-slate-950 to-slate-950 pointer-events-none -z-10"></div>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-indigo-600/10 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-600/10 via-fuchsia-600/5 to-transparent blur-[120px] rounded-full pointer-events-none -z-10 animate-pulse"></div>
 
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
@@ -257,24 +269,31 @@ export default function DMDashboard({ onLogout }) {
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
           onClick={() => setToast('')}
-          className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-2xl border border-indigo-900/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2 cursor-pointer touch-pan-x"
+          className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-[0_0_30px_rgba(99,102,241,0.3)] border border-indigo-500/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2 cursor-pointer touch-pan-x"
         >
           <Sparkles className="w-4 h-4" /> {toast}
         </div>
       )}
 
+      {isForgingEnemy && (
+        <EnemyForge 
+          onSave={handleSaveCustomEnemy}
+          onClose={() => setIsForgingEnemy(false)}
+        />
+      )}
+
       {showScratchpad && (
-        <div className="fixed bottom-6 right-6 w-80 h-80 bg-[#fef3c7] rounded-xl shadow-2xl z-[9999] border border-amber-300 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
-          <div className="bg-amber-200 px-4 py-2.5 flex justify-between items-center border-b border-amber-300 shadow-sm cursor-default shrink-0">
-            <span className="text-amber-900 font-bold text-xs flex items-center gap-1.5 tracking-wider uppercase"><PenTool className="w-3 h-3"/> DM Scratchpad</span>
-            <button onClick={() => setShowScratchpad(false)} className="text-amber-700 hover:text-red-600 transition-colors"><X className="w-4 h-4"/></button>
+        <div className="fixed bottom-6 right-6 w-80 h-80 bg-[#fdf6e3] rounded-xl shadow-2xl z-[9999] border border-amber-300/50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
+          <div className="bg-amber-200/80 backdrop-blur-sm px-4 py-3 flex justify-between items-center border-b border-amber-300/50 shadow-sm cursor-default shrink-0">
+            <span className="text-amber-900 font-black text-xs flex items-center gap-2 tracking-widest uppercase"><PenTool className="w-4 h-4"/> DM Scratchpad</span>
+            <button onClick={() => setShowScratchpad(false)} className="text-amber-700 hover:text-red-600 hover:bg-amber-300/50 p-1 rounded transition-colors"><X className="w-4 h-4"/></button>
           </div>
           <div className="flex-1 relative">
             <DebouncedTextarea 
               initialValue={scratchpad}
               onSave={saveScratchpad}
               placeholder="Jot down quick notes, hidden HP, DC checks..."
-              className="w-full h-full p-4 bg-[#fef3c7] text-amber-950 text-sm focus:outline-none resize-none font-medium custom-scrollbar leading-relaxed"
+              className="w-full h-full p-4 bg-transparent text-amber-950 text-sm focus:outline-none resize-none font-medium custom-scrollbar leading-relaxed"
             />
           </div>
         </div>
@@ -296,37 +315,44 @@ export default function DMDashboard({ onLogout }) {
           onLogout={onLogout}
         />
 
-        {isBattleMode ? (
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 animate-in slide-in-from-top-4 duration-500">
-            <div className="xl:col-span-1 h-[70vh]">
-              <InitiativeTracker 
-                unlockedCharacters={unlockedCharacters} 
-                activeEnemies={activeEnemies} 
-                isBattleMode={isBattleMode}
-                onLaunchBattle={() => setIsBattleMode(true)}
-                onExitBattle={() => setIsBattleMode(false)}
-              />
+        {/* Combat / Environment Zone */}
+        <div className="relative">
+          {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>}
+          
+          {isBattleMode ? (
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 animate-in slide-in-from-top-4 duration-500">
+              <div className="xl:col-span-1 h-[70vh]">
+                <InitiativeTracker 
+                  unlockedCharacters={unlockedCharacters} 
+                  activeEnemies={activeEnemies} 
+                  isBattleMode={isBattleMode}
+                  onLaunchBattle={() => setIsBattleMode(true)}
+                  onExitBattle={() => setIsBattleMode(false)}
+                />
+              </div>
+              <div className="xl:col-span-3">
+                <DMBattleMap />
+              </div>
             </div>
-            <div className="xl:col-span-3">
-              <DMBattleMap />
-            </div>
-          </div>
-        ) : (
-          <InitiativeTracker 
-            unlockedCharacters={unlockedCharacters} 
-            activeEnemies={activeEnemies} 
-            isBattleMode={isBattleMode}
-            onLaunchBattle={() => setIsBattleMode(true)}
-            onExitBattle={() => setIsBattleMode(false)}
-          />
-        )}
+          ) : (
+            <InitiativeTracker 
+              unlockedCharacters={unlockedCharacters} 
+              activeEnemies={activeEnemies} 
+              isBattleMode={isBattleMode}
+              onLaunchBattle={() => setIsBattleMode(true)}
+              onExitBattle={() => setIsBattleMode(false)}
+            />
+          )}
+        </div>
 
-        <div>
-          <h2 className="text-xl font-black text-white flex items-center gap-2 mb-4 border-b border-slate-700 pb-2 mt-4">
+        {/* Active Party Zone */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-indigo-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>
+          <h2 className="text-xl font-black text-white flex items-center gap-2 mb-4 border-b border-slate-700/50 pb-2 mt-4 uppercase tracking-widest drop-shadow-sm">
             <Users className="w-5 h-5 text-indigo-400" /> Active Party
           </h2>
           {unlockedCharacters.length === 0 ? (
-            <div className="bg-slate-800/50 border border-slate-700 border-dashed rounded-xl p-8 text-center text-slate-500">Waiting for players...</div>
+            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-700 border-dashed rounded-2xl p-8 text-center text-slate-500 shadow-inner">Waiting for players to connect...</div>
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               {unlockedCharacters.map(charId => <DMPlayerCard key={charId} charId={charId} />)}
@@ -334,35 +360,47 @@ export default function DMDashboard({ onLogout }) {
           )}
         </div>
 
-        <div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 border-b border-slate-700 pb-2 mt-8">
-            <div className="flex items-center gap-4">
-              <h2 className="text-xl font-black text-white flex items-center gap-2">
+        {/* Active Threats Zone */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-red-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-slate-700/50 pb-3 mt-8">
+            <div className="flex items-center gap-4 flex-wrap">
+              <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-sm">
                 <Skull className="w-5 h-5 text-red-500" /> Active Threats
               </h2>
-              <button 
-                onClick={() => setShowBestiary(!showBestiary)}
-                className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded transition-colors flex items-center gap-1 border ${showBestiary ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-900 border-slate-700 text-indigo-400 hover:text-indigo-300'}`}
-              >
-                <DownloadCloud className="w-3 h-3" /> Fetch Bestiary
-              </button>
+              
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setShowBestiary(!showBestiary)}
+                  className={`text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border shadow-sm ${showBestiary ? 'bg-indigo-600 text-white border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.3)]' : 'bg-slate-900 border-slate-700 text-indigo-400 hover:text-white hover:border-indigo-500/50'}`}
+                >
+                  <DownloadCloud className="w-3.5 h-3.5" /> API Search
+                </button>
+                <button 
+                  onClick={() => setIsForgingEnemy(!isForgingEnemy)}
+                  className={`text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border shadow-sm ${isForgingEnemy ? 'bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.3)]' : 'bg-slate-900 border-slate-700 text-red-400 hover:text-white hover:border-red-500/50'}`}
+                >
+                  <Hammer className="w-3.5 h-3.5" /> Forge Monster
+                </button>
+              </div>
             </div>
 
             {activeEnemies.length > 0 && (
-              <div className="flex gap-2 items-center bg-slate-900/80 p-1.5 rounded-lg border border-slate-700 backdrop-blur-sm">
+              <div className="flex gap-2 items-center bg-slate-900/80 p-2 rounded-xl border border-slate-700/50 backdrop-blur-sm shadow-inner">
                 <button 
                   onClick={selectAllEnemies}
-                  className={`px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1.5 ${selectedEnemies.length > 0 ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${selectedEnemies.length > 0 ? 'bg-indigo-600 text-white border border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700'}`}
                 >
-                  {selectedEnemies.length > 0 ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
+                  {selectedEnemies.length > 0 ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
                   {selectedEnemies.length > 0 ? `${selectedEnemies.length} Sel` : 'All'}
                 </button>
-                <div className="w-px h-4 bg-slate-700 mx-1"></div>
+                <div className="w-px h-5 bg-slate-700 mx-1"></div>
 
-                <Calculator className="w-4 h-4 text-slate-500 ml-1 shrink-0" />
-                <input type="number" value={massMathAmount} onChange={(e) => setMassMathAmount(e.target.value)} placeholder="Amt..." className="w-20 bg-slate-950 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:outline-none" />
-                <button onClick={() => handleMassMath(true)} disabled={!massMathAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1"><Flame className="w-3 h-3"/> Dmg All</button>
-                <button onClick={() => handleMassMath(false)} disabled={!massMathAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors">Heal All</button>
+                <Calculator className="w-4 h-4 text-slate-500 mx-1 shrink-0" />
+                <input type="number" value={massMathAmount} onChange={(e) => setMassMathAmount(e.target.value)} placeholder="Amt..." className="w-20 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-sm font-bold focus:outline-none focus:border-red-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                <button onClick={() => handleMassMath(true)} disabled={!massMathAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-black transition-colors flex items-center gap-1.5 border border-red-900/50 shadow-sm"><Flame className="w-3.5 h-3.5"/> Dmg</button>
+                <button onClick={() => handleMassMath(false)} disabled={!massMathAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-black transition-colors border border-emerald-900/50 shadow-sm">Heal</button>
               </div>
             )}
           </div>
@@ -374,7 +412,7 @@ export default function DMDashboard({ onLogout }) {
           )}
 
           {activeEnemies.length === 0 ? (
-            <div className="bg-slate-800/50 border border-slate-700 border-dashed rounded-xl p-8 text-center text-slate-500">The board is clear.</div>
+            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-700 border-dashed rounded-2xl p-8 text-center text-slate-500 shadow-inner">The board is clear. Summon enemies to begin.</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {activeEnemies.map(enemy => (
