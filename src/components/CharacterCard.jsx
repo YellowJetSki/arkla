@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import { PREMADE_CHARACTERS } from '../data/campaignData';
+import { fetchSpeciesTraits } from '../services/arklaEngine'; // <-- NEW IMPORT
 import StatGrid from './shared/StatGrid';
 import QuickTraits from './shared/QuickTraits'; 
 import CollapsibleSection from './shared/CollapsibleSection';
@@ -72,9 +73,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [showFeatSearch, setShowFeatSearch] = useState(false);
   const [isForgingFeat, setIsForgingFeat] = useState(false);
   
-  // Comprehensive API-matched state
   const [customFeat, setCustomFeat] = useState({ name: '', prerequisite: '', minScore: 13, desc: '' });
-
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', inputPlaceholder: '', onConfirm: null });
 
   const showDialog = (options) => setDialog({ ...options, isOpen: true });
@@ -134,6 +133,40 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     return () => { unsubscribeSession(); unsubscribeChar(); unsubscribeLoot(); };
   }, [currentUser.charId, isDM, isKicked]);
 
+  // --- NEW: SILENT AUTO-FETCHER FOR SPECIES TRAITS ---
+  useEffect(() => {
+    const autoFetchTraits = async () => {
+      if (!char || isDM || !char.species || char.hasFetchedSpecies) return;
+
+      try {
+        const speciesData = await fetchSpeciesTraits(char.species);
+        if (speciesData && !speciesData.error && speciesData.traits.length > 0) {
+          const newTraits = speciesData.traits.map(t => ({
+            name: `${char.species} Trait: ${t.name}`,
+            desc: t.desc
+          }));
+
+          await updateDoc(doc(db, 'characters', currentUser.charId), {
+            features: arrayUnion(...newTraits),
+            hasFetchedSpecies: true,
+            speed: speciesData.mechanics?.speed || char.speed || 30
+          });
+          
+          setSaveToast(`${char.species} Traits Auto-Scribed!`);
+          setTimeout(() => setSaveToast(''), 3000);
+        } else {
+          // If no traits exist for this species, mark as fetched so it doesn't loop infinitely
+          await updateDoc(doc(db, 'characters', currentUser.charId), { hasFetchedSpecies: true });
+        }
+      } catch (err) {
+        console.error("Failed to auto-fetch species traits", err);
+      }
+    };
+
+    autoFetchTraits();
+  }, [char?.species, char?.hasFetchedSpecies, isDM, currentUser.charId]);
+  // ---------------------------------------------------
+
   const updateField = async (field, value) => {
     if (!char) return;
     await updateDoc(doc(db, 'characters', currentUser.charId), { [field]: value });
@@ -191,7 +224,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     e.preventDefault();
     if (!customFeat.name || !customFeat.desc) return;
     
-    // Structure perfectly matching the API object
     const newFeat = { 
       name: customFeat.name, 
       desc: customFeat.desc, 
@@ -295,7 +327,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         )}
 
         {saveToast && (
-          <div className="fixed bottom-6 right-6 bg-slate-800 text-emerald-400 px-4 py-3 rounded-xl shadow-2xl border border-emerald-900/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2">
+          <div className="fixed bottom-6 right-6 bg-slate-800 text-emerald-400 px-4 py-3 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] border border-emerald-900/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2">
             <Sparkles className="w-4 h-4" /> {saveToast}
           </div>
         )}
