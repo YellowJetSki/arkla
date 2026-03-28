@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, arrayUnion, writeBatch } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
+import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize, Ruler, CircleDashed, ArrowUpCircle, BrainCircuit, PenTool, Eraser, Triangle, Circle } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -32,9 +32,6 @@ export default function DMBattleMap() {
   const [tempImageUrl, setTempImageUrl] = useState('');
   const [tempGridScale, setTempGridScale] = useState(30); 
   const [tempGridColor, setTempGridColor] = useState('rgba(255,255,255,0.35)');
-
-  const [editingHp, setEditingHp] = useState("");
-  const [isEditingHpFocus, setIsEditingHpFocus] = useState(false);
 
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
@@ -195,6 +192,10 @@ export default function DMBattleMap() {
     return 1; 
   };
 
+  // ---------------------------------------------------------
+  // CRITICAL FIXES: Firebase Dot Notation to prevent race conditions
+  // ---------------------------------------------------------
+
   const stageToken = async (actor, type) => {
     if (tokens[actor.id]) return; 
     const newToken = { 
@@ -215,28 +216,28 @@ export default function DMBattleMap() {
       elevation: 0, 
       isConcentrating: actor.isConcentrating || false
     };
-    await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: { ...tokens, [actor.id]: newToken } }, { merge: true });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${actor.id}`]: newToken });
   };
 
   const stageAllActive = async () => {
-    const newTokens = { ...tokens };
+    const updates = {};
     let pX = 0;
     let eX = 0;
     
     unstagedPlayers.forEach(p => {
-      newTokens[p.id] = { id: p.id, name: p.name || 'Unknown', type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
+      updates[`tokens.${p.id}`] = { id: p.id, name: p.name || 'Unknown', type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
     });
     unstagedEnemies.forEach(e => {
-      newTokens[e.id] = { id: e.id, name: e.name || 'Unknown', type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
+      updates[`tokens.${e.id}`] = { id: e.id, name: e.name || 'Unknown', type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
     });
     
-    await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: newTokens }, { merge: true });
+    if (Object.keys(updates).length > 0) {
+      await updateDoc(doc(db, 'campaign', 'battlemap'), updates);
+    }
   };
 
   const removeToken = async (tokenId) => {
-    const updatedTokens = { ...tokens };
-    delete updatedTokens[tokenId];
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
     if (selectedTokenId === tokenId) setSelectedTokenId(null);
   };
 
@@ -244,8 +245,7 @@ export default function DMBattleMap() {
     const targetId = tokenId || selectedTokenId;
     if (!targetId || !tokens[targetId]) return;
     const isCurrentlyHidden = tokens[targetId].isHidden || false;
-    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], isHidden: !isCurrentlyHidden } };
-    await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.isHidden`]: !isCurrentlyHidden });
   };
 
   const handleUpdateTokenImage = (tokenId) => {
@@ -265,8 +265,7 @@ export default function DMBattleMap() {
     }
 
     try {
-      const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], img: url } };
-      await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
+      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.img`]: url });
       const type = tokens[targetId].type;
       const collectionName = type === 'player' ? 'characters' : 'active_enemies';
       await updateDoc(doc(db, collectionName, targetId), { img: url });
@@ -280,8 +279,7 @@ export default function DMBattleMap() {
     const parsedHp = parseInt(newHpVal, 10);
     if (isNaN(parsedHp) || !tokenId || !tokens[tokenId]) return;
     
-    const updatedTokens = { ...tokens, [tokenId]: { ...tokens[tokenId], hp: parsedHp } };
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp });
     
     const type = tokens[tokenId].type;
     const collectionName = type === 'player' ? 'characters' : 'active_enemies';
@@ -301,8 +299,7 @@ export default function DMBattleMap() {
     if (!targetId || !tokens[targetId]) return;
     const currentSize = tokens[targetId].size || 1;
     const newSize = currentSize >= 4 ? 1 : currentSize + 1; 
-    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], size: newSize } };
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.size`]: newSize });
   };
 
   const handleToggleAura = async (tokenId) => {
@@ -310,8 +307,7 @@ export default function DMBattleMap() {
     if (!targetId || !tokens[targetId]) return;
     const currentAura = tokens[targetId].aura || 0;
     const newAura = currentAura === 0 ? 10 : currentAura === 10 ? 15 : currentAura === 15 ? 30 : 0; 
-    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], aura: newAura } };
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.aura`]: newAura });
   };
 
   const handleToggleElevation = async (tokenId) => {
@@ -319,11 +315,9 @@ export default function DMBattleMap() {
     if (!targetId || !tokens[targetId]) return;
     const current = tokens[targetId].elevation || 0;
     const newElev = current === 0 ? 10 : current === 10 ? 20 : current === 20 ? 30 : current === 30 ? 60 : 0;
-    const updatedTokens = { ...tokens, [targetId]: { ...tokens[targetId], elevation: newElev } };
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.elevation`]: newElev });
   };
 
-  // --- TOKEN SYNC HOOK FOR CONCENTRATION ---
   const handleToggleConcentration = async (tokenId) => {
     const targetId = tokenId || selectedTokenId;
     if (!targetId || !tokens[targetId]) return;
@@ -331,11 +325,8 @@ export default function DMBattleMap() {
     const t = tokens[targetId];
     const newConcState = !t.isConcentrating;
     
-    // 1. Update Map Token
-    const updatedTokens = { ...tokens, [targetId]: { ...t, isConcentrating: newConcState } };
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.isConcentrating`]: newConcState });
     
-    // 2. Update Character/Enemy Sheet
     const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
     await updateDoc(doc(db, collectionName, targetId), { isConcentrating: newConcState });
   };
@@ -349,8 +340,7 @@ export default function DMBattleMap() {
       ? currentConds.filter(c => c !== cond) 
       : [...currentConds, cond];
       
-    const updatedTokens = { ...tokens, [targetId]: { ...t, conditions: newConds } };
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.conditions`]: newConds });
     
     const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
     await updateDoc(doc(db, collectionName, targetId), { conditions: newConds });
@@ -358,15 +348,19 @@ export default function DMBattleMap() {
 
   const handleTileClick = async (x, y) => {
     if (!selectedTokenId || !tokens[selectedTokenId]) return;
-    const updatedTokens = { ...tokens, [selectedTokenId]: { ...tokens[selectedTokenId], x, y } };
-    await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { 
+      [`tokens.${selectedTokenId}.x`]: x, 
+      [`tokens.${selectedTokenId}.y`]: y 
+    });
     setSelectedTokenId(null); 
   };
 
   const handleTokenDrop = async (tokenId, x, y) => {
     if (!tokenId || !tokens[tokenId]) return;
-    const updatedTokens = { ...tokens, [tokenId]: { ...tokens[tokenId], x, y } };
-    await setDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens }, { merge: true });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { 
+      [`tokens.${tokenId}.x`]: x, 
+      [`tokens.${tokenId}.y`]: y 
+    });
   };
 
   const handlePing = async (x, y, type = 'default') => {
@@ -453,75 +447,75 @@ export default function DMBattleMap() {
         onRestorePreset={handleRestorePreset}
       />
 
-      <div className="bg-slate-900 border border-indigo-500/50 rounded-xl p-4 shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0">
+      <div className="bg-slate-900/80 backdrop-blur-md border border-indigo-500/50 rounded-2xl p-4 shadow-[0_0_30px_rgba(99,102,241,0.15)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-sm">
           <Map className="w-5 h-5" /> Battlefield
         </h2>
         
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar">
           
-          <div className="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-700 shadow-inner mr-2 shrink-0">
+          <div className="flex items-center bg-slate-950/80 p-1.5 rounded-xl border border-slate-700/80 shadow-inner mr-2 shrink-0">
             <button 
               onClick={() => setIsDrawingMode(!isDrawingMode)}
-              className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1.5 ${isDrawingMode ? 'bg-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-red-400 hover:bg-slate-800'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${isDrawingMode ? 'bg-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-red-400 hover:bg-slate-800'}`}
             >
-              <PenTool className="w-3 h-3" /> Pen
+              <PenTool className="w-3.5 h-3.5" /> Pen
             </button>
             
             {isDrawingMode && (
-              <div className="flex items-center gap-1 px-2 border-l border-slate-700 ml-1 pl-2">
-                <button onClick={() => setDrawingShape('freehand')} className={`p-1 rounded ${drawingShape === 'freehand' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`} title="Freehand"><PenTool className="w-3 h-3" /></button>
-                <button onClick={() => setDrawingShape('line')} className={`p-1 rounded ${drawingShape === 'line' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`} title="Line/Wall"><div className="w-3 h-0.5 bg-current rotate-45" /></button>
-                <button onClick={() => setDrawingShape('circle')} className={`p-1 rounded ${drawingShape === 'circle' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`} title="Sphere/Radius"><Circle className="w-3 h-3" /></button>
-                <button onClick={() => setDrawingShape('cone')} className={`p-1 rounded ${drawingShape === 'cone' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`} title="Cone"><Triangle className="w-3 h-3" /></button>
+              <div className="flex items-center gap-1.5 px-2 border-l border-slate-700/50 ml-1 pl-2">
+                <button onClick={() => setDrawingShape('freehand')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'freehand' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`} title="Freehand"><PenTool className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('line')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'line' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`} title="Line/Wall"><div className="w-3 h-0.5 bg-current rotate-45" /></button>
+                <button onClick={() => setDrawingShape('circle')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'circle' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`} title="Sphere/Radius"><Circle className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('cone')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'cone' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`} title="Cone"><Triangle className="w-3 h-3" /></button>
                 
-                <div className="w-px h-4 bg-slate-700 mx-1"></div>
+                <div className="w-px h-4 bg-slate-700/50 mx-1"></div>
                 
                 {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
-                  <button key={c} onClick={() => setDrawingColor(c)} className={`w-4 h-4 rounded-full border-2 transition-transform ${drawingColor === c ? 'scale-125 border-white' : 'border-transparent opacity-70'}`} style={{ backgroundColor: c }} />
+                  <button key={c} onClick={() => setDrawingColor(c)} className={`w-5 h-5 rounded-full border-2 transition-all ${drawingColor === c ? 'scale-110 border-white shadow-md' : 'border-transparent opacity-60 hover:opacity-100'}`} style={{ backgroundColor: c }} />
                 ))}
               </div>
             )}
-            <button onClick={handleClearDrawings} className="text-slate-500 hover:text-red-400 p-1.5 ml-1 border-l border-slate-700" title="Clear Map Drawings">
+            <button onClick={handleClearDrawings} className="text-slate-500 hover:text-red-400 p-2 ml-1 border-l border-slate-700/50 transition-colors" title="Clear Map Drawings">
               <Eraser className="w-4 h-4" />
             </button>
           </div>
 
           <button 
             onClick={launchDisplayTab}
-            className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shrink-0"
+            className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-4 py-2 rounded-xl font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shadow-sm shrink-0 uppercase tracking-wider"
             title="Cast to a second monitor"
           >
-            <MonitorPlay className="w-3 h-3" /> Cast Display
+            <MonitorPlay className="w-3.5 h-3.5" /> Cast Display
           </button>
 
           <button 
             onClick={() => setIsPresetsOpen(true)}
-            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shrink-0"
+            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-4 py-2 rounded-xl font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shadow-sm shrink-0 uppercase tracking-wider"
           >
-            <Save className="w-3 h-3" /> Presets
+            <Save className="w-3.5 h-3.5" /> Presets
           </button>
 
-          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shrink-0">
-            <Settings className="w-3 h-3" /> Config
+          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 px-4 py-2 rounded-xl font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shadow-sm shrink-0 uppercase tracking-wider">
+            <Settings className="w-3.5 h-3.5" /> Config
           </button>
           
           <button 
             onClick={togglePublish} 
-            className={`px-4 py-1.5 rounded-lg font-black text-[10px] md:text-xs flex items-center gap-2 transition-all shadow-md shrink-0 ${mapData.isPublished ? 'bg-emerald-600 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-800 text-slate-400 border border-slate-600 hover:text-white'}`}
+            className={`px-5 py-2 rounded-xl font-black text-[10px] md:text-xs flex items-center gap-2 transition-all shadow-md shrink-0 uppercase tracking-widest ${mapData.isPublished ? 'bg-emerald-600 text-white border border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-800'}`}
           >
-            {mapData.isPublished ? <><Send className="w-3 h-3"/> LIVE</> : <><EyeOff className="w-3 h-3"/> HIDDEN</>}
+            {mapData.isPublished ? <><Send className="w-3.5 h-3.5"/> LIVE</> : <><EyeOff className="w-3.5 h-3.5"/> HIDDEN</>}
           </button>
         </div>
       </div>
 
       {isEditingMap && (
-        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-2xl p-5 shadow-inner animate-in fade-in slide-in-from-top-2 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Preset Local Map</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preset Local Map</label>
               <select 
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner"
                 onChange={(e) => setTempImageUrl(e.target.value)}
                 value={LOCAL_MAPS.some(m => m.value === tempImageUrl) ? tempImageUrl : ''}
               >
@@ -532,28 +526,28 @@ export default function DMBattleMap() {
               </select>
             </div>
             <div>
-               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Or Custom Web URL</label>
+               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Or Custom Web URL</label>
                <input 
                  type="url" 
                  value={tempImageUrl}
                  onChange={(e) => setTempImageUrl(e.target.value)}
-                 className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                 className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner"
                  placeholder="https://example.com/map.jpg"
                />
             </div>
             <div>
-               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Grid Cell Size (Pixels)</label>
+               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Grid Cell Size (Pixels)</label>
                <input 
                  type="number" 
                  value={tempGridScale}
                  onChange={(e) => setTempGridScale(Number(e.target.value))}
-                 className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm font-black focus:outline-none focus:border-indigo-500"
+                 className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm font-black focus:outline-none focus:border-indigo-500 shadow-inner"
                />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Grid Color</label>
+              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Grid Color</label>
               <select 
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner"
                 onChange={(e) => setTempGridColor(e.target.value)}
                 value={tempGridColor}
               >
@@ -565,11 +559,11 @@ export default function DMBattleMap() {
             </div>
           </div>
 
-          <div className="flex justify-end border-t border-slate-700 pt-4 mt-2">
+          <div className="flex justify-end border-t border-slate-700/80 pt-5 mt-2">
             <button 
               onClick={handleUpdateMapSettings} 
               disabled={isSavingMap}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors flex items-center gap-2"
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-black uppercase tracking-widest px-8 py-3 rounded-xl transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
             >
               {isSavingMap ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating Grid...</> : 'Save Configuration'}
             </button>
@@ -578,20 +572,20 @@ export default function DMBattleMap() {
       )}
 
       {hasUnstagedActors && (
-        <div className="bg-slate-800/80 p-2 md:p-3 rounded-xl border border-slate-700 border-dashed flex items-center flex-wrap gap-2">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2 hidden xl:block">Stage Actors:</span>
+        <div className="bg-slate-900/50 backdrop-blur-sm p-3 md:p-4 rounded-2xl border border-slate-700/50 border-dashed flex items-center flex-wrap gap-2 shadow-inner">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 hidden xl:block">Stage Actors:</span>
           
-          <button onClick={stageAllActive} className="text-[10px] md:text-xs bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 px-2 py-1 rounded hover:bg-emerald-600 transition-colors mr-2 flex items-center gap-1">
-            <Users className="w-3 h-3"/> Deploy All
+          <button onClick={stageAllActive} className="text-[10px] md:text-xs font-bold uppercase tracking-wider bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors mr-2 flex items-center gap-1.5 shadow-sm">
+            <Users className="w-3.5 h-3.5"/> Deploy All
           </button>
 
-          <div className="w-px h-4 bg-slate-700 mx-1"></div>
+          <div className="w-px h-5 bg-slate-700/50 mx-1"></div>
 
           {unstagedPlayers.map(p => (
-            <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs bg-indigo-900/40 border border-indigo-500/50 text-indigo-200 px-2 py-1 rounded hover:bg-indigo-600 transition-colors">+ {(p.name || 'Unknown').split(' ')[0]}</button>
+            <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs font-bold bg-indigo-900/30 border border-indigo-500/30 text-indigo-300 px-2.5 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">+ {(p.name || 'Unknown').split(' ')[0]}</button>
           ))}
           {unstagedEnemies.map(e => (
-            <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs bg-red-900/40 border border-red-500/50 text-red-200 px-2 py-1 rounded hover:bg-red-600 transition-colors">+ {(e.name || 'Unknown').substring(0,8)}</button>
+            <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs font-bold bg-red-900/30 border border-red-500/30 text-red-300 px-2.5 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-sm">+ {(e.name || 'Unknown').substring(0,8)}</button>
           ))}
         </div>
       )}
