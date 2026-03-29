@@ -221,7 +221,7 @@ My search led me to the ancient druidic ruins of the Weeping Grove. The untended
     maxHp: 12,
     tempHp: 0,
     hitDice: { current: 1, max: 1, type: 'd10' },
-    ac: 15, // 12 from Studded Leather + 3 DEX
+    ac: 15,
     initiative: '+3', 
     spellSave: '--',
     spellAttack: '--',
