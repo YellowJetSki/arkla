@@ -50,18 +50,20 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
     
     try {
+      const batch = writeBatch(db);
       const charRef = doc(db, 'characters', charId);
-      const mapRef = doc(db, 'campaign', 'battlemap');
-      
-      updateDoc(charRef, updates).catch(console.error);
+      batch.update(charRef, updates);
 
-      getDoc(mapRef).then(mapDoc => {
-        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-           let mapUpdates = { [`tokens.${charId}.hp`]: boundedHp };
-           if (newTempVal !== null) mapUpdates[`tokens.${charId}.tempHp`] = updates.tempHp;
-           updateDoc(mapRef, mapUpdates).catch(console.error);
-        }
-      });
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      const mapDoc = await getDoc(mapRef);
+      if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+         const mapTokens = mapDoc.data().tokens;
+         mapTokens[charId].hp = boundedHp;
+         if (newTempVal !== null) mapTokens[charId].tempHp = updates.tempHp;
+         batch.update(mapRef, { tokens: mapTokens });
+      }
+      
+      await batch.commit();
     } catch (err) {
        console.log("Could not sync HP.", err);
     }
@@ -98,19 +100,20 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
     
     try {
+      const batch = writeBatch(db);
       const charRef = doc(db, 'characters', charId);
-      const mapRef = doc(db, 'campaign', 'battlemap');
-      
-      updateDoc(charRef, updates).catch(console.error);
+      batch.update(charRef, updates);
 
-      getDoc(mapRef).then(mapDoc => {
-        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-           updateDoc(mapRef, { 
-             [`tokens.${charId}.hp`]: currentHp,
-             [`tokens.${charId}.tempHp`]: currentTemp
-           }).catch(console.error);
-        }
-      });
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      const mapDoc = await getDoc(mapRef);
+      if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+         const mapTokens = mapDoc.data().tokens;
+         mapTokens[charId].hp = currentHp;
+         mapTokens[charId].tempHp = currentTemp;
+         batch.update(mapRef, { tokens: mapTokens });
+      }
+      
+      await batch.commit();
     } catch (err) {
       console.error("HP Update Failed:", err);
     }
@@ -175,7 +178,7 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
               <button onClick={isDM ? toggleInspiration : undefined} className={`shrink-0 transition-all z-10 flex items-center justify-center ${isDM ? 'cursor-pointer hover:scale-110' : 'pointer-events-none'} ${char.inspiration ? 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,1)] scale-110' : (isDM ? 'text-slate-400 hover:text-yellow-400/50' : 'text-slate-600')}`}><Star className="w-5 h-5 md:w-6 md:h-6 fill-current pointer-events-none" /></button>
             </div>
           </div>
-          <p className={`${activeTheme.text} font-bold text-xs md:text-sm drop-shadow-md`}>Lvl {char.level} {char.species} {char.class.split(' ')[0]}</p>
+          <p className={`${activeTheme.text} font-bold text-xs md:text-sm drop-shadow-md`}>Lvl {char.level} {char.species || char.race} {char.class.split(' ')[0]}</p>
         </div>
       </div>
 

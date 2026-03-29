@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { Palette, Download, Upload, ShieldAlert, Sparkles, RotateCcw } from 'lucide-react';
+import DialogModal from '../shared/DialogModal';
 
 export default function SettingsTab({ char, updateField, activeTheme, THEMES, restoreCharacter }) {
   const [fileError, setFileError] = useState('');
-  const [importConfirmData, setImportConfirmData] = useState(null);
+  
+  // Hook into the global DialogModal system
+  const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
+  const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
   const handleExport = () => {
     const dataStr = JSON.stringify(char, null, 2);
@@ -25,7 +29,19 @@ export default function SettingsTab({ char, updateField, activeTheme, THEMES, re
       try {
         const importedData = JSON.parse(event.target.result);
         if (!importedData.name || !importedData.stats) throw new Error("Invalid format");
-        setImportConfirmData(importedData); // Trigger the custom modal instead of window.confirm
+        
+        // Trigger the global DialogModal
+        setDialog({
+          isOpen: true,
+          title: 'Overwrite Character?',
+          message: 'This will completely overwrite your current character with the data from the backup file. This cannot be undone. Proceed?',
+          type: 'confirm',
+          onConfirm: () => {
+            restoreCharacter(importedData);
+            closeDialog();
+          }
+        });
+
       } catch (err) {
         setFileError("Invalid character backup file.");
         setTimeout(() => setFileError(''), 3000);
@@ -38,23 +54,15 @@ export default function SettingsTab({ char, updateField, activeTheme, THEMES, re
   return (
     <div className="space-y-6 animate-in fade-in duration-300 relative">
       
-      {/* CUSTOM IMPORT CONFIRMATION MODAL */}
-      {importConfirmData && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-sm w-full p-5 shadow-2xl">
-            <h3 className="text-lg font-bold mb-2 text-amber-400 flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5"/> Overwrite Character?
-            </h3>
-            <p className="text-sm text-slate-300 mb-6 leading-relaxed">
-              This will completely overwrite your current character with the data from the backup file. This cannot be undone. Proceed?
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setImportConfirmData(null)} className="px-4 py-2 text-slate-400 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-bold text-sm">Cancel</button>
-              <button onClick={() => { restoreCharacter(importConfirmData); setImportConfirmData(null); }} className="px-4 py-2 bg-amber-600 hover:bg-amber-500 transition-colors text-white rounded-lg font-bold text-sm">Confirm Restore</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Global Dialog Modal */}
+      <DialogModal 
+        isOpen={dialog.isOpen} 
+        title={dialog.title} 
+        message={dialog.message} 
+        type={dialog.type} 
+        onConfirm={dialog.onConfirm} 
+        onCancel={closeDialog} 
+      />
 
       {/* App Setup & Tutorial */}
       <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-sm">

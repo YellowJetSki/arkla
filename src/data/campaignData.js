@@ -247,8 +247,8 @@ My search led me to the ancient druidic ruins of the Weeping Grove. The untended
     ],
     dmNotes: '',
     attacks: [
-      { name: 'Strider\'s Longsword', hit: '+5', damage: '1d10 + 3', type: 'Slashing', notes: '2-Handed' },
-      { name: 'Masterwork Longbow', hit: '+5', damage: '1d8 + 3', type: 'Piercing', notes: 'Range: 150/600ft' }
+      { name: 'Strider\'s Longsword', hit: '--', damage: '1d10', type: 'Slashing', notes: '2-Handed' },
+      { name: 'Masterwork Longbow', hit: '--', damage: '1d8', type: 'Piercing', notes: 'Range: 150/600ft' }
     ],
     proficiencies: {
       skills: 'Stealth (+5), Athletics (+5), Persuasion (+3), History (+2), Nature (+2)',
