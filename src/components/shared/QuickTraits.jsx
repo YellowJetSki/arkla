@@ -14,16 +14,15 @@ export default function QuickTraits({ features = [] }) {
         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Quick Traits & Senses</h4>
       </div>
       
-      {/* Wrapped the trait buttons in the new ScrollableRow */}
       <ScrollableRow className="gap-2 pb-2">
         {features.map((feat, idx) => (
           <button
             key={idx}
             onClick={() => setActiveFeature(activeFeature === idx ? null : idx)}
-            className={`shrink-0 snap-start px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+            className={`shrink-0 snap-start px-3 py-1.5 rounded-lg text-xs font-bold transition-all border outline-none focus:ring-2 focus:ring-indigo-500/50 ${
               activeFeature === idx 
                 ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_10px_rgba(79,70,229,0.5)]' 
-                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white'
             }`}
           >
             {feat.name}
@@ -36,7 +35,7 @@ export default function QuickTraits({ features = [] }) {
           <p className="whitespace-pre-wrap">{features[activeFeature].desc}</p>
           <button 
             onClick={() => setActiveFeature(null)} 
-            className="shrink-0 text-indigo-400 hover:text-white bg-indigo-900/50 p-1.5 rounded-md transition-colors"
+            className="shrink-0 text-indigo-400 hover:text-white bg-indigo-900/50 hover:bg-indigo-800/80 p-1.5 rounded-md transition-colors"
           >
             <X className="w-3 h-3" />
           </button>

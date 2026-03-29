@@ -18,7 +18,6 @@ export default function OnboardingWizard({ charName, onComplete }) {
   const firstName = charName.split(' ')[0];
   const welcomeText = `Welcome, ${firstName}. Your legacy begins now.`;
 
-  // Typewriter effect for the welcome message
   useEffect(() => {
     if (step === 1) {
       let i = 0;
@@ -40,12 +39,10 @@ export default function OnboardingWizard({ charName, onComplete }) {
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl h-[100dvh] overflow-hidden animate-in fade-in duration-700">
       
-      {/* Immersive Portal Background */}
       <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] ${activeTheme.bg} opacity-5 blur-[150px] rounded-full pointer-events-none transition-colors duration-1000`}></div>
 
       <div className={`bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-3xl w-full max-w-md shadow-2xl flex flex-col relative overflow-hidden transition-all duration-500`}>
         
-        {/* Progress Bar Header */}
         <div className="absolute top-0 left-0 right-0 flex h-1 bg-slate-800 z-20">
           <div className={`h-full ${activeTheme.bg} transition-all duration-500`} style={{ width: `${(step / 3) * 100}%` }}></div>
         </div>
@@ -73,7 +70,7 @@ export default function OnboardingWizard({ charName, onComplete }) {
                      <button 
                        key={t} 
                        onClick={() => setSelectedTheme(t)} 
-                       className={`w-10 h-10 rounded-full ${THEMES[t].bg} relative transition-all duration-300 group`}
+                       className={`w-10 h-10 rounded-full ${THEMES[t].bg} relative transition-all duration-300 group outline-none focus:ring-2 focus:ring-white`}
                        title={THEMES[t].name}
                      >
                        {selectedTheme === t && (
@@ -160,7 +157,7 @@ export default function OnboardingWizard({ charName, onComplete }) {
 
           <button 
             onClick={handleNext}
-            className={`px-6 py-3 rounded-xl ${activeTheme.bg} hover:opacity-90 text-white font-black text-sm uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg group`}
+            className={`px-6 py-3 rounded-xl ${activeTheme.bg} hover:opacity-90 text-white font-black text-sm uppercase tracking-widest flex items-center gap-2 transition-all shadow-lg group focus:outline-none focus:ring-2 focus:ring-white`}
           >
             {step < 3 ? (
               <>Next <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" /></>
