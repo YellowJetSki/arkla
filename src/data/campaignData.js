@@ -210,96 +210,62 @@ My search led me to the ancient druidic ruins of the Weeping Grove. The untended
     notes: ''
   },
   'strider': {
-  id: "strider_tudul",
-  name: "Edward 'Strider' Tudul",
-  class: "Ranger",
-  level: 1,
-  species: "Human (Variant)",
-  background: "Noble",
-  alignment: "Chaotic Good",
-  img: "/strider_bm.png", // Make sure to add a token image with this name to your public folder!
-  
-  // Vitals
-  hp: 12,
-  maxHp: 12,
-  tempHp: 0,
-  ac: 15, // 12 from Studded Leather + 3 DEX
-  speed: 30,
-  initiative: 3,
-  
-  // Wealth
-  assarions: 45, // Rich kid money
-  quadrans: 20,
-  leptons: 0, // "I don't carry pocket change."
-  
-  // Core Stats
-  str: 16, // +3
-  dex: 16, // +3
-  con: 14, // +2
-  int: 10, // +0
-  wis: 9,  // -1
-  cha: 12, // +1
-
-  // Combat
-  attacks: [
-    {
-      name: "Strider's Longsword (2-Handed)",
-      hitBonus: 5, // STR(3) + Prof(2)
-      damage: "1d10 + 3",
-      type: "Slashing",
-      range: "Melee (5ft)"
+    name: 'Edward "Strider" Tudul',
+    race: 'Human (Variant)',
+    class: 'Ranger 1',
+    classes: [{ name: 'Ranger', level: 1 }],
+    level: 1,
+    exp: 0,
+    alignment: 'Chaotic Good',
+    hp: 12,
+    maxHp: 12,
+    tempHp: 0,
+    hitDice: { current: 1, max: 1, type: 'd10' },
+    ac: 15, // 12 from Studded Leather + 3 DEX
+    initiative: '+3', 
+    spellSave: '--',
+    spellAttack: '--',
+    combatInitiative: null,
+    speed: 30,
+    inspiration: false,
+    isConcentrating: false,
+    conditions: [],
+    hasSeenRules: false, 
+    journal: '',
+    stats: { STR: 16, DEX: 16, CON: 14, INT: 10, WIS: 9, CHA: 12 },
+    currency: { assarions: 45, quadrans: 20, leptons: 0 },
+    imageUrl: '/strider_bm.png', 
+    deathSaves: { successes: 0, failures: 0 },
+    resources: [], 
+    spellSlots: {},
+    spells: [],
+    dmNotes: '',
+    attacks: [
+      { name: 'Strider\'s Longsword', hit: '+5', damage: '1d10 + 3', type: 'Slashing', notes: '2-Handed' },
+      { name: 'Masterwork Longbow', hit: '+5', damage: '1d8 + 3', type: 'Piercing', notes: 'Range: 150/600ft' }
+    ],
+    proficiencies: {
+      skills: 'Stealth (+5), Athletics (+5), Persuasion (+3), History (+2), Nature (+2)',
+      tools: 'Dragonchess Set',
+      weapons: 'Simple Weapons, Martial Weapons',
+      armor: 'Light Armor, Medium Armor, Shields',
+      languages: 'Common, Elvish, Hisma'
     },
-    {
-      name: "Masterwork Longbow",
-      hitBonus: 5, // DEX(3) + Prof(2)
-      damage: "1d8 + 3",
-      type: "Piercing",
-      range: "150/600ft"
-    }
-  ],
-
-  // Skills & Proficiencies
-  proficiencies: {
-    skills: "Stealth (+5), Athletics (+5), Persuasion (+3), History (+2), Nature (+2)",
-    tools: "Dragonchess Set",
-    weapons: "Simple Weapons, Martial Weapons",
-    armor: "Light Armor, Medium Armor, Shields",
-    languages: "Common, Elvish, Hisma"
-  },
-
-  // Abilities
-  features: [
-    {
-      name: "Feat: Actor",
-      description: "You have advantage on Deception and Performance checks when trying to pass yourself off as a different person. You can mimic the speech of another person or the sounds made by other creatures."
+    features: [
+      { name: 'Feat: Actor', desc: 'Advantage on Deception and Performance checks when trying to pass yourself off as a different person. Can perfectly mimic speech and sounds.' },
+      { name: 'Favored Enemy: Beasts', desc: 'Advantage on Wisdom (Survival) checks to track beasts, as well as on Intelligence checks to recall information about them.' },
+      { name: 'Natural Explorer: Forest', desc: 'When you make an Intelligence or Wisdom check related to the forest, your proficiency bonus is doubled if you are using a skill that you\'re proficient in.' }
+    ],
+    inventory: "• 1x Custom-Distressed Studded Leather Armor\n  Looks battle-worn, but the stitching is flawless and very expensive.\n• 1x Strider's Longsword\n  Perfectly balanced. Hasn't seen much real combat.\n• 1x Masterwork Longbow\n  Carved from rare imported wood.\n• 20x Premium Arrows\n  Fletched with swan feathers.\n• 1x Tudul Family Signet Ring\n  Buried at the very bottom of the pack. He adamantly refuses to wear it.\n• 5x Truffle-Infused Trail Rations\n  Delicious, but terrible for actual wilderness survival.\n• 1x Woven Silk Bedroll\n  Extremely soft.\n• 1x Imported Mustache Wax & Silver Mirror\n  Gotta look the part.\n• 1x Leather-bound Bestiary\n  Heavily bookmarked at the 'Bears' section.",
+    traits: {
+      personality: 'I insist everyone calls me "Strider" in a deep, gravelly voice. I lean against walls in the shadows whenever possible to look mysterious.',
+      ideal: 'Idealism. I want to be the ultimate cool, mysterious ranger that saves the day.',
+      bond: 'I am running from my boring, lame family to make a real name for myself in the wilds.',
+      flaws: 'I have zero actual survival instincts and terrible intuition. I rely entirely on acting to seem tough.'
     },
-    {
-      name: "Favored Enemy: Beasts",
-      description: "You have advantage on Wisdom (Survival) checks to track beasts, as well as on Intelligence checks to recall information about them."
-    },
-    {
-      name: "Natural Explorer: Forest",
-      description: "When you make an Intelligence or Wisdom check related to the forest, your proficiency bonus is doubled if you are using a skill that you're proficient in."
-    }
-  ],
-
-  // The Rich-Kid Survival Kit
-  inventory: [
-    { name: "Custom-Distressed Studded Leather Armor", quantity: 1 },
-    { name: "Strider's Longsword", quantity: 1 },
-    { name: "Masterwork Longbow", quantity: 1 },
-    { name: "Bundle of Premium Arrows (Fletched with Swan Feathers)", quantity: 20 },
-    { name: "Tudul Family Signet Ring", quantity: 1, notes: "Buried at the very bottom of his pack. He adamantly refuses to wear it." },
-    { name: "Truffle-Infused Trail Rations", quantity: 5 },
-    { name: "Woven Silk Bedroll", quantity: 1 },
-    { name: "Imported Mustache Wax & Silver Mirror", quantity: 1 },
-    { name: "Leather-bound Bestiary (Heavily bookmarked at the 'Bears' section)", quantity: 1 }
-  ],
-  
-  conditions: [],
-  isConcentrating: false
-}
-  
+    backstory: "Edward Tudul is the scion of the affluent Tudul family, whose patriarch, Mayor Tudul, secretly runs the criminal underworld of the Republic. Unaware of his family's true, dangerous nature and viewing them as 'boring and lame,' Edward despised his pampered nobility. Craving the gritty idealism of a hardened ranger, he spent a fortune outfitting himself with custom-distressed armor, masterwork weapons, and truffle-infused rations. Adopting the alias 'Strider' and faking a deep, raspy voice, he set out to make his own name. While his survival skills are laughably non-existent (relying entirely on his expensive acting tutors to pull off the persona), his fencing and archery lessons genuinely paid off, making him accidentally dangerous in a fight.",
+    notes: ''
+  }
 };
 
 // ==========================================
