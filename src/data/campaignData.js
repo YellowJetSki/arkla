@@ -208,7 +208,98 @@ export const PREMADE_CHARACTERS = {
 
 My search led me to the ancient druidic ruins of the Weeping Grove. The untended wild magic there violently reacted to the curse on my accordion, causing the shrine to collapse and crush my leg. I awoke with a mysterious wooden peg leg and an unnaturally small bear who now refuses to leave my side. Occasionally I feel a strange pulsing coming from trees and plants, as if I can feel their life force coursing through me. I no longer hear talk of the stranger and my trail has run cold. Regardless, I know I could never face this powerful man alone, so I now search for powerful heroes alongside my quest for clues. Ones I could manipulate into helping me accomplish my one goal, revenge on that evil stranger.`,
     notes: ''
-  }
+  },
+  'strider': {
+  id: "strider_tudul",
+  name: "Edward 'Strider' Tudul",
+  class: "Ranger",
+  level: 1,
+  species: "Human (Variant)",
+  background: "Noble",
+  alignment: "Chaotic Good",
+  img: "/strider_bm.png", // Make sure to add a token image with this name to your public folder!
+  
+  // Vitals
+  hp: 12,
+  maxHp: 12,
+  tempHp: 0,
+  ac: 15, // 12 from Studded Leather + 3 DEX
+  speed: 30,
+  initiative: 3,
+  
+  // Wealth
+  assarions: 45, // Rich kid money
+  quadrans: 20,
+  leptons: 0, // "I don't carry pocket change."
+  
+  // Core Stats
+  str: 16, // +3
+  dex: 16, // +3
+  con: 14, // +2
+  int: 10, // +0
+  wis: 9,  // -1
+  cha: 12, // +1
+
+  // Combat
+  attacks: [
+    {
+      name: "Strider's Longsword (2-Handed)",
+      hitBonus: 5, // STR(3) + Prof(2)
+      damage: "1d10 + 3",
+      type: "Slashing",
+      range: "Melee (5ft)"
+    },
+    {
+      name: "Masterwork Longbow",
+      hitBonus: 5, // DEX(3) + Prof(2)
+      damage: "1d8 + 3",
+      type: "Piercing",
+      range: "150/600ft"
+    }
+  ],
+
+  // Skills & Proficiencies
+  proficiencies: {
+    skills: "Stealth (+5), Athletics (+5), Persuasion (+3), History (+2), Nature (+2)",
+    tools: "Dragonchess Set",
+    weapons: "Simple Weapons, Martial Weapons",
+    armor: "Light Armor, Medium Armor, Shields",
+    languages: "Common, Elvish, Hisma"
+  },
+
+  // Abilities
+  features: [
+    {
+      name: "Feat: Actor",
+      description: "You have advantage on Deception and Performance checks when trying to pass yourself off as a different person. You can mimic the speech of another person or the sounds made by other creatures."
+    },
+    {
+      name: "Favored Enemy: Beasts",
+      description: "You have advantage on Wisdom (Survival) checks to track beasts, as well as on Intelligence checks to recall information about them."
+    },
+    {
+      name: "Natural Explorer: Forest",
+      description: "When you make an Intelligence or Wisdom check related to the forest, your proficiency bonus is doubled if you are using a skill that you're proficient in."
+    }
+  ],
+
+  // The Rich-Kid Survival Kit
+  inventory: [
+    { name: "Custom-Distressed Studded Leather Armor", quantity: 1 },
+    { name: "Strider's Longsword", quantity: 1 },
+    { name: "Masterwork Longbow", quantity: 1 },
+    { name: "Bundle of Premium Arrows (Fletched with Swan Feathers)", quantity: 20 },
+    { name: "Tudul Family Signet Ring", quantity: 1, notes: "Buried at the very bottom of his pack. He adamantly refuses to wear it." },
+    { name: "Truffle-Infused Trail Rations", quantity: 5 },
+    { name: "Woven Silk Bedroll", quantity: 1 },
+    { name: "Imported Mustache Wax & Silver Mirror", quantity: 1 },
+    { name: "Leather-bound Bestiary (Heavily bookmarked at the 'Bears' section)", quantity: 1 }
+  ],
+  
+  conditions: [],
+  isConcentrating: false
+}
+  
 };
 
 // ==========================================
