@@ -4,6 +4,33 @@ import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { parseAndScaleAttack } from '../../services/arklaEngine';
 
+// Mini-component to handle the premium typing experience for high-pool resources
+const ResourceCounter = ({ res, idx, isDM, handleResourceToggle }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [displayVal, setDisplayVal] = useState("");
+
+  return (
+    <div className="flex items-center gap-3 bg-slate-950/80 p-2 rounded-xl border border-slate-800 shadow-inner">
+      <Heart className="w-5 h-5 text-emerald-500 shrink-0 ml-1" />
+      <input 
+        type="number" 
+        disabled={isDM}
+        value={isEditing ? displayVal : res.current}
+        onFocus={(e) => { setDisplayVal(res.current); setIsEditing(true); e.target.select(); }}
+        onChange={(e) => setDisplayVal(e.target.value)}
+        onBlur={() => {
+          setIsEditing(false);
+          const newVal = Math.min(res.max, Math.max(0, parseInt(displayVal) || 0));
+          handleResourceToggle(idx, newVal);
+        }}
+        onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+        className="w-16 bg-transparent text-white font-black text-xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+      />
+      <span className="text-slate-500 font-bold text-sm">/ {res.max}</span>
+    </div>
+  );
+};
+
 export default function CombatTab({ 
   char,
   charId, 
@@ -17,12 +44,11 @@ export default function CombatTab({
   showDialog
 }) {
   const [isForgingAttack, setIsForgingAttack] = useState(false);
-  
-  // Comprehensive API-matched state
   const [customAttack, setCustomAttack] = useState({ name: '', damage: '1d8', type: 'Slashing', notes: '' });
 
-  const bonusActions = (char.features || []).filter(f => f.desc.toLowerCase().includes('bonus action'));
-  const reactions = (char.features || []).filter(f => f.desc.toLowerCase().includes('reaction'));
+  // Safe parsing to prevent fatal crashes if a feature description is undefined
+  const bonusActions = (char.features || []).filter(f => f.desc?.toLowerCase().includes('bonus action'));
+  const reactions = (char.features || []).filter(f => f.desc?.toLowerCase().includes('reaction'));
   const hasSpells = char.spells && char.spells.length > 0;
   
   const resources = char.resources || [];
@@ -36,9 +62,7 @@ export default function CombatTab({
       onConfirm: async () => {
         const newAttacks = [...(char.attacks || [])];
         newAttacks.splice(index, 1);
-        await updateDoc(doc(db, 'characters', charId), {
-          attacks: newAttacks
-        });
+        await updateDoc(doc(db, 'characters', charId), { attacks: newAttacks });
         showDialog({ isOpen: false });
       },
       onCancel: () => showDialog({ isOpen: false })
@@ -49,7 +73,6 @@ export default function CombatTab({
     e.preventDefault();
     if (!customAttack.name || !customAttack.damage) return;
 
-    // Structured perfectly for the arklaEngine
     const newAttack = {
       name: customAttack.name,
       hit: '--', 
@@ -59,9 +82,7 @@ export default function CombatTab({
     };
 
     try {
-      await updateDoc(doc(db, 'characters', charId), {
-        attacks: arrayUnion(newAttack)
-      });
+      await updateDoc(doc(db, 'characters', charId), { attacks: arrayUnion(newAttack) });
       setCustomAttack({ name: '', damage: '1d8', type: 'Slashing', notes: '' });
       setIsForgingAttack(false);
     } catch (err) {
@@ -130,17 +151,7 @@ export default function CombatTab({
                 </div>
                 
                 {res.isPool || res.max > 15 ? (
-                  <div className="flex items-center gap-3 bg-slate-950/80 p-2 rounded-xl border border-slate-800 shadow-inner">
-                     <Heart className="w-5 h-5 text-emerald-500 shrink-0 ml-1" />
-                     <input 
-                       type="number" 
-                       disabled={isDM}
-                       value={res.current}
-                       onChange={(e) => handleResourceToggle(idx, Math.min(res.max, Math.max(0, parseInt(e.target.value) || 0)))}
-                       className="w-16 bg-transparent text-white font-black text-xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
-                     />
-                     <span className="text-slate-500 font-bold text-sm">/ {res.max}</span>
-                  </div>
+                  <ResourceCounter res={res} idx={idx} isDM={isDM} handleResourceToggle={handleResourceToggle} />
                 ) : (
                   <div className="flex gap-1.5 flex-wrap">
                     {Array.from({ length: res.max }).map((_, bubbleIdx) => (
@@ -186,19 +197,19 @@ export default function CombatTab({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Attack Name</label>
-                    <input type="text" required value={customAttack.name} onChange={e => setCustomAttack({...customAttack, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. Rusty Blunderbuss" />
+                    <input type="text" onFocus={(e) => e.target.select()} required value={customAttack.name} onChange={e => setCustomAttack({...customAttack, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. Rusty Blunderbuss" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Base Dice</label>
-                    <input type="text" required value={customAttack.damage} onChange={e => setCustomAttack({...customAttack, damage: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. 1d10" />
+                    <input type="text" onFocus={(e) => e.target.select()} required value={customAttack.damage} onChange={e => setCustomAttack({...customAttack, damage: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. 1d10" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Damage Type</label>
-                    <input type="text" value={customAttack.type} onChange={e => setCustomAttack({...customAttack, type: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. Piercing" />
+                    <input type="text" onFocus={(e) => e.target.select()} value={customAttack.type} onChange={e => setCustomAttack({...customAttack, type: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. Piercing" />
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Engine Overrides & Notes</label>
-                    <input type="text" value={customAttack.notes} onChange={e => setCustomAttack({...customAttack, notes: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. Use: CHA, Ranged, Loading" />
+                    <input type="text" onFocus={(e) => e.target.select()} value={customAttack.notes} onChange={e => setCustomAttack({...customAttack, notes: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. Use: CHA, Ranged, Loading" />
                   </div>
                 </div>
                 <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(16,185,129,0.3)] hover:shadow-[0_0_25px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 mt-2"><Plus className="w-4 h-4" /> Inject Attack</button>

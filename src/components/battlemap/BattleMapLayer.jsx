@@ -6,7 +6,7 @@ import MapGrid from './MapGrid';
 import { getConditionMechanics } from '../../services/arklaEngine';
 
 export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
-  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
+  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
   const [tokens, setTokens] = useState({});
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert' });
   
@@ -28,7 +28,6 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
           rows: data.rows || 15,
           isPublished: data.isPublished || false,
           activeTokenId: data.activeTokenId || null,
-          ping: data.ping || null,
           gridColor: data.gridColor || 'rgba(255,255,255,0.35)',
           drawings: data.drawings || []
         });
@@ -163,12 +162,6 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
     }
   };
 
-  const handlePing = async (x, y, type = 'default') => {
-    await updateDoc(doc(db, 'campaign', 'battlemap'), {
-      ping: { x, y, type, timestamp: Date.now() }
-    });
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -180,7 +173,7 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
           </div>
           <div>
             <h2 className="text-white font-black text-sm uppercase tracking-widest">Tactical View</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase">Tap your token to see range. Long-press to ping.</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase">Tap your token to see range.</p>
           </div>
         </div>
         <button onClick={onClose} className="bg-slate-800 text-slate-400 p-2 rounded-xl border border-slate-700 hover:text-white transition-colors">
@@ -229,9 +222,7 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
             onTokenClick={handleTokenClick}
             selectedTokenId={charId}
             isDM={false} 
-            // The Fix: Pass the dynamically calculated speed down into the visual grid engine
             showMovementRangeFor={showRange ? { ...tokens[charId], speed: dynamicSpeed } : null}
-            onPing={handlePing}
           />
         )}
       </div>

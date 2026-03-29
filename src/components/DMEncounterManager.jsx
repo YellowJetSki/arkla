@@ -176,7 +176,6 @@ export default function DMEncounterManager({ onClose }) {
               
               <ApiBestiaryImport onImportMonster={handleImportMonster} />
 
-              {/* HOMEBREW MONSTER FORGE */}
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
                 <div className="flex justify-between items-center border-b border-slate-700/50 pb-2 mb-3">
                   <h3 className="font-bold text-indigo-400">Create New Preset</h3>
@@ -193,15 +192,15 @@ export default function DMEncounterManager({ onClose }) {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Monster Name</label>
-                        <input type="text" required value={customEnemy.name} onChange={e => setCustomEnemy({...customEnemy, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                        <input type="text" onFocus={(e) => e.target.select()} required value={customEnemy.name} onChange={e => setCustomEnemy({...customEnemy, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-indigo-500" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Max HP</label>
-                        <input type="number" required value={customEnemy.hp} onChange={e => setCustomEnemy({...customEnemy, hp: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                        <input type="number" onFocus={(e) => e.target.select()} required value={customEnemy.hp} onChange={e => setCustomEnemy({...customEnemy, hp: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Armor Class</label>
-                        <input type="number" required value={customEnemy.ac} onChange={e => setCustomEnemy({...customEnemy, ac: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-indigo-500" />
+                        <input type="number" onFocus={(e) => e.target.select()} required value={customEnemy.ac} onChange={e => setCustomEnemy({...customEnemy, ac: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                       </div>
                       <div className="col-span-2">
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Attacks & Abilities</label>

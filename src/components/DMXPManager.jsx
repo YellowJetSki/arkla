@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { TrendingUp, Users, User, Award } from 'lucide-react';
+import { TrendingUp, Users, User, Award, Sparkles } from 'lucide-react';
 import { PREMADE_CHARACTERS } from '../data/campaignData';
 
 export default function DMXPManager({ unlockedCharacters }) {
   const [xpAmount, setXpAmount] = useState('');
   const [target, setTarget] = useState('party'); // 'party' or specific charId
   const [isAwarding, setIsAwarding] = useState(false);
+  const [saveToast, setSaveToast] = useState('');
 
   const handleAwardXP = async (e) => {
     e.preventDefault();
@@ -29,8 +30,11 @@ export default function DMXPManager({ unlockedCharacters }) {
         }
       }
       
-      setXpAmount(''); // Clear input on success
-      // Optional: Add a temporary success toast here if desired
+      const targetName = target === 'party' ? 'the Party' : (PREMADE_CHARACTERS[target]?.name || target);
+      setSaveToast(`Awarded ${amount} XP to ${targetName}!`);
+      setTimeout(() => setSaveToast(''), 3000);
+      
+      setXpAmount(''); 
     } catch (error) {
       console.error("Failed to award XP:", error);
     } finally {
@@ -39,7 +43,14 @@ export default function DMXPManager({ unlockedCharacters }) {
   };
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl mb-8">
+    <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl mb-8 relative">
+      
+      {saveToast && (
+        <div className="absolute -top-12 right-0 bg-slate-800 text-emerald-400 px-4 py-2.5 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] border border-emerald-900/50 z-50 animate-in slide-in-from-bottom-2 fade-in duration-300 font-bold text-sm flex items-center gap-2">
+          <Sparkles className="w-4 h-4" /> {saveToast}
+        </div>
+      )}
+
       <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2 mb-4">
         <TrendingUp className="w-5 h-5" /> Award Experience
       </h3>
@@ -72,10 +83,11 @@ export default function DMXPManager({ unlockedCharacters }) {
           <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">XP Amount</label>
           <input 
             type="number" 
+            onFocus={(e) => e.target.select()}
             value={xpAmount}
             onChange={(e) => setXpAmount(e.target.value)}
             placeholder="e.g. 150"
-            className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-center font-bold focus:outline-none focus:border-emerald-500"
+            className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-center font-bold focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             required
           />
         </div>
@@ -83,7 +95,7 @@ export default function DMXPManager({ unlockedCharacters }) {
         <button 
           type="submit"
           disabled={isAwarding || !xpAmount}
-          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-lg transition-colors h-10"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-2 px-6 rounded-lg transition-colors h-10 shadow-sm"
         >
           {isAwarding ? '...' : <><Award className="w-4 h-4" /> Award</>}
         </button>

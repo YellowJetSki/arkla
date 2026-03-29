@@ -1,5 +1,5 @@
-// The rules of the Sanctuary Filter
-const FORBIDDEN_WORDS = /\b(soul|blood|demon|demons|demonic|fiend|fiends|fiendish|devil|devils|undead|spirit|spirits|necromancy|pact)\b/i;
+// The rules of the Sanctuary Filter - 'blood' removed to prevent banning Potions of Healing
+const FORBIDDEN_WORDS = /\b(soul|demon|demons|demonic|fiend|fiends|fiendish|devil|devils|undead|spirit|spirits|necromancy|pact)\b/i;
 const FORBIDDEN_TYPES = ['fiend', 'undead', 'aberration'];
 
 export const fetchSafeSpells = async (query) => {

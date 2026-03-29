@@ -65,7 +65,6 @@ export default function MapGrid({
   onToggleRuler,
   isDisplayMode = false,
   onTokenDrop, 
-  onPing,
   isDrawingMode = false, 
   drawingColor = '#ef4444',
   drawingShape = 'freehand',
@@ -82,26 +81,12 @@ export default function MapGrid({
   const currentCellSize = 30 * zoom;
   const scrollRef = useRef(null);
 
-  const [pingMenu, setPingMenu] = useState(null);
   const [dragMeasure, setDragMeasure] = useState(null);
   
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
   const [initialPinchDist, setInitialPinchDist] = useState(null);
   const [initialPinchZoom, setInitialPinchZoom] = useState(null);
-
-  // The Fix: Replaced the global setInterval with a targeted activePing state
-  const [activePing, setActivePing] = useState(null);
-
-  useEffect(() => {
-    if (mapData?.ping) {
-      setActivePing(mapData.ping);
-      const timer = setTimeout(() => {
-        setActivePing(null);
-      }, 3500);
-      return () => clearTimeout(timer);
-    }
-  }, [mapData?.ping]);
 
   const centerOnMap = () => {
     if (scrollRef.current) {
@@ -154,21 +139,8 @@ export default function MapGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapData?.activeTokenId, isDisplayMode]);
 
-  const handleContextMenuPing = (e, x, y) => {
-    e.preventDefault();
-    if (isDisplayMode || isDrawingMode) return;
-    setPingMenu({ x, y, clientX: e.clientX, clientY: e.clientY });
-  };
-
-  const executePing = (type) => {
-    if (pingMenu && onPing) {
-      onPing(pingMenu.x, pingMenu.y, type);
-    }
-    setPingMenu(null);
-  };
-  
   const handleMapMouseDown = (e) => {
-    if (isDisplayMode || isDrawingMode || pingMenu) return;
+    if (isDisplayMode || isDrawingMode) return;
     setIsPanning(true);
     setPanStart({
       x: e.clientX,
@@ -197,7 +169,7 @@ export default function MapGrid({
   };
 
   const handleTouchStart = (e) => {
-    if (isDisplayMode || pingMenu) return;
+    if (isDisplayMode) return;
     
     if (e.touches.length === 2) {
       setIsPanning(false);
@@ -245,15 +217,6 @@ export default function MapGrid({
   const activeToken = mapData?.activeTokenId ? tokens[mapData.activeTokenId] : null;
   const gridColor = mapData?.gridColor || 'rgba(255,255,255,0.35)';
 
-  const getPingColor = (type) => {
-    switch(type) {
-      case 'move': return 'text-emerald-400 border-emerald-400 bg-emerald-500/30';
-      case 'attack': return 'text-red-400 border-red-400 bg-red-500/30';
-      case 'look': return 'text-amber-400 border-amber-400 bg-amber-500/30';
-      default: return 'text-sky-400 border-white bg-sky-500/30';
-    }
-  };
-
   const cellGroups = {};
   Object.values(tokens || {}).forEach(t => {
     if (t.isHidden && !isDM) return;
@@ -272,7 +235,7 @@ export default function MapGrid({
   }
 
   return (
-    <div className={`relative w-full flex flex-col overflow-hidden ${isDisplayMode ? 'h-[100dvh] rounded-none border-0 bg-black' : 'h-[75vh] md:max-h-[70vh] rounded-xl border border-slate-700 bg-slate-950 shadow-inner'}`} onClick={() => setPingMenu(null)}>
+    <div className={`relative w-full flex flex-col overflow-hidden ${isDisplayMode ? 'h-[100dvh] rounded-none border-0 bg-black' : 'h-[75vh] md:max-h-[70vh] rounded-xl border border-slate-700 bg-slate-950 shadow-inner'}`}>
       
       {!isDisplayMode && (
         <div className="absolute top-4 right-4 z-[90] flex flex-col gap-2 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-lg border border-slate-700 shadow-lg">
@@ -280,14 +243,6 @@ export default function MapGrid({
           <button onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
           <div className="w-full h-px bg-slate-700 my-0.5"></div>
           <button onClick={() => centerOnToken(selectedTokenId || mapData?.activeTokenId)} className="p-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/50 rounded transition-colors" title="Center on Active Turn/Me"><Target className="w-5 h-5"/></button>
-        </div>
-      )}
-
-      {pingMenu && (
-        <div className="fixed z-[99999] bg-slate-900 border border-slate-700 rounded-xl p-2 shadow-2xl flex gap-2 animate-in zoom-in-95" style={{ top: pingMenu.clientY, left: pingMenu.clientX }}>
-           <button onClick={() => executePing('move')} className="flex flex-col items-center gap-1 p-2 hover:bg-slate-800 rounded text-emerald-400"><ArrowDown className="w-5 h-5" /><span className="text-[10px] font-bold">Move</span></button>
-           <button onClick={() => executePing('attack')} className="flex flex-col items-center gap-1 p-2 hover:bg-slate-800 rounded text-red-400"><Target className="w-5 h-5" /><span className="text-[10px] font-bold">Attack</span></button>
-           <button onClick={() => executePing('look')} className="flex flex-col items-center gap-1 p-2 hover:bg-slate-800 rounded text-amber-400"><Eye className="w-5 h-5" /><span className="text-[10px] font-bold">Look</span></button>
         </div>
       )}
 
@@ -329,15 +284,6 @@ export default function MapGrid({
 
           <MapDrawings drawings={mapData?.drawings || []} isDrawingMode={isDrawingMode && !isDisplayMode} drawingShape={drawingShape} onDrawEnd={onDrawEnd} currentCellSize={currentCellSize} cols={cols} rows={rows} drawingColor={drawingColor} />
 
-          {activePing && (
-            <div className="absolute z-50 pointer-events-none" style={{ width: currentCellSize, height: currentCellSize, transform: `translate(${activePing.x * currentCellSize}px, ${activePing.y * currentCellSize}px)` }}>
-              <div className={`absolute inset-0 rounded-full border-[4px] animate-ping opacity-75 ${getPingColor(activePing.type).split(' ')[1]}`}></div>
-              <div className={`absolute inset-0 rounded-full border-[2px] flex items-center justify-center ${getPingColor(activePing.type)}`}>
-                <Target className="w-1/2 h-1/2 drop-shadow-md animate-pulse" />
-              </div>
-            </div>
-          )}
-
           <div className={`absolute inset-0 grid z-20 ${isDrawingMode ? 'pointer-events-none' : ''}`} style={{ gridTemplateColumns: `repeat(${cols}, ${currentCellSize}px)`, gridTemplateRows: `repeat(${rows}, ${currentCellSize}px)` }}>
             {Array.from({ length: cols * rows }).map((_, i) => {
               const tile = { x: i % cols, y: Math.floor(i / cols) };
@@ -368,7 +314,6 @@ export default function MapGrid({
                     if(isPanning) return; 
                     if(!isDisplayMode && onTileClick) onTileClick(tile.x, tile.y); 
                   }}
-                  onContextMenu={(e) => { e.stopPropagation(); handleContextMenuPing(e, tile.x, tile.y); }}
                   onDragOver={(e) => { 
                     if(isDisplayMode) return;
                     e.preventDefault(); 

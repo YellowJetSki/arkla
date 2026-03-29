@@ -5,12 +5,13 @@ import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, Chevro
 import EquipmentDiscovery from '../EquipmentDiscovery';
 import DebouncedTextarea from '../shared/DebouncedTextarea';
 
+// New intelligent parser: splits by double-newlines OR lines starting with a bullet/dash
 const parseInventory = (text) => {
   if (!text) return [];
-  const blocks = text.split(/^(?=•|-|\d+x)/m).filter(b => b.trim());
+  const blocks = text.split(/(?:\n\s*\n|(?=^[•\-*]\s+))/m).filter(b => b.trim());
   return blocks.map(block => {
     const lines = block.trim().split('\n');
-    const name = lines[0];
+    const name = lines[0].replace(/^[•\-*]\s*/, '').trim();
     const desc = lines.slice(1).join('\n').trim();
     return { name, desc };
   });
@@ -20,20 +21,21 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   const [showItemSearch, setShowItemSearch] = useState(false);
   const [isForgingItem, setIsForgingItem] = useState(false);
   
-  // Comprehensive API-matched state
   const [customItem, setCustomItem] = useState({ 
-    name: '', 
-    category: 'Wondrous Item', 
-    damageDice: '1d8', 
-    damageType: 'Slashing', 
-    properties: '', 
-    ac: 14, 
-    desc: '' 
+    name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, desc: '' 
   });
   
   const [transactionAmount, setTransactionAmount] = useState('');
   const [transactionType, setTransactionType] = useState('assarions'); 
   const [openItems, setOpenItems] = useState({}); 
+
+  // Premium input states
+  const [isEditingGold, setIsEditingGold] = useState(false);
+  const [displayGold, setDisplayGold] = useState("");
+  const [isEditingSilver, setIsEditingSilver] = useState(false);
+  const [displaySilver, setDisplaySilver] = useState("");
+  const [isEditingCopper, setIsEditingCopper] = useState(false);
+  const [displayCopper, setDisplayCopper] = useState("");
 
   const addEquipmentToInventory = async (formattedItemText) => {
     const currentInventory = char.inventory || '';
@@ -76,12 +78,11 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
     let formattedText = `• ${customItem.name} (${customItem.category})`;
     
     if (customItem.category === 'Weapon') {
-      formattedText += `\n  Damage: ${customItem.damageDice || 'N/A'} ${customItem.damageType}`;
+      formattedText += `\nDamage: ${customItem.damageDice || 'N/A'} ${customItem.damageType}`;
       if (customItem.properties) {
         formattedText += ` (${customItem.properties})`;
       }
 
-      // --- AUTO-LINK LOGIC: Instantly send to Combat Tab ---
       const newAttack = {
         name: customItem.name,
         hit: '--', 
@@ -91,9 +92,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
       };
 
       try {
-        await updateDoc(doc(db, 'characters', charId), {
-          attacks: arrayUnion(newAttack)
-        });
+        await updateDoc(doc(db, 'characters', charId), { attacks: arrayUnion(newAttack) });
         showDialog({
           title: 'Weapon Forged & Linked',
           message: `${customItem.name} has been added to the inventory AND instantly pinned to the Combat Tab!`,
@@ -103,17 +102,15 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
       } catch (err) {
         console.error("Failed to auto-equip custom weapon:", err);
       }
-      // -----------------------------------------------------
 
     } else if (customItem.category === 'Armor') {
-      formattedText += `\n  AC: ${customItem.ac || 10}`;
+      formattedText += `\nAC: ${customItem.ac || 10}`;
     }
     
     if (customItem.desc) {
-      formattedText += `\n  ${customItem.desc}`;
+      formattedText += `\n${customItem.desc}`;
     }
     
-    // Always add it to the text inventory block
     await addEquipmentToInventory(formattedText);
     
     setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, desc: '' });
@@ -126,11 +123,11 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
       message: 'Send this item to the Shared Party Loot? It will be removed from your personal inventory.',
       type: 'confirm',
       onConfirm: async () => {
-        const blocks = (char.inventory || '').split(/^(?=•|-|\d+x)/m).filter(b => b.trim());
+        const blocks = (char.inventory || '').split(/(?:\n\s*\n|(?=^[•\-*]\s+))/m).filter(b => b.trim());
         blocks.splice(index, 1);
         await updateField('inventory', blocks.join('\n\n'));
 
-        const cleanName = itemString.replace(/^•\s*/, '').split('(')[0].trim() || 'Shared Item';
+        const cleanName = itemString.split('\n')[0].replace(/^[•\-*]\s*/, '').trim() || 'Shared Item';
         const newItem = {
           id: `loot_${Date.now()}`,
           name: cleanName,
@@ -281,7 +278,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                 <>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Damage Dice</label>
-                    <input type="text" required value={customItem.damageDice} onChange={e => setCustomItem({...customItem, damageDice: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 1d10" />
+                    <input type="text" onFocus={(e) => e.target.select()} required value={customItem.damageDice} onChange={e => setCustomItem({...customItem, damageDice: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 1d10" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Damage Type</label>
@@ -297,7 +294,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
               {customItem.category === 'Armor' && (
                 <div className="sm:col-span-2">
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Base Armor Class (AC)</label>
-                  <input type="number" required value={customItem.ac} onChange={e => setCustomItem({...customItem, ac: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 14" />
+                  <input type="number" onFocus={(e) => e.target.select()} required value={customItem.ac} onChange={e => setCustomItem({...customItem, ac: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 14" />
                 </div>
               )}
 
@@ -334,7 +331,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                     <span className={`font-black text-sm md:text-base ${openItems[i] ? activeTheme.text : 'text-slate-200'}`}>{item.name}</span>
                     <div className="flex items-center gap-3">
                       <button 
-                        onClick={(e) => { e.stopPropagation(); handleShareToParty(`${item.name}${item.desc ? '\n' + item.desc : ''}`, i); }}
+                        onClick={(e) => { e.stopPropagation(); handleShareToParty(`• ${item.name}${item.desc ? '\n' + item.desc : ''}`, i); }}
                         className="bg-slate-800 border border-slate-700 p-2 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors text-slate-400 shadow-sm"
                         title="Share to Party Loot"
                       >
@@ -367,9 +364,10 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
             <input 
               type="number" 
               value={transactionAmount}
+              onFocus={(e) => e.target.select()}
               onChange={(e) => setTransactionAmount(e.target.value)}
               placeholder="Amount..." 
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-black focus:outline-none focus:border-yellow-500 shadow-inner"
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-black focus:outline-none focus:border-yellow-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <div className="flex flex-col gap-1.5 shrink-0">
               <button onClick={() => handleTransaction(true)} disabled={!transactionAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white border border-emerald-900/50 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors shadow-sm">+ Loot</button>
@@ -391,7 +389,15 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
             <span className="text-yellow-500/50 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Assarions (Gold)</span>
             <div className="flex items-center justify-between gap-3">
               <button onClick={() => adjustCurrency('assarions', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
-              <input type="number" value={char.currency?.assarions || 0} onChange={(e) => updateField('currency.assarions', Number(e.target.value))} className="w-20 bg-transparent text-yellow-400 font-black text-3xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <input 
+                type="number" 
+                value={isEditingGold ? displayGold : (char.currency?.assarions || 0)} 
+                onFocus={(e) => { setDisplayGold(char.currency?.assarions || 0); setIsEditingGold(true); e.target.select(); }}
+                onChange={(e) => setDisplayGold(e.target.value)}
+                onBlur={() => { setIsEditingGold(false); updateField('currency.assarions', Number(displayGold)); }}
+                onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
+                className="w-20 bg-transparent text-yellow-400 font-black text-3xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+              />
               <button onClick={() => adjustCurrency('assarions', 1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Plus className="w-5 h-5" /></button>
             </div>
           </div>
@@ -400,7 +406,15 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
             <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Quadrans (Silver)</span>
             <div className="flex items-center justify-between gap-3">
               <button onClick={() => adjustCurrency('quadrans', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
-              <input type="number" value={char.currency?.quadrans || 0} onChange={(e) => updateField('currency.quadrans', Number(e.target.value))} className="w-20 bg-transparent text-slate-300 font-black text-2xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <input 
+                type="number" 
+                value={isEditingSilver ? displaySilver : (char.currency?.quadrans || 0)} 
+                onFocus={(e) => { setDisplaySilver(char.currency?.quadrans || 0); setIsEditingSilver(true); e.target.select(); }}
+                onChange={(e) => setDisplaySilver(e.target.value)}
+                onBlur={() => { setIsEditingSilver(false); updateField('currency.quadrans', Number(displaySilver)); }}
+                onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
+                className="w-20 bg-transparent text-slate-300 font-black text-2xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+              />
               <button onClick={() => adjustCurrency('quadrans', 1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Plus className="w-5 h-5" /></button>
             </div>
           </div>
@@ -409,7 +423,15 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
             <span className="text-amber-700 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Leptons (Copper)</span>
             <div className="flex items-center justify-between gap-3">
               <button onClick={() => adjustCurrency('leptons', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
-              <input type="number" value={char.currency?.leptons || 0} onChange={(e) => updateField('currency.leptons', Number(e.target.value))} className="w-20 bg-transparent text-amber-600 font-black text-2xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              <input 
+                type="number" 
+                value={isEditingCopper ? displayCopper : (char.currency?.leptons || 0)} 
+                onFocus={(e) => { setDisplayCopper(char.currency?.leptons || 0); setIsEditingCopper(true); e.target.select(); }}
+                onChange={(e) => setDisplayCopper(e.target.value)}
+                onBlur={() => { setIsEditingCopper(false); updateField('currency.leptons', Number(displayCopper)); }}
+                onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
+                className="w-20 bg-transparent text-amber-600 font-black text-2xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+              />
               <button onClick={() => adjustCurrency('leptons', 1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Plus className="w-5 h-5" /></button>
             </div>
           </div>

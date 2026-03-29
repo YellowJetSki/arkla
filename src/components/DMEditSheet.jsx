@@ -100,38 +100,38 @@ export default function DMEditSheet({ char, charId, onCancel }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Character Name</label>
-            <input type="text" value={formData.name} onChange={e => handleChange('name', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
+            <input type="text" value={formData.name} onChange={e => handleChange('name', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Level (Total)</label>
-            <input type="number" value={formData.level} onChange={e => handleChange('level', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
+            <input type="number" onFocus={(e) => e.target.select()} value={formData.level} onChange={e => handleChange('level', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Class</label>
-            <input type="text" value={formData.class} onChange={e => handleChange('class', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
+            <input type="text" value={formData.class} onChange={e => handleChange('class', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Race</label>
-            <input type="text" value={formData.race} onChange={e => handleChange('race', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white" />
+            <input type="text" value={formData.race} onChange={e => handleChange('race', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Max HP</label>
-            <input type="number" value={formData.maxHp} onChange={e => handleChange('maxHp', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
+            <input type="number" onFocus={(e) => e.target.select()} value={formData.maxHp} onChange={e => handleChange('maxHp', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Armor Class</label>
-            <input type="number" value={formData.ac} onChange={e => handleChange('ac', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
+            <input type="number" onFocus={(e) => e.target.select()} value={formData.ac} onChange={e => handleChange('ac', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Initiative Mod</label>
-            <input type="text" value={formData.initiative} onChange={e => handleChange('initiative', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
+            <input type="text" onFocus={(e) => e.target.select()} value={formData.initiative} onChange={e => handleChange('initiative', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500" />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Speed</label>
-            <input type="number" value={formData.speed} onChange={e => handleChange('speed', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold" />
+            <input type="number" onFocus={(e) => e.target.select()} value={formData.speed} onChange={e => handleChange('speed', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
           </div>
         </div>
 
@@ -139,13 +139,14 @@ export default function DMEditSheet({ char, charId, onCancel }) {
           <label className="block text-xs font-bold text-slate-400 uppercase mb-3">Base Ability Scores</label>
           <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
             {Object.keys(formData.stats).map(stat => (
-              <div key={stat} className="bg-slate-900 border border-slate-600 rounded p-2 text-center">
+              <div key={stat} className="bg-slate-900 border border-slate-600 rounded p-2 text-center focus-within:border-amber-500 transition-colors">
                 <span className="text-[10px] text-slate-500 font-bold block mb-1">{stat}</span>
                 <input 
                   type="number" 
+                  onFocus={(e) => e.target.select()}
                   value={formData.stats[stat]} 
                   onChange={e => handleStatChange(stat, e.target.value)} 
-                  className="w-full bg-transparent text-center text-white font-bold text-xl focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" 
+                  className="w-full bg-transparent text-center text-white font-bold text-xl focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                 />
               </div>
             ))}

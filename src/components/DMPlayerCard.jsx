@@ -49,15 +49,14 @@ export default function DMPlayerCard({ charId }) {
   const hasPerception = (char.proficiencies?.skills || '').toLowerCase().includes('perception');
   const passivePerception = 10 + wisMod + (hasPerception ? proficiencyBonus : 0);
 
-  const bonusActions = (char.features || []).filter(f => f.desc.toLowerCase().includes('bonus action'));
-  const reactions = (char.features || []).filter(f => f.desc.toLowerCase().includes('reaction'));
-  
+  // Safely check descriptions to prevent a crash if a homebrew feature lacks text
+  const bonusActions = (char.features || []).filter(f => f.desc?.toLowerCase().includes('bonus action'));
+  const reactions = (char.features || []).filter(f => f.desc?.toLowerCase().includes('reaction'));
   const passives = (char.features || []).filter(f => 
-    !f.desc.toLowerCase().includes('bonus action') && 
-    !f.desc.toLowerCase().includes('reaction')
+    !f.desc?.toLowerCase().includes('bonus action') && 
+    !f.desc?.toLowerCase().includes('reaction')
   );
 
-  // Use the engine to ensure the DM sees the exact same attack numbers the player sees
   const dynamicAttacks = (char.attacks || []).map(atk => parseAndScaleAttack(atk, char.stats, totalLevel));
 
   return (
