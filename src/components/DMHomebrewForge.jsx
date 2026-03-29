@@ -111,19 +111,19 @@ export default function DMHomebrewForge({ onClose }) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Armor Class</label>
-                <input type="number" value={enemy.ac} onChange={e => setEnemy({...enemy, ac: Number(e.target.value)})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold" />
+                <input type="number" onFocus={(e) => e.target.select()} value={enemy.ac} onChange={e => setEnemy({...enemy, ac: Number(e.target.value)})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Max HP</label>
-                <input type="number" value={enemy.hp} onChange={e => setEnemy({...enemy, hp: Number(e.target.value)})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold" />
+                <input type="number" onFocus={(e) => e.target.select()} value={enemy.hp} onChange={e => setEnemy({...enemy, hp: Number(e.target.value)})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Speed</label>
-                <input type="text" value={enemy.speed} onChange={e => setEnemy({...enemy, speed: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold" />
+                <input type="text" onFocus={(e) => e.target.select()} value={enemy.speed} onChange={e => setEnemy({...enemy, speed: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Passive Perc.</label>
-                <input type="number" value={enemy.passivePerception} onChange={e => setEnemy({...enemy, passivePerception: Number(e.target.value)})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold" />
+                <input type="number" onFocus={(e) => e.target.select()} value={enemy.passivePerception} onChange={e => setEnemy({...enemy, passivePerception: Number(e.target.value)})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
               </div>
             </div>
 
@@ -131,9 +131,9 @@ export default function DMHomebrewForge({ onClose }) {
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Ability Modifiers (e.g. +2 or -1)</label>
               <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                 {Object.keys(enemy.stats).map(stat => (
-                  <div key={stat} className="text-center">
+                  <div key={stat} className="text-center focus-within:border-amber-500 transition-colors rounded">
                     <span className="text-[10px] text-slate-500 font-bold block mb-1">{stat}</span>
-                    <input type="text" value={enemy.stats[stat]} onChange={e => handleStatChange(stat, e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded text-center text-white font-bold py-1" />
+                    <input type="text" onFocus={(e) => e.target.select()} value={enemy.stats[stat]} onChange={e => handleStatChange(stat, e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded text-center text-white font-bold py-1 focus:outline-none focus:border-amber-500" />
                   </div>
                 ))}
               </div>
@@ -148,8 +148,8 @@ export default function DMHomebrewForge({ onClose }) {
                 {enemy.features.map((feat, i) => (
                   <div key={i} className="flex gap-2 bg-slate-900 p-3 rounded-xl border border-slate-700">
                     <div className="flex-1 space-y-2">
-                      <input type="text" placeholder="Feature Name (e.g. Pack Tactics)" value={feat.name} onChange={e => updateArrayItem('features', i, 'name', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-white text-sm" />
-                      <textarea placeholder="Description..." value={feat.desc} onChange={e => updateArrayItem('features', i, 'desc', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-white text-sm resize-y" />
+                      <input type="text" placeholder="Feature Name (e.g. Pack Tactics)" value={feat.name} onChange={e => updateArrayItem('features', i, 'name', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:border-amber-500" />
+                      <textarea placeholder="Description..." value={feat.desc} onChange={e => updateArrayItem('features', i, 'desc', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-white text-sm resize-y focus:outline-none focus:border-amber-500" />
                     </div>
                     <button type="button" onClick={() => removeArrayItem('features', i)} className="text-red-400 hover:text-red-300 p-2"><Trash2 className="w-4 h-4" /></button>
                   </div>
@@ -166,8 +166,8 @@ export default function DMHomebrewForge({ onClose }) {
                 {enemy.actions.map((act, i) => (
                   <div key={i} className="flex gap-2 bg-slate-900 p-3 rounded-xl border border-slate-700">
                     <div className="flex-1 space-y-2">
-                      <input type="text" placeholder="Action Name (e.g. Multiattack or Claws)" value={act.name} onChange={e => updateArrayItem('actions', i, 'name', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-white text-sm" />
-                      <textarea placeholder="Melee Weapon Attack: +5 to hit..." value={act.desc} onChange={e => updateArrayItem('actions', i, 'desc', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-white text-sm resize-y" />
+                      <input type="text" placeholder="Action Name (e.g. Multiattack or Claws)" value={act.name} onChange={e => updateArrayItem('actions', i, 'name', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:border-amber-500" />
+                      <textarea placeholder="Melee Weapon Attack: +5 to hit..." value={act.desc} onChange={e => updateArrayItem('actions', i, 'desc', e.target.value)} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-1.5 text-white text-sm resize-y focus:outline-none focus:border-amber-500" />
                     </div>
                     <button type="button" onClick={() => removeArrayItem('actions', i)} className="text-red-400 hover:text-red-300 p-2"><Trash2 className="w-4 h-4" /></button>
                   </div>

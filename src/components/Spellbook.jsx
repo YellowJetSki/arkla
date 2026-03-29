@@ -239,6 +239,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
                   <input 
                     type="number" 
                     value={spellSlots[level]?.max || ''} 
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => updateSlotMax(level, e.target.value)}
                     placeholder="0"
                     className="w-14 bg-slate-800 border border-slate-600 rounded-lg text-center text-white py-1.5 focus:border-fuchsia-500 focus:outline-none text-sm font-bold shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -315,7 +316,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-2">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Spell Name</label>
-                <input type="text" required value={customSpell.name} onChange={e => setCustomSpell({...customSpell, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Arcane Eruption" />
+                <input type="text" onFocus={(e) => e.target.select()} required value={customSpell.name} onChange={e => setCustomSpell({...customSpell, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Arcane Eruption" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Spell Level</label>
@@ -329,19 +330,19 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Casting Time</label>
-                <input type="text" required value={customSpell.castTime} onChange={e => setCustomSpell({...customSpell, castTime: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 1 Action" />
+                <input type="text" onFocus={(e) => e.target.select()} required value={customSpell.castTime} onChange={e => setCustomSpell({...customSpell, castTime: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 1 Action" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Range</label>
-                <input type="text" value={customSpell.range} onChange={e => setCustomSpell({...customSpell, range: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 60 feet" />
+                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.range} onChange={e => setCustomSpell({...customSpell, range: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 60 feet" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Components</label>
-                <input type="text" value={customSpell.components} onChange={e => setCustomSpell({...customSpell, components: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. V, S, M" />
+                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.components} onChange={e => setCustomSpell({...customSpell, components: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. V, S, M" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Duration</label>
-                <input type="text" value={customSpell.duration} onChange={e => setCustomSpell({...customSpell, duration: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Concentration" />
+                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.duration} onChange={e => setCustomSpell({...customSpell, duration: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Concentration" />
               </div>
             </div>
 

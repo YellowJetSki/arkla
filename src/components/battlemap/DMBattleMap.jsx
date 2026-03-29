@@ -12,7 +12,7 @@ const LOCAL_MAPS = [
 ];
 
 export default function DMBattleMap() {
-  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
+  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
   const [tokens, setTokens] = useState({});
   const [selectedTokenId, setSelectedTokenId] = useState(null);
   
@@ -54,13 +54,12 @@ export default function DMBattleMap() {
           rows: safeRows,
           isPublished: data.isPublished || false,
           activeTokenId: data.activeTokenId || null,
-          ping: data.ping || null,
           gridColor: data.gridColor || 'rgba(255,255,255,0.35)',
           drawings: data.drawings || []
         });
         setTokens(data.tokens || {});
       } else {
-        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null, ping: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
+        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
       }
     });
     return () => unsub();
@@ -191,10 +190,6 @@ export default function DMBattleMap() {
     if (lowerName.includes('bear') || lowerName.includes('boar') || lowerName.includes('dire wolf')) return 2; 
     return 1; 
   };
-
-  // ---------------------------------------------------------
-  // CRITICAL FIXES: Firebase Dot Notation to prevent race conditions
-  // ---------------------------------------------------------
 
   const stageToken = async (actor, type) => {
     if (tokens[actor.id]) return; 
@@ -363,12 +358,6 @@ export default function DMBattleMap() {
     });
   };
 
-  const handlePing = async (x, y, type = 'default') => {
-    await updateDoc(doc(db, 'campaign', 'battlemap'), {
-      ping: { x, y, type, timestamp: Date.now() }
-    });
-  };
-
   const handleDrawEnd = async (lineData) => {
     const newLine = { ...lineData, id: Date.now(), shape: drawingShape };
     await updateDoc(doc(db, 'campaign', 'battlemap'), {
@@ -423,6 +412,7 @@ export default function DMBattleMap() {
                 <input 
                   type="url" 
                   value={imagePrompt.url} 
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => setImagePrompt({...imagePrompt, url: e.target.value})} 
                   placeholder="https://example.com/avatar.png"
                   className="w-full bg-slate-950 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
@@ -530,6 +520,7 @@ export default function DMBattleMap() {
                <input 
                  type="url" 
                  value={tempImageUrl}
+                 onFocus={(e) => e.target.select()}
                  onChange={(e) => setTempImageUrl(e.target.value)}
                  className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner"
                  placeholder="https://example.com/map.jpg"
@@ -540,8 +531,9 @@ export default function DMBattleMap() {
                <input 
                  type="number" 
                  value={tempGridScale}
+                 onFocus={(e) => e.target.select()}
                  onChange={(e) => setTempGridScale(Number(e.target.value))}
-                 className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm font-black focus:outline-none focus:border-indigo-500 shadow-inner"
+                 className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm font-black focus:outline-none focus:border-indigo-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                />
             </div>
             <div>
@@ -600,7 +592,6 @@ export default function DMBattleMap() {
         selectedTokenId={selectedTokenId}
         isDM={true} 
         onTokenDrop={handleTokenDrop}
-        onPing={handlePing}
         showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null}
         onToggleRuler={(id) => setShowRulerFor(showRulerFor === id ? null : id)}
         isDrawingMode={isDrawingMode}

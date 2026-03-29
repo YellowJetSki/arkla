@@ -134,6 +134,7 @@ export default function ShortRestModal({ char, charId, onClose }) {
                   <input 
                     type="number" 
                     value={spentDice}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => setSpentDice(e.target.value)}
                     placeholder="0"
                     max={currentDice}
@@ -150,6 +151,7 @@ export default function ShortRestModal({ char, charId, onClose }) {
                   <input 
                     type="number" 
                     value={hpRegained}
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => setHpRegained(e.target.value)}
                     placeholder="0"
                     min="0"

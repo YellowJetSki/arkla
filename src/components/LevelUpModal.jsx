@@ -261,6 +261,7 @@ export default function LevelUpModal({ char, charId, onClose }) {
                        <input 
                          type="text" 
                          value={newClassName} 
+                         onFocus={(e) => e.target.select()}
                          onChange={(e) => setNewClassName(e.target.value)} 
                          placeholder="New Class Name (e.g. Rogue)" 
                          className="w-full bg-slate-950 border border-indigo-500/50 rounded-lg px-4 py-3 text-white font-bold ml-7 w-[calc(100%-28px)] shadow-inner transition-colors focus:outline-none focus:border-indigo-400" 
@@ -287,7 +288,13 @@ export default function LevelUpModal({ char, charId, onClose }) {
                 <Dices className="absolute -right-4 -bottom-4 w-32 h-32 text-slate-700/20 rotate-12 pointer-events-none" />
                 <h3 className="flex items-center gap-2 text-xl font-black text-white mb-2 uppercase tracking-wider"><Heart className="w-6 h-6 text-red-400" /> Vitality</h3>
                 <p className="text-sm text-slate-400 mb-6">Your {targetClassName} hit die is a <strong className="text-indigo-300">d{engineData.hitDie}</strong>. The average gain (+ CON) is pre-calculated.</p>
-                <input type="number" value={hpIncrease} onChange={(e) => setHpIncrease(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-6 text-white font-black text-4xl text-center mb-1 relative z-10 shadow-inner focus:outline-none focus:border-red-500 transition-colors" />
+                <input 
+                  type="number" 
+                  value={hpIncrease} 
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setHpIncrease(e.target.value)} 
+                  className="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-6 text-white font-black text-4xl text-center mb-1 relative z-10 shadow-inner focus:outline-none focus:border-red-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                />
               </div>
 
               {isASILevel && (
