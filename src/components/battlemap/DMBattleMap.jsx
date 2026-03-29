@@ -11,6 +11,14 @@ const LOCAL_MAPS = [
   { label: 'Screwbeard Cave', value: '/screwbeard_cave_enc.png' }
 ];
 
+// Helper to extract the quoted name (e.g. Edward "Strider" Tudul -> Strider)
+const getShortName = (fullName) => {
+  if (!fullName) return 'Unknown';
+  const match = fullName.match(/["']([^"']+)["']/);
+  if (match) return match[1];
+  return fullName.split(' ')[0];
+};
+
 export default function DMBattleMap() {
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
   const [tokens, setTokens] = useState({});
@@ -195,7 +203,7 @@ export default function DMBattleMap() {
     if (tokens[actor.id]) return; 
     const newToken = { 
       id: actor.id, 
-      name: actor.name || 'Unknown', 
+      name: getShortName(actor.name), 
       type: type, 
       img: actor.img || '', 
       speed: actor.speed || 30, 
@@ -220,10 +228,10 @@ export default function DMBattleMap() {
     let eX = 0;
     
     unstagedPlayers.forEach(p => {
-      updates[`tokens.${p.id}`] = { id: p.id, name: p.name || 'Unknown', type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
+      updates[`tokens.${p.id}`] = { id: p.id, name: getShortName(p.name), type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
     });
     unstagedEnemies.forEach(e => {
-      updates[`tokens.${e.id}`] = { id: e.id, name: e.name || 'Unknown', type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
+      updates[`tokens.${e.id}`] = { id: e.id, name: getShortName(e.name), type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
     });
     
     if (Object.keys(updates).length > 0) {
@@ -574,10 +582,10 @@ export default function DMBattleMap() {
           <div className="w-px h-5 bg-slate-700/50 mx-1"></div>
 
           {unstagedPlayers.map(p => (
-            <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs font-bold bg-indigo-900/30 border border-indigo-500/30 text-indigo-300 px-2.5 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">+ {(p.name || 'Unknown').split(' ')[0]}</button>
+            <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs font-bold bg-indigo-900/30 border border-indigo-500/30 text-indigo-300 px-2.5 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">+ {getShortName(p.name)}</button>
           ))}
           {unstagedEnemies.map(e => (
-            <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs font-bold bg-red-900/30 border border-red-500/30 text-red-300 px-2.5 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-sm">+ {(e.name || 'Unknown').substring(0,8)}</button>
+            <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs font-bold bg-red-900/30 border border-red-500/30 text-red-300 px-2.5 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-sm">+ {getShortName(e.name)}</button>
           ))}
         </div>
       )}

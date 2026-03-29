@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, Users, Calculator, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud, Hammer } from 'lucide-react';
+import { Skull, Users, Calculator, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud, Hammer, UserPlus } from 'lucide-react';
 
 import DMControlNav from './DMControlNav';
 import DMPlayerCard from './DMPlayerCard';
@@ -16,6 +16,7 @@ import DialogModal from './shared/DialogModal';
 import ApiBestiaryImport from './ApiBestiaryImport';
 import DebouncedTextarea from './shared/DebouncedTextarea';
 import EnemyForge from './EnemyForge';
+import DMCharacterBuilder from './DMCharacterBuilder';
 
 export default function DMDashboard({ onLogout }) {
   const [unlockedCharacters, setUnlockedCharacters] = useState([]);
@@ -29,6 +30,7 @@ export default function DMDashboard({ onLogout }) {
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [showBestiary, setShowBestiary] = useState(false); 
   const [isForgingEnemy, setIsForgingEnemy] = useState(false);
+  const [isBuildingCharacter, setIsBuildingCharacter] = useState(false);
   const [scratchpad, setScratchpad] = useState(() => localStorage.getItem('dm_scratchpad') || '');
 
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'confirm', onConfirm: null });
@@ -42,6 +44,9 @@ export default function DMDashboard({ onLogout }) {
 
   const [massMathAmount, setMassMathAmount] = useState('');
   const fileInputRef = useRef(null);
+
+  // Expose cache for character builder to access active session array
+  useEffect(() => { window.unlockedCharactersCache = unlockedCharacters; }, [unlockedCharacters]);
 
   let touchStartX = 0;
   const handleTouchStart = (e) => { touchStartX = e.touches[0].clientX; };
@@ -281,6 +286,10 @@ export default function DMDashboard({ onLogout }) {
         />
       )}
 
+      {isBuildingCharacter && (
+        <DMCharacterBuilder onClose={() => setIsBuildingCharacter(false)} />
+      )}
+
       {showScratchpad && (
         <div className="fixed bottom-6 right-6 w-80 h-80 bg-[#fdf6e3] rounded-xl shadow-2xl z-[9999] border border-amber-300/50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
           <div className="bg-amber-200/80 backdrop-blur-sm px-4 py-3 flex justify-between items-center border-b border-amber-300/50 shadow-sm cursor-default shrink-0">
@@ -344,9 +353,17 @@ export default function DMDashboard({ onLogout }) {
 
         <div className="relative">
           <div className="absolute inset-0 bg-indigo-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>
-          <h2 className="text-xl font-black text-white flex items-center gap-2 mb-4 border-b border-slate-700/50 pb-2 mt-4 uppercase tracking-widest drop-shadow-sm">
-            <Users className="w-5 h-5 text-indigo-400" /> Active Party
-          </h2>
+          <div className="flex justify-between items-center mb-4 border-b border-slate-700/50 pb-2 mt-4">
+            <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-sm">
+              <Users className="w-5 h-5 text-indigo-400" /> Active Party
+            </h2>
+            <button 
+              onClick={() => setIsBuildingCharacter(true)}
+              className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white px-3 py-1.5 rounded-lg text-[10px] uppercase font-black tracking-widest transition-colors flex items-center gap-1.5 border border-indigo-500/50 shadow-sm"
+            >
+              <UserPlus className="w-3.5 h-3.5" /> Create Character
+            </button>
+          </div>
           {unlockedCharacters.length === 0 ? (
             <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-700 border-dashed rounded-2xl p-8 text-center text-slate-500 shadow-inner">Waiting for players to connect...</div>
           ) : (

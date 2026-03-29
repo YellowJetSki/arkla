@@ -34,8 +34,9 @@ export const CONDITION_EFFECTS = {
 export const PREMADE_CHARACTERS = {
   'wendy': {
     name: 'Wendy Warmwind',
-    race: 'Rock Gnome',
-    class: 'Monk 1',
+    species: 'Rock Gnome',
+    theme: 'rose',
+    class: 'Monk',
     classes: [{ name: 'Monk', level: 1 }],
     level: 1,
     exp: 0,
@@ -46,14 +47,16 @@ export const PREMADE_CHARACTERS = {
     hitDice: { current: 1, max: 1, type: 'd8' },
     ac: 16,
     initiative: '--', 
-    spellSave: '--',
-    spellAttack: '--',
+    spellSave: '13',
+    spellAttack: '+5',
     combatInitiative: null,
     speed: 25,
     inspiration: false,
     isConcentrating: false,
     conditions: [],
-    hasSeenRules: false, 
+    hasCompletedTutorial: false, 
+    hasFetchedSpecies: false,
+    hasFetchedClass: false,
     journal: '',
     stats: { STR: 10, DEX: 17, CON: 16, INT: 15, WIS: 16, CHA: 11 },
     currency: { assarions: 5, quadrans: 10, leptons: 15 },
@@ -75,15 +78,9 @@ export const PREMADE_CHARACTERS = {
       languages: 'Common, Gnomish'
     },
     features: [
-      { name: 'Dark Secret (flaw)', desc: 'It was my watch when the Brevants attacked... I cost my fellow pupils their lives.' },
-      { name: 'Unarmored Defense', desc: 'AC equals 10 + DEX + WIS when not wearing armor or using a shield.' },
-      { name: 'Martial Arts', desc: 'Use DEX instead of STR for unarmed strikes/monk weapons. Roll d4 for unarmed damage. You can make an unarmed strike as a bonus action.' },
-      { name: 'Darkvision', desc: 'Dim light within 60ft = Bright light. Darkness = Dim light.' },
-      { name: 'Gnome Cunning', desc: 'Advantage on INT, WIS and CHA saving throws against magic.' },
-      { name: 'Tinkerer’s knowledge', desc: 'Add +4 to History checks around little gizmos and gadgets.' },
-      { name: 'Tinker', desc: 'Spend 1 hour and 5 Assarions to construct a Tiny device or item.' },
+      { name: 'Dark Secret (Flaw)', desc: 'It was my watch when the Brevants attacked... I cost my fellow pupils their lives.' },
       { name: 'Background: Fly on the Wall', desc: 'People gloss over your presence. Easily eavesdrop or observe details in crowds if quiet. You have advantage when doing so.' },
-      { name: 'Not so Brevar', desc: 'Wendy is Frightened when faced by Brevars or anything that reminds her of them. She hates bears.' }
+      { name: 'Not so Brevar (Trait)', desc: 'Wendy is Frightened when faced by Brevars or anything that reminds her of them. She hates bears.' }
     ],
     inventory: "• 1x Quarterstaff\n  A simple, sturdy wooden staff.\n• 10x Shurikens\n  Custom-made gear-shaped throwing stars.\n• 1x Bag of Caltrops\n  Self-made traps to slow enemies.\n• 1x Tinkerer’s Tools\n  Used to craft tiny clockwork devices.\n• 1x Worn Overalls & Gnome cap\n  Comfortable and unassuming.\n• 1x Faded Picture\n  A picture of mom, dad and uncle.\n• 1x Coastal Sketch\n  A drawing of a beautiful restaurant by the sea.\n• 1x Duku’s Belt\n  Monogrammed with a mysterious lizard symbol.\n• 1x Explorer’s pack\n  Contains a backpack, bedroll, mess kit, tinderbox, 10 torches, 10 days of rations, and a waterskin.",
     traits: {
@@ -97,8 +94,9 @@ export const PREMADE_CHARACTERS = {
   },
   'kehrfuffle': {
     name: 'Kehrfuffle Songroot',
-    race: 'Wood Elf',
-    class: 'Bard 1',
+    species: 'Wood Elf',
+    theme: 'amber',
+    class: 'Bard',
     classes: [{ name: 'Bard', level: 1 }],
     level: 1,
     exp: 0,
@@ -109,28 +107,22 @@ export const PREMADE_CHARACTERS = {
     hitDice: { current: 1, max: 1, type: 'd8' },
     ac: 14,
     initiative: '--', 
-    spellSave: '--', 
-    spellAttack: '--', 
+    spellSave: '13', 
+    spellAttack: '+5', 
     combatInitiative: null,
     speed: 35,
     inspiration: false,
     isConcentrating: false,
     conditions: [],
-    hasSeenRules: false, 
+    hasCompletedTutorial: false, 
+    hasFetchedSpecies: false,
+    hasFetchedClass: false,
     journal: '',
     stats: { STR: 10, DEX: 17, CON: 14, INT: 10, WIS: 16, CHA: 17 },
     currency: { assarions: 0, quadrans: 5, leptons: 10 },
     imageUrl: '', 
     deathSaves: { successes: 0, failures: 0 },
-    resources: [
-      { 
-        name: 'Bardic Inspiration', 
-        max: 3, 
-        current: 3, 
-        recharge: 'long', 
-        desc: 'Use a Bonus Action to give an ally within 60 ft a 1d6 to add to an attack roll, saving throw, or skill check. Regains all uses on a Long Rest.' 
-      }
-    ],    
+    resources: [],    
     spellSlots: {
       "1": { current: 2, max: 2 }
     },
@@ -184,13 +176,9 @@ export const PREMADE_CHARACTERS = {
       languages: 'Common, Elvish, Sylvan'
     },
     features: [
-      { name: 'Dark Secret (flaw)', desc: 'I traded the most charming thing about me to a dark stranger for musical fame. He took my wife Caroline and bound her soul to my accordion.' },
-      { name: 'Bardic Inspiration', desc: '(3 uses/day) Use a Bonus Action to play an inspiring chord. Give one friend within 60 feet a 1d6 to add to any one attack roll, saving throw, or skill check of their choice.' },
-      { name: 'Fey Ancestry', desc: 'You have advantage on saving throws against being magically charmed. Magic cannot put you to sleep.' },
-      { name: 'Darkvision', desc: 'Dim light within 60ft = Bright light. Darkness = Dim light.' },
-      { name: 'Trance', desc: 'You don\'t need to sleep. You meditate deeply for 4 hours to get the exact same benefits as an 8-hour human sleep.' },
-      { name: 'Haunted by your past', desc: 'Commoners will afford you every courtesy and do their utmost to help you.' },
-      { name: 'The Tiny Bear (dormant)', desc: 'An unusually tiny bear that refuses to leave your side.' },
+      { name: 'Dark Secret (Flaw)', desc: 'I traded the most charming thing about me to a dark stranger for musical fame. He took my wife Caroline and bound her soul to my accordion.' },
+      { name: 'Haunted by your past (Trait)', desc: 'Commoners will afford you every courtesy and do their utmost to help you.' },
+      { name: 'The Tiny Bear (Dormant)', desc: 'An unusually tiny bear that refuses to leave your side.' },
       { name: 'The Peg Leg', desc: 'Your leg was crushed in the Weeping Grove. You rely on your wooden peg leg to stand your ground.' }
     ],
     inventory: "• 1x The Cursed Accordion\n  A magical instrument. Caroline's soul is bound to the wood and bellows.\n• 1x Rusty Great Sickle\n  A heavy, intimidating farming implement repurposed for combat.\n• 1x Dagger\n  A simple, sharp blade.\n• 1x Leather Armor\n  Light and flexible defense.\n• 1x Wooden Peg Leg\n  Replaces the leg crushed in the Weeping Grove.\n• 1x The Tiny Bear\n  A strangely small, loyal companion.\n• 1x Entertainer’s Pack\n  Contains a backpack, a bedroll, 2 costumes, 5 candles, 5 days of rations, a waterskin, and a disguise kit.\n• 1x Locket\n  Contains a faded picture of Caroline.",
@@ -211,8 +199,9 @@ My search led me to the ancient druidic ruins of the Weeping Grove. The untended
   },
   'strider': {
     name: 'Edward "Strider" Tudul',
-    race: 'Human (Variant)',
-    class: 'Ranger 1',
+    species: 'Human',
+    theme: 'sky',
+    class: 'Ranger',
     classes: [{ name: 'Ranger', level: 1 }],
     level: 1,
     exp: 0,
@@ -223,22 +212,39 @@ My search led me to the ancient druidic ruins of the Weeping Grove. The untended
     hitDice: { current: 1, max: 1, type: 'd10' },
     ac: 15,
     initiative: '+3', 
-    spellSave: '--',
-    spellAttack: '--',
+    spellSave: '9',
+    spellAttack: '+1',
     combatInitiative: null,
     speed: 30,
     inspiration: false,
     isConcentrating: false,
     conditions: [],
-    hasSeenRules: false, 
+    hasCompletedTutorial: false, 
+    hasFetchedSpecies: false,
+    hasFetchedClass: false,
     journal: '',
     stats: { STR: 16, DEX: 16, CON: 14, INT: 10, WIS: 9, CHA: 12 },
     currency: { assarions: 45, quadrans: 20, leptons: 0 },
     imageUrl: '/strider_bm.png', 
     deathSaves: { successes: 0, failures: 0 },
     resources: [], 
-    spellSlots: {},
-    spells: [],
+    spellSlots: {
+      "1": { current: 2, max: 2 }
+    },
+    spells: [
+      { 
+        name: 'Hunter\'s Mark', 
+        level: 1, 
+        castTime: '1 Bonus Action', 
+        desc: 'Concentration, up to 1 hour. Choose a creature you can see within 90 feet. You deal an extra 1d6 damage to the target whenever you hit it with a weapon attack. If the target drops to 0 HP, you can use a bonus action on a subsequent turn to mark a new creature.' 
+      },
+      {
+        name: 'Cure Wounds',
+        level: 1,
+        castTime: '1 Action',
+        desc: 'A creature you touch regains a number of hit points equal to 1d8 + your spellcasting ability modifier (+1).'
+      }
+    ],
     dmNotes: '',
     attacks: [
       { name: 'Strider\'s Longsword', hit: '+5', damage: '1d10 + 3', type: 'Slashing', notes: '2-Handed' },
@@ -252,9 +258,7 @@ My search led me to the ancient druidic ruins of the Weeping Grove. The untended
       languages: 'Common, Elvish, Hisma'
     },
     features: [
-      { name: 'Feat: Actor', desc: 'Advantage on Deception and Performance checks when trying to pass yourself off as a different person. Can perfectly mimic speech and sounds.' },
-      { name: 'Favored Enemy: Beasts', desc: 'Advantage on Wisdom (Survival) checks to track beasts, as well as on Intelligence checks to recall information about them.' },
-      { name: 'Natural Explorer: Forest', desc: 'When you make an Intelligence or Wisdom check related to the forest, your proficiency bonus is doubled if you are using a skill that you\'re proficient in.' }
+      { name: 'Feat: Actor', desc: 'Advantage on Deception and Performance checks when trying to pass yourself off as a different person. Can perfectly mimic speech and sounds.' }
     ],
     inventory: "• 1x Custom-Distressed Studded Leather Armor\n  Looks battle-worn, but the stitching is flawless and very expensive.\n• 1x Strider's Longsword\n  Perfectly balanced. Hasn't seen much real combat.\n• 1x Masterwork Longbow\n  Carved from rare imported wood.\n• 20x Premium Arrows\n  Fletched with swan feathers.\n• 1x Tudul Family Signet Ring\n  Buried at the very bottom of the pack. He adamantly refuses to wear it.\n• 5x Truffle-Infused Trail Rations\n  Delicious, but terrible for actual wilderness survival.\n• 1x Woven Silk Bedroll\n  Extremely soft.\n• 1x Imported Mustache Wax & Silver Mirror\n  Gotta look the part.\n• 1x Leather-bound Bestiary\n  Heavily bookmarked at the 'Bears' section.",
     traits: {

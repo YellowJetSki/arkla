@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Skull, Maximize, Star, Heart, Shield, Tent, Moon, ArrowUpCircle } from 'lucide-react';
 
@@ -53,10 +53,8 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
       const charRef = doc(db, 'characters', charId);
       const mapRef = doc(db, 'campaign', 'battlemap');
       
-      // 1. Instant Optimistic Update
       updateDoc(charRef, updates).catch(console.error);
 
-      // 2. Safe Dot-Notation Map Sync
       getDoc(mapRef).then(mapDoc => {
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
            let mapUpdates = { [`tokens.${charId}.hp`]: boundedHp };
@@ -103,10 +101,8 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
       const charRef = doc(db, 'characters', charId);
       const mapRef = doc(db, 'campaign', 'battlemap');
       
-      // 1. Instant Optimistic Update
       updateDoc(charRef, updates).catch(console.error);
 
-      // 2. Safe Dot-Notation Map Sync
       getDoc(mapRef).then(mapDoc => {
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
            updateDoc(mapRef, { 
@@ -179,7 +175,7 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
               <button onClick={isDM ? toggleInspiration : undefined} className={`shrink-0 transition-all z-10 flex items-center justify-center ${isDM ? 'cursor-pointer hover:scale-110' : 'pointer-events-none'} ${char.inspiration ? 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,1)] scale-110' : (isDM ? 'text-slate-400 hover:text-yellow-400/50' : 'text-slate-600')}`}><Star className="w-5 h-5 md:w-6 md:h-6 fill-current pointer-events-none" /></button>
             </div>
           </div>
-          <p className={`${activeTheme.text} font-bold text-xs md:text-sm drop-shadow-md`}>Lvl {char.level} {char.race} {char.class.split(' ')[0]}</p>
+          <p className={`${activeTheme.text} font-bold text-xs md:text-sm drop-shadow-md`}>Lvl {char.level} {char.species} {char.class.split(' ')[0]}</p>
         </div>
       </div>
 

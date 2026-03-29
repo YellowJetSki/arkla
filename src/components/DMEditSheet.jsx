@@ -8,7 +8,7 @@ export default function DMEditSheet({ char, charId, onCancel }) {
   const [formData, setFormData] = useState({
     name: char.name,
     class: char.class,
-    race: char.race,
+    species: char.species || char.race,
     level: char.level,
     ac: char.ac,
     speed: char.speed,
@@ -46,7 +46,7 @@ export default function DMEditSheet({ char, charId, onCancel }) {
       let updates = {
         name: formData.name,
         class: formData.class,
-        race: formData.race,
+        species: formData.species,
         level: Number(formData.level),
         ac: Number(formData.ac),
         speed: newSpeed,
@@ -108,8 +108,8 @@ export default function DMEditSheet({ char, charId, onCancel }) {
             <input type="text" value={formData.class} onChange={e => handleChange('class', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500" />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Race</label>
-            <input type="text" value={formData.race} onChange={e => handleChange('race', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500" />
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Species</label>
+            <input type="text" value={formData.species} onChange={e => handleChange('species', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500" />
           </div>
         </div>
 
