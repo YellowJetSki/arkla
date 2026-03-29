@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, deleteDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
+import { doc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Shield, Heart, Skull, Trash2, Swords, Calculator, CheckSquare, Square, Plus } from 'lucide-react';
 import { CONDITIONS_LIST, PREMADE_ENEMIES } from '../data/campaignData';
@@ -18,7 +18,6 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
-  // --- TOKEN SYNC HOOKS FOR ENEMIES ---
   const updateHp = async (newHp) => {
     const boundedHp = Math.max(0, Math.min(newHp, fullEnemy.hp));
     try {
@@ -26,9 +25,12 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
         const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
         const mapRef = doc(db, 'campaign', 'battlemap');
         
+        // 1. ALL READS FIRST
+        const mapDoc = await transaction.get(mapRef);
+
+        // 2. ALL WRITES SECOND
         transaction.update(enemyRef, { currentHp: boundedHp });
         
-        const mapDoc = await transaction.get(mapRef);
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
           const mapTokens = mapDoc.data().tokens;
           mapTokens[fullEnemy.id].hp = boundedHp;
@@ -47,9 +49,12 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
         const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
         const mapRef = doc(db, 'campaign', 'battlemap');
         
+        // 1. ALL READS FIRST
+        const mapDoc = await transaction.get(mapRef);
+
+        // 2. ALL WRITES SECOND
         transaction.update(enemyRef, { currentHp: newHp });
         
-        const mapDoc = await transaction.get(mapRef);
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
           const mapTokens = mapDoc.data().tokens;
           mapTokens[fullEnemy.id].hp = newHp;
@@ -78,9 +83,10 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
         const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
         const mapRef = doc(db, 'campaign', 'battlemap');
         
+        const mapDoc = await transaction.get(mapRef);
+
         transaction.update(enemyRef, { conditions: arrayUnion(condition) });
         
-        const mapDoc = await transaction.get(mapRef);
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
           const mapTokens = mapDoc.data().tokens;
           const currentConds = mapTokens[fullEnemy.id].conditions || [];
@@ -102,9 +108,10 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
         const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
         const mapRef = doc(db, 'campaign', 'battlemap');
         
+        const mapDoc = await transaction.get(mapRef);
+
         transaction.update(enemyRef, { conditions: arrayRemove(condition) });
         
-        const mapDoc = await transaction.get(mapRef);
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
           const mapTokens = mapDoc.data().tokens;
           const currentConds = mapTokens[fullEnemy.id].conditions || [];
@@ -129,9 +136,10 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
             const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
             const mapRef = doc(db, 'campaign', 'battlemap');
             
+            const mapDoc = await transaction.get(mapRef);
+
             transaction.delete(enemyRef);
             
-            const mapDoc = await transaction.get(mapRef);
             if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
               const mapTokens = mapDoc.data().tokens;
               delete mapTokens[fullEnemy.id];
@@ -208,7 +216,7 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
                     <input 
                       type="number" 
                       value={isEditingHp ? displayHp : currentHp} 
-                      onFocus={() => { setDisplayHp(currentHp); setIsEditingHp(true); }}
+                      onFocus={(e) => { setDisplayHp(currentHp); setIsEditingHp(true); e.target.select(); }}
                       onChange={(e) => setDisplayHp(e.target.value)} 
                       onBlur={() => { setIsEditingHp(false); updateHp(Number(displayHp)); }}
                       onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
@@ -228,6 +236,7 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
                   type="number" 
                   value={mathInput}
                   onChange={(e) => setMathInput(e.target.value)}
+                  onFocus={(e) => e.target.select()}
                   placeholder="0"
                   className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-sm focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />

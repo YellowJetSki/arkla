@@ -67,7 +67,6 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
     }
   };
 
-  // Engine Integration: Calculate true speed based on active conditions
   const myToken = tokens[charId];
   const conditionMechanics = myToken ? getConditionMechanics(myToken.conditions || []) : null;
   let dynamicSpeed = myToken ? myToken.speed || 30 : 30;
@@ -144,8 +143,6 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
 
   const moveToken = async (newX, newY) => {
     try {
-      // Replaced standard updateDoc with a transaction to prevent race conditions 
-      // where the player moving overwrites a DM's simultaneous HP change
       await runTransaction(db, async (transaction) => {
         const mapRef = doc(db, 'campaign', 'battlemap');
         const mapDoc = await transaction.get(mapRef);
@@ -232,7 +229,8 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
             onTokenClick={handleTokenClick}
             selectedTokenId={charId}
             isDM={false} 
-            showMovementRangeFor={showRange ? tokens[charId] : null}
+            // The Fix: Pass the dynamically calculated speed down into the visual grid engine
+            showMovementRangeFor={showRange ? { ...tokens[charId], speed: dynamicSpeed } : null}
             onPing={handlePing}
           />
         )}

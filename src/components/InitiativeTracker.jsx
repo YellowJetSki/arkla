@@ -13,10 +13,15 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [newCustomName, setNewCustomName] = useState('');
   
-  // NEW: State to hold the live snapshot of the active player to track their conditions
   const [activePlayerSnap, setActivePlayerSnap] = useState(null);
 
   const missingIdsTracker = useRef(new Set());
+  // The Fix: Decoupling initiative from the dependency array using a ref to prevent infinite sync loops
+  const initiativeRef = useRef(initiative);
+
+  useEffect(() => {
+    initiativeRef.current = initiative;
+  }, [initiative]);
 
   useEffect(() => {
     const initRef = doc(db, 'campaign', 'initiative');
@@ -32,7 +37,6 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
     return () => unsub();
   }, []);
 
-  // NEW: Live listener for the active player's conditions
   useEffect(() => {
     const activeActor = initiative[activeTurn];
     if (activeActor && activeActor.type === 'player') {
@@ -50,7 +54,8 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
       if (!isLoaded) return; 
 
       try {
-        const currentIds = initiative.map(i => i.id);
+        const currentOrder = initiativeRef.current;
+        const currentIds = currentOrder.map(i => i.id);
         
         const safePlayers = (unlockedCharacters || [])
           .filter(id => id && typeof id === 'string' && !missingIdsTracker.current.has(id));
@@ -62,10 +67,10 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
         const targetIds = [...safePlayers, ...safeEnemies];
         
         const hasMissing = targetIds.some(id => !currentIds.includes(id));
-        const staleActors = initiative.filter(i => i.type !== 'custom' && !targetIds.includes(i.id));
+        const staleActors = currentOrder.filter(i => i.type !== 'custom' && !targetIds.includes(i.id));
 
         if (hasMissing || staleActors.length > 0) {
-          let newOrder = [...initiative];
+          let newOrder = [...currentOrder];
           
           newOrder = newOrder.filter(item => targetIds.includes(item.id) || item.type === 'custom');
 
@@ -104,7 +109,8 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
     if (isLoaded) {
       autoSync();
     }
-  }, [unlockedCharacters, activeEnemies, initiative, isLoaded]); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unlockedCharacters, activeEnemies, isLoaded]); // Removed `initiative` dependency!
 
   const saveInitiative = async (newOrder, newTurn, newRound) => {
     await setDoc(doc(db, 'campaign', 'initiative'), { order: newOrder, activeTurn: newTurn, round: newRound }, { merge: true });
@@ -127,7 +133,6 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
     saveInitiative(resetOrder, -1, 1);
   };
 
-  // NEW: Engine-powered Auto-Roll for NPCs
   const autoRollEnemies = () => {
     const newOrder = [...initiative];
     let changed = false;
@@ -214,7 +219,6 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
   const activeActorData = initiative[activeTurn];
   const activeEnemyData = activeActorData?.type === 'enemy' ? activeEnemies.find(e => e.id === activeActorData.id) : null;
   
-  // NEW: Dynamically pull conditions for BOTH players and enemies
   let activeConditions = [];
   if (activeActorData?.type === 'enemy' && activeEnemyData) activeConditions = activeEnemyData.conditions || [];
   if (activeActorData?.type === 'player' && activePlayerSnap) activeConditions = activePlayerSnap.conditions || [];
@@ -232,7 +236,6 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
         </div>
         <div className="flex flex-wrap gap-2 justify-start 2xl:justify-end w-full 2xl:w-auto">
           
-          {/* NEW: Auto-Roll Button */}
           <button onClick={autoRollEnemies} className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/50 p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5" title="Auto-Roll NPC Initiative">
             <Dices className="w-4 h-4 md:w-3 md:h-3" /> <span className="hidden md:inline">Roll NPCs</span>
           </button>
@@ -309,6 +312,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
                   <input 
                     type="number" 
                     value={actor.value} 
+                    onFocus={(e) => e.target.select()}
                     onChange={(e) => updateValue(idx, e.target.value)}
                     className="w-10 md:w-12 bg-slate-800 border border-slate-600 rounded px-1 py-1 text-center text-white text-xs md:text-sm font-black focus:outline-none focus:border-fuchsia-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />

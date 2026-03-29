@@ -85,7 +85,6 @@ export default function MapGrid({
   const [pingMenu, setPingMenu] = useState(null);
   const [dragMeasure, setDragMeasure] = useState(null);
   
-  // Panning & Pinching State
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
   const [initialPinchDist, setInitialPinchDist] = useState(null);
@@ -161,7 +160,6 @@ export default function MapGrid({
     setPingMenu(null);
   };
   
-  // Desktop Handlers for Pan Tool
   const handleMapMouseDown = (e) => {
     if (isDisplayMode || isDrawingMode || pingMenu) return;
     setIsPanning(true);
@@ -185,7 +183,6 @@ export default function MapGrid({
     setIsPanning(false);
   };
 
-  // Mobile Handlers for Touch Pan & Pinch to Zoom
   const getPinchDistance = (touches) => {
     const dx = touches[0].clientX - touches[1].clientX;
     const dy = touches[0].clientY - touches[1].clientY;
@@ -196,12 +193,10 @@ export default function MapGrid({
     if (isDisplayMode || pingMenu) return;
     
     if (e.touches.length === 2) {
-      // Begin Pinch Zoom
       setIsPanning(false);
       setInitialPinchDist(getPinchDistance(e.touches));
       setInitialPinchZoom(zoom);
     } else if (e.touches.length === 1 && !isDrawingMode) {
-      // Begin Touch Pan
       setIsPanning(true);
       setPanStart({
         x: e.touches[0].clientX,
@@ -216,7 +211,6 @@ export default function MapGrid({
     if (!scrollRef.current || isDisplayMode) return;
 
     if (e.touches.length === 2 && initialPinchDist) {
-      // Prevent browser from doing a native page zoom
       if (e.cancelable) e.preventDefault(); 
       
       const currentDist = getPinchDistance(e.touches);
@@ -253,7 +247,6 @@ export default function MapGrid({
     }
   };
 
-  // QoL: Group tokens by cell coordinates to prevent perfectly overlapping/hidden tokens
   const cellGroups = {};
   Object.values(tokens || {}).forEach(t => {
     if (t.isHidden && !isDM) return;
@@ -262,11 +255,10 @@ export default function MapGrid({
     cellGroups[key].push(t.id);
   });
 
-  // Determine cursor
   let mapCursorClass = 'cursor-auto';
   if (!isDisplayMode) {
      if (isDrawingMode) {
-       mapCursorClass = 'cursor-crosshair touch-none'; // Prevent touch scrolling while drawing
+       mapCursorClass = 'cursor-crosshair touch-none'; 
      } else {
        mapCursorClass = isPanning ? 'cursor-grabbing' : 'cursor-grab';
      }
@@ -344,6 +336,7 @@ export default function MapGrid({
               const tile = { x: i % cols, y: Math.floor(i / cols) };
               let tileClass = isDisplayMode ? '' : 'hover:bg-white/10'; 
 
+              // The Fix: Re-applying the premium gradient overlay for movement ranges 
               if (!isDisplayMode && showMovementRangeFor) {
                   const tSize = showMovementRangeFor.size || 1;
                   const dx = Math.max(0, tile.x - (showMovementRangeFor.x + tSize - 1), showMovementRangeFor.x - tile.x);
@@ -351,8 +344,11 @@ export default function MapGrid({
                   const dist = Math.max(dx, dy) * 5;
                   const speed = showMovementRangeFor.speed || 30;
 
-                  if (dist > 0 && dist <= speed) tileClass = 'bg-emerald-500/30 border border-emerald-400/50 hover:bg-emerald-400/50';
-                  else if (dist > speed && dist <= speed * 2) tileClass = 'bg-amber-500/30 border border-amber-400/50 hover:bg-amber-400/50';
+                  if (dist > 0 && dist <= speed) {
+                     tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.4),_transparent)] border border-emerald-400/30 hover:bg-emerald-400/50';
+                  } else if (dist > speed && dist <= speed * 2) {
+                     tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.4),_transparent)] border border-amber-400/30 hover:bg-amber-400/50';
+                  }
               }
 
               return (
@@ -360,11 +356,10 @@ export default function MapGrid({
                   key={`click-${tile.x},${tile.y}`}
                   onMouseDown={(e) => { 
                     if(isDisplayMode) { e.preventDefault(); return; } 
-                    // Let panning handle mousedown unless it's drawing mode
                     if(isDrawingMode) e.stopPropagation(); 
                   }}
                   onClick={(e) => { 
-                    if(isPanning) return; // Ignore click if we were just panning
+                    if(isPanning) return; 
                     if(!isDisplayMode && onTileClick) onTileClick(tile.x, tile.y); 
                   }}
                   onContextMenu={(e) => { e.stopPropagation(); handleContextMenuPing(e, tile.x, tile.y); }}
@@ -390,7 +385,6 @@ export default function MapGrid({
             })}
           </div>
 
-          {/* Drag-to-Measure Overlay */}
           {dragMeasure && dragMeasure.isMeasuring && !isDisplayMode && (
              <div className="absolute z-[80] pointer-events-none" style={{ left: dragMeasure.currentX * currentCellSize + currentCellSize/2, top: dragMeasure.currentY * currentCellSize - 30 }}>
                <div className={`px-2 py-1 rounded shadow-lg font-black text-xs whitespace-nowrap ${dragMeasure.distance > dragMeasure.speed ? 'bg-red-600 text-white' : 'bg-slate-800 text-emerald-400'}`}>
@@ -427,7 +421,6 @@ export default function MapGrid({
               const safeX = token.x || 0;
               const safeY = token.y || 0;
 
-              // QoL: Stacking Offset ensures tokens on the same tile remain slightly visible
               const group = cellGroups[`${safeX},${safeY}`]?.sort() || [];
               const stackIndex = group.indexOf(token.id);
               const offsetXY = stackIndex > 0 ? stackIndex * 6 : 0;

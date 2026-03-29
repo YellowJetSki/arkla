@@ -43,8 +43,6 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
   };
 
-  // --- TOKEN SYNC HOOK START ---
-  // Any manual typed input to HP syncs to the Battle Map Token
   const submitHpUpdate = async (newHpVal, newTempVal = null) => {
     const boundedHp = Math.max(0, Math.min(parseInt(newHpVal, 10) || 0, char.maxHp || 10));
     let updates = { hp: boundedHp };
@@ -55,14 +53,17 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
       updates['deathSaves.failures'] = 0;
     }
     
-    // 1. Update the character sheet
-    await updateDoc(doc(db, 'characters', charId), updates);
-
-    // 2. Sync to the Battle Map if they are staged
     try {
       await runTransaction(db, async (transaction) => {
         const mapRef = doc(db, 'campaign', 'battlemap');
+        const charRef = doc(db, 'characters', charId);
+        
+        // 1. ALL READS FIRST
         const mapDoc = await transaction.get(mapRef);
+        
+        // 2. ALL WRITES SECOND
+        transaction.update(charRef, updates);
+        
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
            const mapTokens = mapDoc.data().tokens;
            mapTokens[charId].hp = boundedHp;
@@ -71,16 +72,14 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
         }
       });
     } catch (err) {
-       console.log("Could not sync HP to map (token probably not staged).");
+       console.log("HP Sync Failed", err);
     }
   };
 
-  // The Plus/Minus buttons sync to the Battle Map Token
   const adjustHp = async (amount) => {
     const charRef = doc(db, 'characters', charId);
     const mapRef = doc(db, 'campaign', 'battlemap');
     
-    // QoL: The Concentration Safety Net
     if (amount < 0 && char.isConcentrating) {
       const damageTaken = Math.abs(amount);
       const dc = Math.max(10, Math.floor(damageTaken / 2));
@@ -89,9 +88,12 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
 
     try {
       await runTransaction(db, async (transaction) => {
+        // 1. ALL READS FIRST
         const sfDoc = await transaction.get(charRef);
         if (!sfDoc.exists()) return;
+        const mapDoc = await transaction.get(mapRef);
         
+        // 2. LOGIC
         const data = sfDoc.data();
         let currentHp = data.hp || 0;
         let currentTemp = data.tempHp || 0;
@@ -116,11 +118,9 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
           updates['deathSaves.failures'] = 0;
         }
         
-        // 1. Update Character
+        // 3. ALL WRITES SECOND
         transaction.update(charRef, updates);
 
-        // 2. Sync to Battle Map
-        const mapDoc = await transaction.get(mapRef);
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
            const mapTokens = mapDoc.data().tokens;
            mapTokens[charId].hp = currentHp;
@@ -132,7 +132,6 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
       console.error("HP Transaction Failed:", err);
     }
   };
-  // --- TOKEN SYNC HOOK END ---
 
   const handleSpendHitDie = async () => {
     const currentHD = char.hitDice?.current ?? char.level;
@@ -231,16 +230,40 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
                   <Heart className={`w-4 h-4 ${isPoisoned ? 'text-lime-400' : 'text-emerald-400'}`} />
                   <div className="flex items-center gap-1 bg-blue-900/40 border border-blue-500/40 px-1.5 py-0.5 rounded ml-1 shadow-sm">
                     <Shield className="w-3 h-3 text-blue-400" />
-                    <input type="number" value={isEditingTempHp ? displayTempHp : (char.tempHp || 0)} onFocus={() => { setDisplayTempHp(char.tempHp || 0); setIsEditingTempHp(true); }} onChange={(e) => setDisplayTempHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingTempHp(false); submitHpUpdate(char.hp, e.target.value); }} className="w-6 bg-transparent focus:outline-none text-center font-black text-blue-100 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                    <input 
+                      type="number" 
+                      value={isEditingTempHp ? displayTempHp : (char.tempHp || 0)} 
+                      onFocus={(e) => { setDisplayTempHp(char.tempHp || 0); setIsEditingTempHp(true); e.target.select(); }} 
+                      onChange={(e) => setDisplayTempHp(e.target.value)} 
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} 
+                      onBlur={(e) => { setIsEditingTempHp(false); submitHpUpdate(char.hp, e.target.value); }} 
+                      className="w-6 bg-transparent focus:outline-none text-center font-black text-blue-100 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                    />
                   </div>
                 </div>
 
                 <div className="relative z-20 flex items-center gap-1 pr-1">
                   <button onClick={() => adjustHp(-1)} className="w-8 h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-lg flex items-center justify-center border border-slate-600 cursor-pointer">-</button>
                   <div className="flex items-center gap-1 text-white bg-slate-800/50 border border-slate-600 rounded px-2 py-1">
-                    <input type="number" value={isEditingHp ? displayHp : (char.hp ?? 0)} onFocus={() => { setDisplayHp(char.hp ?? 0); setIsEditingHp(true); }} onChange={(e) => setDisplayHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingHp(false); submitHpUpdate(e.target.value, char.tempHp); }} className={`w-8 bg-transparent focus:outline-none text-center font-black text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingHp ? activeTheme.text : ''}`} />
+                    <input 
+                      type="number" 
+                      value={isEditingHp ? displayHp : (char.hp ?? 0)} 
+                      onFocus={(e) => { setDisplayHp(char.hp ?? 0); setIsEditingHp(true); e.target.select(); }} 
+                      onChange={(e) => setDisplayHp(e.target.value)} 
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} 
+                      onBlur={(e) => { setIsEditingHp(false); submitHpUpdate(e.target.value, char.tempHp); }} 
+                      className={`w-8 bg-transparent focus:outline-none text-center font-black text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingHp ? activeTheme.text : ''}`} 
+                    />
                     <span className="text-slate-500 font-black text-sm">/</span>
-                    <input type="number" value={isEditingMaxHp ? displayMaxHp : (char.maxHp || 10)} onFocus={() => { setDisplayMaxHp(char.maxHp || 10); setIsEditingMaxHp(true); }} onChange={(e) => setDisplayMaxHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingMaxHp(false); const parsedMax = parseInt(e.target.value, 10); updateField('maxHp', isNaN(parsedMax) ? (char.maxHp || 10) : parsedMax); }} className={`w-8 bg-transparent focus:outline-none text-center text-slate-400 text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingMaxHp ? activeTheme.text : ''}`} />
+                    <input 
+                      type="number" 
+                      value={isEditingMaxHp ? displayMaxHp : (char.maxHp || 10)} 
+                      onFocus={(e) => { setDisplayMaxHp(char.maxHp || 10); setIsEditingMaxHp(true); e.target.select(); }} 
+                      onChange={(e) => setDisplayMaxHp(e.target.value)} 
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} 
+                      onBlur={(e) => { setIsEditingMaxHp(false); const parsedMax = parseInt(e.target.value, 10); updateField('maxHp', isNaN(parsedMax) ? (char.maxHp || 10) : parsedMax); }} 
+                      className={`w-8 bg-transparent focus:outline-none text-center text-slate-400 text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingMaxHp ? activeTheme.text : ''}`} 
+                    />
                   </div>
                   <button onClick={() => adjustHp(1)} className="w-8 h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-lg flex items-center justify-center border border-slate-600 cursor-pointer">+</button>
                 </div>
@@ -279,7 +302,7 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
               <input 
                 type="number" 
                 value={isEditingXp ? displayXp : currentXp} 
-                onFocus={() => { setDisplayXp(currentXp); setIsEditingXp(true); }}
+                onFocus={(e) => { setDisplayXp(currentXp); setIsEditingXp(true); e.target.select(); }}
                 onChange={(e) => setDisplayXp(e.target.value)} 
                 onBlur={() => { setIsEditingXp(false); updateField('exp', Number(displayXp)); }}
                 onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
