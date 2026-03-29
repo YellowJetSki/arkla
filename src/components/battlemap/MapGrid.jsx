@@ -90,11 +90,18 @@ export default function MapGrid({
   const [initialPinchDist, setInitialPinchDist] = useState(null);
   const [initialPinchZoom, setInitialPinchZoom] = useState(null);
 
-  const [now, setNow] = useState(Date.now());
+  // The Fix: Replaced the global setInterval with a targeted activePing state
+  const [activePing, setActivePing] = useState(null);
+
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (mapData?.ping) {
+      setActivePing(mapData.ping);
+      const timer = setTimeout(() => {
+        setActivePing(null);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [mapData?.ping]);
 
   const centerOnMap = () => {
     if (scrollRef.current) {
@@ -322,10 +329,10 @@ export default function MapGrid({
 
           <MapDrawings drawings={mapData?.drawings || []} isDrawingMode={isDrawingMode && !isDisplayMode} drawingShape={drawingShape} onDrawEnd={onDrawEnd} currentCellSize={currentCellSize} cols={cols} rows={rows} drawingColor={drawingColor} />
 
-          {mapData?.ping && (now - mapData.ping.timestamp < 3500) && (
-            <div className="absolute z-50 pointer-events-none" style={{ width: currentCellSize, height: currentCellSize, transform: `translate(${mapData.ping.x * currentCellSize}px, ${mapData.ping.y * currentCellSize}px)` }}>
-              <div className={`absolute inset-0 rounded-full border-[4px] animate-ping opacity-75 ${getPingColor(mapData.ping.type).split(' ')[1]}`}></div>
-              <div className={`absolute inset-0 rounded-full border-[2px] flex items-center justify-center ${getPingColor(mapData.ping.type)}`}>
+          {activePing && (
+            <div className="absolute z-50 pointer-events-none" style={{ width: currentCellSize, height: currentCellSize, transform: `translate(${activePing.x * currentCellSize}px, ${activePing.y * currentCellSize}px)` }}>
+              <div className={`absolute inset-0 rounded-full border-[4px] animate-ping opacity-75 ${getPingColor(activePing.type).split(' ')[1]}`}></div>
+              <div className={`absolute inset-0 rounded-full border-[2px] flex items-center justify-center ${getPingColor(activePing.type)}`}>
                 <Target className="w-1/2 h-1/2 drop-shadow-md animate-pulse" />
               </div>
             </div>
@@ -336,7 +343,6 @@ export default function MapGrid({
               const tile = { x: i % cols, y: Math.floor(i / cols) };
               let tileClass = isDisplayMode ? '' : 'hover:bg-white/10'; 
 
-              // The Fix: Re-applying the premium gradient overlay for movement ranges 
               if (!isDisplayMode && showMovementRangeFor) {
                   const tSize = showMovementRangeFor.size || 1;
                   const dx = Math.max(0, tile.x - (showMovementRangeFor.x + tSize - 1), showMovementRangeFor.x - tile.x);

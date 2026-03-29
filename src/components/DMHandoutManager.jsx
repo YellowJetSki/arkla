@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Image as ImageIcon, X, Send, Trash2, Eye, AlertTriangle } from 'lucide-react';
+import { Image as ImageIcon, X, Send, Trash2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import ImageSelector from './shared/ImageSelector';
 
 export default function DMHandoutManager({ onClose }) {
   const [handouts, setHandouts] = useState([]);
+  const [currentDisplayId, setCurrentDisplayId] = useState(null);
   const [newHandout, setNewHandout] = useState({ name: '', url: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -13,7 +14,9 @@ export default function DMHandoutManager({ onClose }) {
     const lootRef = doc(db, 'campaign', 'shared_loot');
     const unsub = onSnapshot(lootRef, (docSnap) => {
       if (docSnap.exists()) {
-        setHandouts(docSnap.data().items || []);
+        const data = docSnap.data();
+        setHandouts(data.items || []);
+        setCurrentDisplayId(data.displayHandoutId !== undefined ? data.displayHandoutId : data.latestShareId);
       }
     });
     return () => unsub();
@@ -35,7 +38,8 @@ export default function DMHandoutManager({ onClose }) {
       
       await setDoc(lootRef, {
         items: [newItem, ...handouts],
-        latestShareId: newItem.id
+        latestShareId: newItem.id,
+        displayHandoutId: newItem.id
       }, { merge: true });
 
       setNewHandout({ name: '', url: '' });
@@ -47,12 +51,23 @@ export default function DMHandoutManager({ onClose }) {
 
   const handleRebroadcast = async (item) => {
     try {
+      const newId = `${item.id}_${Date.now()}`;
       const lootRef = doc(db, 'campaign', 'shared_loot');
       await updateDoc(lootRef, { 
-        latestShareId: `${item.id}_${Date.now()}` 
+        latestShareId: newId,
+        displayHandoutId: newId
       });
     } catch (error) {
       console.error("Error rebroadcasting handout:", error);
+    }
+  };
+
+  const handleHideFromDisplay = async () => {
+    try {
+      const lootRef = doc(db, 'campaign', 'shared_loot');
+      await updateDoc(lootRef, { displayHandoutId: null });
+    } catch (error) {
+      console.error("Error hiding handout:", error);
     }
   };
 
@@ -61,7 +76,14 @@ export default function DMHandoutManager({ onClose }) {
       try {
         const lootRef = doc(db, 'campaign', 'shared_loot');
         const updatedItems = handouts.filter(item => item.id !== id);
-        await updateDoc(lootRef, { items: updatedItems });
+        
+        // If we are revoking the currently displayed item, clear the TV as well
+        const updates = { items: updatedItems };
+        if (currentDisplayId && currentDisplayId.startsWith(id)) {
+          updates.displayHandoutId = null;
+        }
+
+        await updateDoc(lootRef, updates);
       } catch (error) {
         console.error("Error revoking handout:", error);
       }
@@ -145,7 +167,7 @@ export default function DMHandoutManager({ onClose }) {
             <div className="bg-indigo-900/20 border border-indigo-500/30 p-4 rounded-xl flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" />
               <p className="text-xs text-indigo-200/80 leading-relaxed">
-                When you click broadcast, the image will forcefully open on every player's device. Once they close it, it remains accessible in their "Party Loot" tab until you revoke it.
+                When you click broadcast, the image will forcefully open on every player's device and stay on the TV Display until you choose to hide it. Players can dismiss it on their own devices, but it remains accessible in their "Party Loot" tab until you revoke it.
               </p>
             </div>
           </div>
@@ -159,32 +181,46 @@ export default function DMHandoutManager({ onClose }) {
               <p className="text-sm text-slate-500 italic bg-slate-800 p-4 rounded-xl border border-slate-700">No images are currently shared with the party.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
-                {handouts.filter(i => i.url).map((item) => (
-                  <div key={item.id} className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-lg group relative flex flex-col">
-                    <div className="h-32 w-full overflow-hidden bg-slate-950 relative">
-                      <img src={item.url} alt={item.name} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    <div className="p-3 bg-slate-800 flex justify-between items-center mt-auto">
-                      <h4 className="font-bold text-white text-sm truncate mr-2">{item.name}</h4>
-                      <div className="flex gap-1 shrink-0">
-                        <button 
-                          onClick={() => handleRebroadcast(item)} 
-                          className="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white px-2 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1"
-                          title="Force this image to pop up on all screens again"
-                        >
-                          <Eye className="w-3 h-3" />
-                        </button>
-                        <button 
-                          onClick={() => handleRevoke(item.id)} 
-                          className="text-slate-500 hover:text-red-400 bg-slate-900 p-1.5 rounded transition-colors"
-                          title="Revoke Image"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                {handouts.filter(i => i.url).map((item) => {
+                  const isCurrentlyDisplayed = currentDisplayId && currentDisplayId.startsWith(item.id);
+
+                  return (
+                    <div key={item.id} className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-lg group relative flex flex-col">
+                      <div className="h-32 w-full overflow-hidden bg-slate-950 relative">
+                        <img src={item.url} alt={item.name} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="p-3 bg-slate-800 flex justify-between items-center mt-auto gap-2">
+                        <h4 className="font-bold text-white text-sm truncate flex-1">{item.name}</h4>
+                        <div className="flex gap-1 shrink-0">
+                          {isCurrentlyDisplayed ? (
+                            <button 
+                              onClick={handleHideFromDisplay} 
+                              className="bg-amber-500 hover:bg-amber-400 text-amber-950 px-2 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1 shadow-md"
+                              title="Hide from Display/TV"
+                            >
+                              <EyeOff className="w-3 h-3" /> <span className="hidden sm:inline">Hide</span>
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handleRebroadcast(item)} 
+                              className="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white px-2 py-1.5 rounded text-xs font-bold transition-colors flex items-center gap-1"
+                              title="Force this image to pop up on all screens again"
+                            >
+                              <Eye className="w-3 h-3" /> <span className="hidden sm:inline">Show</span>
+                            </button>
+                          )}
+                          <button 
+                            onClick={() => handleRevoke(item.id)} 
+                            className="text-slate-500 hover:text-red-400 bg-slate-900 p-1.5 rounded transition-colors ml-1"
+                            title="Revoke Image"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

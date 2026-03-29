@@ -7,8 +7,6 @@ import MapGrid from './MapGrid';
 export default function BattleMapDisplay({ onLogout }) {
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null });
   const [tokens, setTokens] = useState({});
-  
-  // NEW: Handout State
   const [activeHandout, setActiveHandout] = useState(null);
 
   useEffect(() => {
@@ -29,35 +27,30 @@ export default function BattleMapDisplay({ onLogout }) {
     return () => unsub();
   }, []);
 
-  // NEW: Listen for Handout Pushes
+  // Listen for Handout Pushes
   useEffect(() => {
     const lootRef = doc(db, 'campaign', 'shared_loot');
     const unsub = onSnapshot(lootRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        if (data.latestShareId && data.items) {
-          // Find the item being shared (works even if DM rebroadcasts with a timestamp appended)
-          const baseItem = data.items.find(i => data.latestShareId.startsWith(i.id));
-          
-          // Only take over the screen if it's a visual handout with a URL
+        
+        // Prioritize the dedicated TV display ID, fallback to latestShareId for backward compatibility
+        const targetId = data.displayHandoutId !== undefined ? data.displayHandoutId : data.latestShareId;
+        
+        if (targetId && data.items) {
+          const baseItem = data.items.find(i => targetId.startsWith(i.id));
           if (baseItem && baseItem.url) {
             setActiveHandout(baseItem);
+          } else {
+            setActiveHandout(null);
           }
+        } else {
+          setActiveHandout(null);
         }
       }
     });
     return () => unsub();
   }, []);
-
-  // NEW: 10-Second Auto-Dismiss Timer for the TV Display
-  useEffect(() => {
-    if (activeHandout) {
-      const timer = setTimeout(() => {
-        setActiveHandout(null);
-      }, 10000); // 10 seconds
-      return () => clearTimeout(timer);
-    }
-  }, [activeHandout]);
 
   if (!mapData.isPublished && !activeHandout) {
     return (
