@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Skull, Maximize, Star, Heart, Shield, Tent, Moon, ArrowUpCircle } from 'lucide-react';
 
@@ -50,20 +50,20 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
     
     try {
-      const batch = writeBatch(db);
       const charRef = doc(db, 'characters', charId);
-      batch.update(charRef, updates);
-
       const mapRef = doc(db, 'campaign', 'battlemap');
-      const mapDoc = await getDoc(mapRef);
-      if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-         const mapTokens = mapDoc.data().tokens;
-         mapTokens[charId].hp = boundedHp;
-         if (newTempVal !== null) mapTokens[charId].tempHp = updates.tempHp;
-         batch.update(mapRef, { tokens: mapTokens });
-      }
       
-      await batch.commit();
+      // 1. Instant Optimistic Update
+      updateDoc(charRef, updates).catch(console.error);
+
+      // 2. Safe Dot-Notation Map Sync
+      getDoc(mapRef).then(mapDoc => {
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+           let mapUpdates = { [`tokens.${charId}.hp`]: boundedHp };
+           if (newTempVal !== null) mapUpdates[`tokens.${charId}.tempHp`] = updates.tempHp;
+           updateDoc(mapRef, mapUpdates).catch(console.error);
+        }
+      });
     } catch (err) {
        console.log("Could not sync HP.", err);
     }
@@ -100,20 +100,21 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
     
     try {
-      const batch = writeBatch(db);
       const charRef = doc(db, 'characters', charId);
-      batch.update(charRef, updates);
-
       const mapRef = doc(db, 'campaign', 'battlemap');
-      const mapDoc = await getDoc(mapRef);
-      if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-         const mapTokens = mapDoc.data().tokens;
-         mapTokens[charId].hp = currentHp;
-         mapTokens[charId].tempHp = currentTemp;
-         batch.update(mapRef, { tokens: mapTokens });
-      }
       
-      await batch.commit();
+      // 1. Instant Optimistic Update
+      updateDoc(charRef, updates).catch(console.error);
+
+      // 2. Safe Dot-Notation Map Sync
+      getDoc(mapRef).then(mapDoc => {
+        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+           updateDoc(mapRef, { 
+             [`tokens.${charId}.hp`]: currentHp,
+             [`tokens.${charId}.tempHp`]: currentTemp
+           }).catch(console.error);
+        }
+      });
     } catch (err) {
       console.error("HP Update Failed:", err);
     }

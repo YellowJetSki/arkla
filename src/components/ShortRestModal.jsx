@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, runTransaction } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Tent, X, Heart, ShieldPlus, CheckCircle2, Dices, Info, Sparkles, Flame } from 'lucide-react';
 
@@ -27,37 +27,34 @@ export default function ShortRestModal({ char, charId, onClose }) {
     const boundedSpent = Math.max(0, Math.min(safeSpent, currentDice));
     
     try {
-      await runTransaction(db, async (transaction) => {
-        const charRef = doc(db, 'characters', charId);
-        const mapRef = doc(db, 'campaign', 'battlemap');
+      const charRef = doc(db, 'characters', charId);
+      const mapRef = doc(db, 'campaign', 'battlemap');
 
-        const updates = {
-          hp: previewHp,
-          'hitDice.current': currentDice - boundedSpent,
-        };
+      const updates = {
+        hp: previewHp,
+        'hitDice.current': currentDice - boundedSpent,
+      };
 
-        if (previewHp > 0 && currentHp === 0) {
-          updates['deathSaves.successes'] = 0;
-          updates['deathSaves.failures'] = 0;
-        }
+      if (previewHp > 0 && currentHp === 0) {
+        updates['deathSaves.successes'] = 0;
+        updates['deathSaves.failures'] = 0;
+      }
 
-        if (shortRestResources.length > 0) {
-          const updatedResources = char.resources.map(res => {
-            if (shortRestResources.some(sr => sr.name === res.name)) {
-              return { ...res, current: res.max };
-            }
-            return res;
-          });
-          updates.resources = updatedResources;
-        }
+      if (shortRestResources.length > 0) {
+        const updatedResources = char.resources.map(res => {
+          if (shortRestResources.some(sr => sr.name === res.name)) {
+            return { ...res, current: res.max };
+          }
+          return res;
+        });
+        updates.resources = updatedResources;
+      }
 
-        transaction.update(charRef, updates);
+      updateDoc(charRef, updates).catch(console.error);
 
-        const mapDoc = await transaction.get(mapRef);
+      getDoc(mapRef).then(mapDoc => {
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-          const mapTokens = mapDoc.data().tokens;
-          mapTokens[charId].hp = previewHp;
-          transaction.update(mapRef, { tokens: mapTokens });
+          updateDoc(mapRef, { [`tokens.${charId}.hp`]: previewHp }).catch(console.error);
         }
       });
       

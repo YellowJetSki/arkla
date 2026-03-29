@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, runTransaction } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Save, X, AlertTriangle } from 'lucide-react';
 import { calculateSpellcastingStats } from '../services/arklaEngine';
@@ -34,50 +34,47 @@ export default function DMEditSheet({ char, charId, onCancel }) {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await runTransaction(db, async (transaction) => {
-        const charRef = doc(db, 'characters', charId);
-        const mapRef = doc(db, 'campaign', 'battlemap');
+      const charRef = doc(db, 'characters', charId);
+      const mapRef = doc(db, 'campaign', 'battlemap');
 
-        const newMaxHp = Number(formData.maxHp);
-        const newSpeed = Number(formData.speed);
+      const newMaxHp = Number(formData.maxHp);
+      const newSpeed = Number(formData.speed);
 
-        // Optional recalculation of casting stats in case ability scores changed
-        const classesToPass = char.classes || [{ name: formData.class, level: Number(formData.level) }];
-        const spellStats = calculateSpellcastingStats(classesToPass, formData.stats);
+      const classesToPass = char.classes || [{ name: formData.class, level: Number(formData.level) }];
+      const spellStats = calculateSpellcastingStats(classesToPass, formData.stats);
 
-        let updates = {
-          name: formData.name,
-          class: formData.class,
-          race: formData.race,
-          level: Number(formData.level),
-          ac: Number(formData.ac),
-          speed: newSpeed,
-          initiative: char.initiative === '--' ? '--' : Number(formData.initiative),
-          maxHp: newMaxHp,
-          stats: formData.stats
-        };
+      let updates = {
+        name: formData.name,
+        class: formData.class,
+        race: formData.race,
+        level: Number(formData.level),
+        ac: Number(formData.ac),
+        speed: newSpeed,
+        initiative: char.initiative === '--' ? '--' : Number(formData.initiative),
+        maxHp: newMaxHp,
+        stats: formData.stats
+      };
 
-        if (spellStats.spellSave !== '--') {
-          updates.spellSave = spellStats.spellSave;
-          updates.spellAttack = spellStats.spellAttack;
-        }
+      if (spellStats.spellSave !== '--') {
+        updates.spellSave = spellStats.spellSave;
+        updates.spellAttack = spellStats.spellAttack;
+      }
 
-        // 1. Update Character Sheet
-        transaction.update(charRef, updates);
+      updateDoc(charRef, updates).catch(console.error);
 
-        // 2. Sync to Battle Map Token
-        const mapDoc = await transaction.get(mapRef);
+      getDoc(mapRef).then(mapDoc => {
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-          const mapTokens = mapDoc.data().tokens;
-          mapTokens[charId].maxHp = newMaxHp;
-          mapTokens[charId].speed = newSpeed;
-          // Bound current HP if the DM lowered the Max HP below current
-          if (mapTokens[charId].hp > newMaxHp) {
-             mapTokens[charId].hp = newMaxHp;
+          let mapUpdates = {
+            [`tokens.${charId}.maxHp`]: newMaxHp,
+            [`tokens.${charId}.speed`]: newSpeed
+          };
+          if (mapDoc.data().tokens[charId].hp > newMaxHp) {
+             mapUpdates[`tokens.${charId}.hp`] = newMaxHp;
           }
-          transaction.update(mapRef, { tokens: mapTokens });
+          updateDoc(mapRef, mapUpdates).catch(console.error);
         }
       });
+      
       onCancel(); 
     } catch (error) {
       console.error("Error saving character:", error);

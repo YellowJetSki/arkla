@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
+import { doc, arrayUnion, arrayRemove, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Shield, Heart, Skull, Trash2, Swords, Calculator, CheckSquare, Square, Plus } from 'lucide-react';
 import { CONDITIONS_LIST, PREMADE_ENEMIES } from '../data/campaignData';
@@ -20,21 +20,15 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
 
   const updateHp = async (newHp) => {
     const boundedHp = Math.max(0, Math.min(newHp, fullEnemy.hp));
-    try {
-      await runTransaction(db, async (transaction) => {
-        const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
-        const mapRef = doc(db, 'campaign', 'battlemap');
-        
-        // 1. ALL READS FIRST
-        const mapDoc = await transaction.get(mapRef);
+    const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+    const mapRef = doc(db, 'campaign', 'battlemap');
 
-        // 2. ALL WRITES SECOND
-        transaction.update(enemyRef, { currentHp: boundedHp });
-        
+    try {
+      updateDoc(enemyRef, { currentHp: boundedHp }).catch(console.error);
+      
+      getDoc(mapRef).then(mapDoc => {
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
-          const mapTokens = mapDoc.data().tokens;
-          mapTokens[fullEnemy.id].hp = boundedHp;
-          transaction.update(mapRef, { tokens: mapTokens });
+          updateDoc(mapRef, { [`tokens.${fullEnemy.id}.hp`]: boundedHp }).catch(console.error);
         }
       });
     } catch (err) {
@@ -44,21 +38,15 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
 
   const adjustHp = async (amount) => {
     const newHp = Math.max(0, Math.min((fullEnemy.currentHp ?? fullEnemy.hp) + amount, fullEnemy.hp));
-    try {
-      await runTransaction(db, async (transaction) => {
-        const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
-        const mapRef = doc(db, 'campaign', 'battlemap');
-        
-        // 1. ALL READS FIRST
-        const mapDoc = await transaction.get(mapRef);
+    const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+    const mapRef = doc(db, 'campaign', 'battlemap');
 
-        // 2. ALL WRITES SECOND
-        transaction.update(enemyRef, { currentHp: newHp });
-        
+    try {
+      updateDoc(enemyRef, { currentHp: newHp }).catch(console.error);
+      
+      getDoc(mapRef).then(mapDoc => {
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
-          const mapTokens = mapDoc.data().tokens;
-          mapTokens[fullEnemy.id].hp = newHp;
-          transaction.update(mapRef, { tokens: mapTokens });
+          updateDoc(mapRef, { [`tokens.${fullEnemy.id}.hp`]: newHp }).catch(console.error);
         }
       });
     } catch (err) {
@@ -78,21 +66,17 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
 
   const handleAddCondition = async (condition) => {
     if (!condition) return;
+    const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+    const mapRef = doc(db, 'campaign', 'battlemap');
+    
     try {
-      await runTransaction(db, async (transaction) => {
-        const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
-        const mapRef = doc(db, 'campaign', 'battlemap');
-        
-        const mapDoc = await transaction.get(mapRef);
-
-        transaction.update(enemyRef, { conditions: arrayUnion(condition) });
-        
+      updateDoc(enemyRef, { conditions: arrayUnion(condition) }).catch(console.error);
+      
+      getDoc(mapRef).then(mapDoc => {
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
-          const mapTokens = mapDoc.data().tokens;
-          const currentConds = mapTokens[fullEnemy.id].conditions || [];
+          const currentConds = mapDoc.data().tokens[fullEnemy.id].conditions || [];
           if (!currentConds.includes(condition)) {
-            mapTokens[fullEnemy.id].conditions = [...currentConds, condition];
-            transaction.update(mapRef, { tokens: mapTokens });
+            updateDoc(mapRef, { [`tokens.${fullEnemy.id}.conditions`]: [...currentConds, condition] }).catch(console.error);
           }
         }
       });
@@ -103,20 +87,17 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
   };
 
   const handleRemoveCondition = async (condition) => {
-    try {
-      await runTransaction(db, async (transaction) => {
-        const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
-        const mapRef = doc(db, 'campaign', 'battlemap');
-        
-        const mapDoc = await transaction.get(mapRef);
+    const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+    const mapRef = doc(db, 'campaign', 'battlemap');
 
-        transaction.update(enemyRef, { conditions: arrayRemove(condition) });
-        
+    try {
+      updateDoc(enemyRef, { conditions: arrayRemove(condition) }).catch(console.error);
+      
+      getDoc(mapRef).then(mapDoc => {
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
-          const mapTokens = mapDoc.data().tokens;
-          const currentConds = mapTokens[fullEnemy.id].conditions || [];
-          mapTokens[fullEnemy.id].conditions = currentConds.filter(c => c !== condition);
-          transaction.update(mapRef, { tokens: mapTokens });
+          const currentConds = mapDoc.data().tokens[fullEnemy.id].conditions || [];
+          const updatedConds = currentConds.filter(c => c !== condition);
+          updateDoc(mapRef, { [`tokens.${fullEnemy.id}.conditions`]: updatedConds }).catch(console.error);
         }
       });
     } catch (err) {
@@ -131,21 +112,27 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
       message: `Are you sure you want to remove ${fullEnemy.name} from the active board?`,
       type: 'confirm',
       onConfirm: async () => {
-        try {
-          await runTransaction(db, async (transaction) => {
-            const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
-            const mapRef = doc(db, 'campaign', 'battlemap');
-            
-            const mapDoc = await transaction.get(mapRef);
+        const enemyRef = doc(db, 'active_enemies', fullEnemy.id);
+        const mapRef = doc(db, 'campaign', 'battlemap');
 
-            transaction.delete(enemyRef);
-            
-            if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
-              const mapTokens = mapDoc.data().tokens;
-              delete mapTokens[fullEnemy.id];
-              transaction.update(mapRef, { tokens: mapTokens });
-            }
+        try {
+          updateDoc(enemyRef, { currentHp: 0 }).then(() => {
+            // Give it 2 seconds so DMs can see it die, then actually delete it
+            setTimeout(async () => {
+               // Delete Enemy Document
+               await db.collection("active_enemies").doc(fullEnemy.id).delete().catch(() => {});
+               
+               // Delete Map Token using dot notation
+               getDoc(mapRef).then(mapDoc => {
+                 if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[fullEnemy.id]) {
+                   const updatedTokens = { ...mapDoc.data().tokens };
+                   delete updatedTokens[fullEnemy.id];
+                   updateDoc(mapRef, { tokens: updatedTokens }).catch(console.error);
+                 }
+               });
+            }, 500);
           });
+
         } catch (err) {
           console.error("Enemy Deletion Sync Failed:", err);
         }
