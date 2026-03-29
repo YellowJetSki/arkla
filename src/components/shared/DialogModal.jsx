@@ -68,6 +68,7 @@ export default function DialogModal({ isOpen, title, message, type = 'alert', in
                 ref={inputRef}
                 type="text" 
                 value={inputValue}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
                 placeholder={inputPlaceholder}

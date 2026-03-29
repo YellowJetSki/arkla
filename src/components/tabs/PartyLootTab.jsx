@@ -118,7 +118,16 @@ export default function PartyLootTab({ partyLoot, setActiveLoot, charId, showDia
                     className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-lg group text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer block"
                   >
                     <div className="h-48 w-full overflow-hidden bg-slate-950 relative">
-                      <img src={item.url} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                      {/* The Fix: Graceful fallback for blocked cross-origin URLs */}
+                      <img 
+                        src={item.url} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://via.placeholder.com/400x200/0f172a/64748b?text=Image+Blocked';
+                        }}
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-80 pointer-events-none"></div>
                       <h4 className="absolute bottom-3 left-3 right-3 font-bold text-emerald-400 truncate drop-shadow-md pointer-events-none">{item.name}</h4>
                     </div>

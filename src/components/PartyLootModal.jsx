@@ -40,7 +40,16 @@ export default function PartyLootModal({ item, onDismiss }) {
           {item.url ? (
             <div className="w-full h-40 rounded-xl overflow-hidden border border-emerald-900/50 mb-6 shadow-inner relative group">
               <div className="absolute inset-0 bg-emerald-500/10 group-hover:bg-transparent transition-colors z-10 pointer-events-none"></div>
-              <img src={item.url} alt={item.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+              {/* The Fix: Graceful fallback for blocked cross-origin URLs */}
+              <img 
+                src={item.url} 
+                alt={item.name} 
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://via.placeholder.com/400x200/0f172a/64748b?text=Image+Blocked';
+                }}
+              />
             </div>
           ) : (
             <div className="w-full bg-slate-950/50 border border-slate-800 rounded-xl p-4 mb-6 text-sm text-slate-300 text-left whitespace-pre-wrap leading-relaxed shadow-inner max-h-40 overflow-y-auto custom-scrollbar">

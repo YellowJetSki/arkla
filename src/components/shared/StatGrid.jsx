@@ -7,11 +7,9 @@ export default function StatGrid({ char, activeTheme }) {
   const totalLevel = char?.classes ? char.classes.reduce((sum, c) => sum + c.level, 0) : (char?.level || 1);
   const profBonus = getProficiencyBonus(totalLevel);
 
-  // --- AUTOMATED CONDITION MECHANICS ---
   const activeConditions = char?.conditions || [];
   const conditionMechanics = getConditionMechanics(activeConditions);
   
-  // Calculate final dynamic speed
   const baseSpeed = char?.speed || 30;
   let displaySpeed = baseSpeed;
   if (conditionMechanics.speedOverride !== null) {
@@ -20,8 +18,10 @@ export default function StatGrid({ char, activeTheme }) {
      displaySpeed = Math.floor(baseSpeed * conditionMechanics.speedMultiplier);
   }
 
-  // Calculate final dynamic AC (If paralyzed/unconscious, DEX mod is dropped in 5e rules, but often AC calculation is complex. For now, we leave AC static but we can flag it).
   const isImmobilized = displaySpeed === 0;
+
+  // The Fix: Hardcoded strict stat array order to prevent layout shifts
+  const STAT_ORDER = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
 
   return (
     <div className="space-y-4">
@@ -58,19 +58,22 @@ export default function StatGrid({ char, activeTheme }) {
 
       {/* Core Stats Grid */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-4">
-        {Object.entries(stats).map(([stat, score]) => (
-          <div key={stat} className="relative group bg-slate-900 border border-slate-700 rounded-xl flex flex-col items-center justify-center p-3 shadow-[0_4px_15px_rgba(0,0,0,0.2)] hover:border-indigo-500/50 transition-all">
-            <span className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">{stat}</span>
-            <div className="relative w-12 h-12 md:w-14 md:h-14 bg-slate-800 rounded-xl border-t border-slate-600 shadow-inner flex items-center justify-center mb-1.5 group-hover:bg-slate-700 transition-colors">
-              <span className={`text-xl md:text-2xl font-black drop-shadow-md ${conditionMechanics.autoFailStrDex && (stat === 'STR' || stat === 'DEX') ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-                {getModifier(score) >= 0 ? `+${getModifier(score)}` : getModifier(score)}
-              </span>
+        {STAT_ORDER.map((stat) => {
+          const score = stats[stat] || 10;
+          return (
+            <div key={stat} className="relative group bg-slate-900 border border-slate-700 rounded-xl flex flex-col items-center justify-center p-3 shadow-[0_4px_15px_rgba(0,0,0,0.2)] hover:border-indigo-500/50 transition-all">
+              <span className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-widest mb-1.5">{stat}</span>
+              <div className="relative w-12 h-12 md:w-14 md:h-14 bg-slate-800 rounded-xl border-t border-slate-600 shadow-inner flex items-center justify-center mb-1.5 group-hover:bg-slate-700 transition-colors">
+                <span className={`text-xl md:text-2xl font-black drop-shadow-md ${conditionMechanics.autoFailStrDex && (stat === 'STR' || stat === 'DEX') ? 'text-red-500 animate-pulse' : 'text-white'}`}>
+                  {getModifier(score) >= 0 ? `+${getModifier(score)}` : getModifier(score)}
+                </span>
+              </div>
+              <div className="bg-slate-950 px-3 py-0.5 rounded-full border border-slate-800">
+                <span className="text-[10px] md:text-xs font-bold text-slate-500">{score}</span>
+              </div>
             </div>
-            <div className="bg-slate-950 px-3 py-0.5 rounded-full border border-slate-800">
-              <span className="text-[10px] md:text-xs font-bold text-slate-500">{score}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Skills & Proficiencies */}

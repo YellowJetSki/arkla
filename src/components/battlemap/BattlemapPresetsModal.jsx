@@ -91,7 +91,6 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
 
   return (
     <>
-      {/* Moved DialogModal to the very top to ensure it never gets buried by z-index */}
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       <div className="fixed inset-0 z-[99990] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -114,6 +113,7 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
                 <input 
                   type="text" 
                   value={newPresetName}
+                  onFocus={(e) => e.target.select()}
                   onChange={(e) => setNewPresetName(e.target.value)}
                   placeholder="e.g., Goblin Ambush..."
                   className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
@@ -138,7 +138,6 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
                     <div key={name} className="flex items-center justify-between bg-slate-950 p-3 rounded-lg border border-slate-800 group hover:border-slate-600 transition-colors">
                       <div>
                         <h4 className="font-bold text-slate-200">{name}</h4>
-                        {/* Safe fallback for older preset formats missing tokens or mapData */}
                         <p className="text-[10px] text-slate-500">{Object.keys(data.tokens || {}).length} Enemies • {data.mapData?.cols || 20}x{data.mapData?.rows || 15} Grid</p>
                       </div>
                       <div className="flex items-center gap-2">

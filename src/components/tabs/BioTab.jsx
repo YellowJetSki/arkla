@@ -57,6 +57,7 @@ export default function BioTab({ char, charId, isDM, updateField, activeTheme, T
               <input 
                 type="text" 
                 value={char[item.field] || ''} 
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => updateField(item.field, e.target.value)}
                 placeholder={item.placeholder}
                 disabled={isDM}

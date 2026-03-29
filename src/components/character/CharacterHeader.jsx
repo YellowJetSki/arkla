@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { doc, runTransaction, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Skull, Maximize, Star, Heart, Shield, Tent, Moon, ArrowUpCircle } from 'lucide-react';
 
 const XP_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000];
 
-export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpenImage, onOpenShortRest, onOpenLongRest }) {
+export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpenImage, onOpenShortRest, onOpenLongRest, onOpenLevelUp }) {
   const [displayHp, setDisplayHp] = useState("");
   const [isEditingHp, setIsEditingHp] = useState(false);
   const [displayMaxHp, setDisplayMaxHp] = useState("");
@@ -32,14 +32,10 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
   const adjustXp = async (amount) => {
     const charRef = doc(db, 'characters', charId);
     try {
-      await runTransaction(db, async (transaction) => {
-        const sfDoc = await transaction.get(charRef);
-        if (!sfDoc.exists()) return;
-        const currentXp = sfDoc.data().exp || 0;
-        transaction.update(charRef, { exp: Math.max(0, currentXp + amount) });
-      });
+      const currentXp = char.exp || 0;
+      await updateDoc(charRef, { exp: Math.max(0, currentXp + amount) });
     } catch (err) {
-      console.error("XP Transaction Failed:", err);
+      console.error("XP Update Failed:", err);
     }
   };
 
@@ -54,82 +50,72 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
     
     try {
-      await runTransaction(db, async (transaction) => {
-        const mapRef = doc(db, 'campaign', 'battlemap');
-        const charRef = doc(db, 'characters', charId);
-        
-        // 1. ALL READS FIRST
-        const mapDoc = await transaction.get(mapRef);
-        
-        // 2. ALL WRITES SECOND
-        transaction.update(charRef, updates);
-        
-        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-           const mapTokens = mapDoc.data().tokens;
-           mapTokens[charId].hp = boundedHp;
-           if (newTempVal !== null) mapTokens[charId].tempHp = updates.tempHp;
-           transaction.update(mapRef, { tokens: mapTokens });
-        }
-      });
+      const batch = writeBatch(db);
+      const charRef = doc(db, 'characters', charId);
+      batch.update(charRef, updates);
+
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      const mapDoc = await getDoc(mapRef);
+      if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+         const mapTokens = mapDoc.data().tokens;
+         mapTokens[charId].hp = boundedHp;
+         if (newTempVal !== null) mapTokens[charId].tempHp = updates.tempHp;
+         batch.update(mapRef, { tokens: mapTokens });
+      }
+      
+      await batch.commit();
     } catch (err) {
-       console.log("HP Sync Failed", err);
+       console.log("Could not sync HP.", err);
     }
   };
 
   const adjustHp = async (amount) => {
-    const charRef = doc(db, 'characters', charId);
-    const mapRef = doc(db, 'campaign', 'battlemap');
-    
     if (amount < 0 && char.isConcentrating) {
       const damageTaken = Math.abs(amount);
       const dc = Math.max(10, Math.floor(damageTaken / 2));
       alert(`⚠️ CONCENTRATION CHECK!\nYou took ${damageTaken} damage. Roll a Constitution Saving Throw (DC ${dc}) to maintain your spell!`);
     }
 
+    let currentHp = char.hp || 0;
+    let currentTemp = char.tempHp || 0;
+    const maxHp = char.maxHp || 10;
+
+    if (amount < 0) {
+      const damage = Math.abs(amount);
+      if (currentTemp >= damage) {
+        currentTemp -= damage; 
+      } else {
+        const rolloverDamage = damage - currentTemp;
+        currentTemp = 0;
+        currentHp = Math.max(0, currentHp - rolloverDamage);
+      }
+    } else { 
+      currentHp = Math.min(maxHp, currentHp + amount);
+    }
+
+    let updates = { hp: currentHp, tempHp: currentTemp };
+    if (currentHp > 0 && char.hp === 0) {
+      updates['deathSaves.successes'] = 0;
+      updates['deathSaves.failures'] = 0;
+    }
+    
     try {
-      await runTransaction(db, async (transaction) => {
-        // 1. ALL READS FIRST
-        const sfDoc = await transaction.get(charRef);
-        if (!sfDoc.exists()) return;
-        const mapDoc = await transaction.get(mapRef);
-        
-        // 2. LOGIC
-        const data = sfDoc.data();
-        let currentHp = data.hp || 0;
-        let currentTemp = data.tempHp || 0;
-        const maxHp = data.maxHp || 10;
+      const batch = writeBatch(db);
+      const charRef = doc(db, 'characters', charId);
+      batch.update(charRef, updates);
 
-        if (amount < 0) {
-          const damage = Math.abs(amount);
-          if (currentTemp >= damage) {
-            currentTemp -= damage; 
-          } else {
-            const rolloverDamage = damage - currentTemp;
-            currentTemp = 0;
-            currentHp = Math.max(0, currentHp - rolloverDamage);
-          }
-        } else { 
-          currentHp = Math.min(maxHp, currentHp + amount);
-        }
-
-        let updates = { hp: currentHp, tempHp: currentTemp };
-        if (currentHp > 0 && (data.hp || 0) === 0) {
-          updates['deathSaves.successes'] = 0;
-          updates['deathSaves.failures'] = 0;
-        }
-        
-        // 3. ALL WRITES SECOND
-        transaction.update(charRef, updates);
-
-        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-           const mapTokens = mapDoc.data().tokens;
-           mapTokens[charId].hp = currentHp;
-           mapTokens[charId].tempHp = currentTemp;
-           transaction.update(mapRef, { tokens: mapTokens });
-        }
-      });
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      const mapDoc = await getDoc(mapRef);
+      if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+         const mapTokens = mapDoc.data().tokens;
+         mapTokens[charId].hp = currentHp;
+         mapTokens[charId].tempHp = currentTemp;
+         batch.update(mapRef, { tokens: mapTokens });
+      }
+      
+      await batch.commit();
     } catch (err) {
-      console.error("HP Transaction Failed:", err);
+      console.error("HP Update Failed:", err);
     }
   };
 
@@ -230,40 +216,16 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
                   <Heart className={`w-4 h-4 ${isPoisoned ? 'text-lime-400' : 'text-emerald-400'}`} />
                   <div className="flex items-center gap-1 bg-blue-900/40 border border-blue-500/40 px-1.5 py-0.5 rounded ml-1 shadow-sm">
                     <Shield className="w-3 h-3 text-blue-400" />
-                    <input 
-                      type="number" 
-                      value={isEditingTempHp ? displayTempHp : (char.tempHp || 0)} 
-                      onFocus={(e) => { setDisplayTempHp(char.tempHp || 0); setIsEditingTempHp(true); e.target.select(); }} 
-                      onChange={(e) => setDisplayTempHp(e.target.value)} 
-                      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} 
-                      onBlur={(e) => { setIsEditingTempHp(false); submitHpUpdate(char.hp, e.target.value); }} 
-                      className="w-6 bg-transparent focus:outline-none text-center font-black text-blue-100 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                    />
+                    <input type="number" value={isEditingTempHp ? displayTempHp : (char.tempHp || 0)} onFocus={(e) => { setDisplayTempHp(char.tempHp || 0); setIsEditingTempHp(true); e.target.select(); }} onChange={(e) => setDisplayTempHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingTempHp(false); submitHpUpdate(char.hp, e.target.value); }} className="w-6 bg-transparent focus:outline-none text-center font-black text-blue-100 text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                   </div>
                 </div>
 
                 <div className="relative z-20 flex items-center gap-1 pr-1">
                   <button onClick={() => adjustHp(-1)} className="w-8 h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-lg flex items-center justify-center border border-slate-600 cursor-pointer">-</button>
                   <div className="flex items-center gap-1 text-white bg-slate-800/50 border border-slate-600 rounded px-2 py-1">
-                    <input 
-                      type="number" 
-                      value={isEditingHp ? displayHp : (char.hp ?? 0)} 
-                      onFocus={(e) => { setDisplayHp(char.hp ?? 0); setIsEditingHp(true); e.target.select(); }} 
-                      onChange={(e) => setDisplayHp(e.target.value)} 
-                      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} 
-                      onBlur={(e) => { setIsEditingHp(false); submitHpUpdate(e.target.value, char.tempHp); }} 
-                      className={`w-8 bg-transparent focus:outline-none text-center font-black text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingHp ? activeTheme.text : ''}`} 
-                    />
+                    <input type="number" value={isEditingHp ? displayHp : (char.hp ?? 0)} onFocus={(e) => { setDisplayHp(char.hp ?? 0); setIsEditingHp(true); e.target.select(); }} onChange={(e) => setDisplayHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingHp(false); submitHpUpdate(e.target.value, char.tempHp); }} className={`w-8 bg-transparent focus:outline-none text-center font-black text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingHp ? activeTheme.text : ''}`} />
                     <span className="text-slate-500 font-black text-sm">/</span>
-                    <input 
-                      type="number" 
-                      value={isEditingMaxHp ? displayMaxHp : (char.maxHp || 10)} 
-                      onFocus={(e) => { setDisplayMaxHp(char.maxHp || 10); setIsEditingMaxHp(true); e.target.select(); }} 
-                      onChange={(e) => setDisplayMaxHp(e.target.value)} 
-                      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} 
-                      onBlur={(e) => { setIsEditingMaxHp(false); const parsedMax = parseInt(e.target.value, 10); updateField('maxHp', isNaN(parsedMax) ? (char.maxHp || 10) : parsedMax); }} 
-                      className={`w-8 bg-transparent focus:outline-none text-center text-slate-400 text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingMaxHp ? activeTheme.text : ''}`} 
-                    />
+                    <input type="number" value={isEditingMaxHp ? displayMaxHp : (char.maxHp || 10)} onFocus={(e) => { setDisplayMaxHp(char.maxHp || 10); setIsEditingMaxHp(true); e.target.select(); }} onChange={(e) => setDisplayMaxHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingMaxHp(false); const parsedMax = parseInt(e.target.value, 10); updateField('maxHp', isNaN(parsedMax) ? (char.maxHp || 10) : parsedMax); }} className={`w-8 bg-transparent focus:outline-none text-center text-slate-400 text-lg font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingMaxHp ? activeTheme.text : ''}`} />
                   </div>
                   <button onClick={() => adjustHp(1)} className="w-8 h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-lg flex items-center justify-center border border-slate-600 cursor-pointer">+</button>
                 </div>
@@ -292,8 +254,19 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
         <div className="relative bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-inner flex items-center justify-between p-2">
           <div className={`absolute left-0 top-0 bottom-0 ${canLevelUp ? 'bg-amber-500/30' : 'bg-blue-500/20'} transition-all duration-500`} style={{ width: `${xpPercent}%` }}></div>
           <div className="relative z-10 flex items-center gap-2 pl-2">
-            <ArrowUpCircle className={`w-4 h-4 ${canLevelUp ? 'text-amber-400 animate-pulse' : 'text-blue-400'}`} />
-            <span className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-widest">Experience</span>
+            {canLevelUp && !isDM ? (
+               <button 
+                 onClick={onOpenLevelUp} 
+                 className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(245,158,11,0.5)] animate-pulse"
+               >
+                 <ArrowUpCircle className="w-3.5 h-3.5" /> Level Up
+               </button>
+            ) : (
+               <>
+                 <ArrowUpCircle className={`w-4 h-4 ${canLevelUp ? 'text-amber-400 animate-pulse' : 'text-blue-400'}`} />
+                 <span className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-widest">Experience</span>
+               </>
+            )}
           </div>
           <div className="relative z-10 flex items-center gap-1 pr-1">
             <button onClick={() => adjustXp(-50)} className="w-6 h-6 md:w-8 md:h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 font-bold flex items-center justify-center border border-slate-600 transition-colors shadow-sm cursor-pointer">-</button>

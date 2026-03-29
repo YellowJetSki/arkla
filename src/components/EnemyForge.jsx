@@ -4,7 +4,6 @@ import { Skull, Shield, Activity, Swords, Plus, Trash2, Save, X, Target, Brain, 
 export default function EnemyForge({ onSave, onClose }) {
   const [activeTab, setActiveTab] = useState('core');
 
-  // Comprehensive state perfectly matching the 5e SRD Monster Schema
   const [enemy, setEnemy] = useState({
     name: '',
     size: 'Medium',
@@ -19,8 +18,8 @@ export default function EnemyForge({ onSave, onClose }) {
     cr: '1',
     senses: 'passive Perception 10',
     languages: 'Any one language (usually Common)',
-    traits: [], // Special abilities
-    actions: [] // Attacks and actions
+    traits: [], 
+    actions: [] 
   });
 
   const [newTrait, setNewTrait] = useState({ name: '', desc: '' });
@@ -47,7 +46,6 @@ export default function EnemyForge({ onSave, onClose }) {
     e.preventDefault();
     if (!newAction.name || !newAction.desc) return;
     
-    // Format action to mimic API structure
     const formattedAction = {
       name: newAction.name,
       desc: newAction.desc,
@@ -76,7 +74,6 @@ export default function EnemyForge({ onSave, onClose }) {
     e.preventDefault();
     if (!enemy.name) return;
 
-    // Package the state into a flawless SRD-compliant object
     const formattedEnemy = {
       name: enemy.name,
       size: enemy.size,
@@ -107,12 +104,10 @@ export default function EnemyForge({ onSave, onClose }) {
   return (
     <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
       
-      {/* Sinister Ambient Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-600/10 blur-[150px] rounded-full pointer-events-none"></div>
 
       <div className="bg-slate-900/90 backdrop-blur-2xl border border-red-500/40 rounded-3xl w-full max-w-4xl shadow-[0_0_60px_rgba(220,38,38,0.2)] flex flex-col max-h-[90dvh] relative overflow-hidden animate-in zoom-in-95 duration-500">
         
-        {/* Header */}
         <div className="p-5 border-b border-slate-700/80 flex justify-between items-center bg-slate-900/50 shrink-0 relative z-10">
           <h2 className="text-xl font-black text-red-400 flex items-center gap-3 uppercase tracking-widest drop-shadow-sm">
             <Skull className="w-6 h-6" /> Monster Forge
@@ -122,21 +117,19 @@ export default function EnemyForge({ onSave, onClose }) {
           </button>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="flex bg-slate-950/80 border-b border-slate-800/80 p-2 shrink-0 relative z-10">
           <button onClick={() => setActiveTab('core')} className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl transition-all ${activeTab === 'core' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>Core Identity</button>
           <button onClick={() => setActiveTab('stats')} className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl transition-all ${activeTab === 'stats' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>Attributes</button>
           <button onClick={() => setActiveTab('actions')} className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl transition-all ${activeTab === 'actions' ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>Traits & Actions</button>
         </div>
 
-        {/* Forge Content Area */}
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1 relative z-10">
           
           {activeTab === 'core' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 animate-in fade-in slide-in-from-bottom-2">
               <div className="sm:col-span-2">
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Monster Name</label>
-                <input type="text" value={enemy.name} onChange={e => setEnemy({...enemy, name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-lg font-bold focus:outline-none focus:border-red-500 shadow-inner" placeholder="e.g. Ancient Blood Fiend" />
+                <input type="text" onFocus={(e) => e.target.select()} value={enemy.name} onChange={e => setEnemy({...enemy, name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-lg font-bold focus:outline-none focus:border-red-500 shadow-inner" placeholder="e.g. Ancient Blood Fiend" />
               </div>
 
               <div>
@@ -149,8 +142,8 @@ export default function EnemyForge({ onSave, onClose }) {
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Type & Alignment</label>
                 <div className="flex gap-2">
-                  <input type="text" value={enemy.type} onChange={e => setEnemy({...enemy, type: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner" placeholder="Type (e.g. fiend)" />
-                  <input type="text" value={enemy.alignment} onChange={e => setEnemy({...enemy, alignment: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner" placeholder="Alignment" />
+                  <input type="text" onFocus={(e) => e.target.select()} value={enemy.type} onChange={e => setEnemy({...enemy, type: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner" placeholder="Type (e.g. fiend)" />
+                  <input type="text" onFocus={(e) => e.target.select()} value={enemy.alignment} onChange={e => setEnemy({...enemy, alignment: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner" placeholder="Alignment" />
                 </div>
               </div>
 
@@ -159,11 +152,11 @@ export default function EnemyForge({ onSave, onClose }) {
                 <div className="flex gap-3">
                   <div className="w-1/3">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">AC</label>
-                    <input type="number" value={enemy.ac} onChange={e => setEnemy({...enemy, ac: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-black text-center focus:outline-none focus:border-emerald-500 shadow-inner" />
+                    <input type="number" onFocus={(e) => e.target.select()} value={enemy.ac} onChange={e => setEnemy({...enemy, ac: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-black text-center focus:outline-none focus:border-emerald-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                   </div>
                   <div className="w-2/3">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Armor Type</label>
-                    <input type="text" value={enemy.acType} onChange={e => setEnemy({...enemy, acType: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. natural armor" />
+                    <input type="text" onFocus={(e) => e.target.select()} value={enemy.acType} onChange={e => setEnemy({...enemy, acType: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. natural armor" />
                   </div>
                 </div>
               </div>
@@ -173,23 +166,23 @@ export default function EnemyForge({ onSave, onClose }) {
                 <div className="flex gap-3">
                   <div className="w-1/3">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Avg HP</label>
-                    <input type="number" value={enemy.hp} onChange={e => setEnemy({...enemy, hp: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-black text-center focus:outline-none focus:border-red-500 shadow-inner" />
+                    <input type="number" onFocus={(e) => e.target.select()} value={enemy.hp} onChange={e => setEnemy({...enemy, hp: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white font-black text-center focus:outline-none focus:border-red-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                   </div>
                   <div className="w-2/3">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Hit Dice Formula</label>
-                    <input type="text" value={enemy.hpDice} onChange={e => setEnemy({...enemy, hpDice: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner" placeholder="e.g. 2d8 + 2" />
+                    <input type="text" onFocus={(e) => e.target.select()} value={enemy.hpDice} onChange={e => setEnemy({...enemy, hpDice: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner" placeholder="e.g. 2d8 + 2" />
                   </div>
                 </div>
               </div>
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Speed</label>
-                <input type="text" value={enemy.speed} onChange={e => setEnemy({...enemy, speed: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner" placeholder="e.g. 30 ft., fly 60 ft." />
+                <input type="text" onFocus={(e) => e.target.select()} value={enemy.speed} onChange={e => setEnemy({...enemy, speed: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner" placeholder="e.g. 30 ft., fly 60 ft." />
               </div>
 
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Challenge Rating (CR)</label>
-                <input type="text" value={enemy.cr} onChange={e => setEnemy({...enemy, cr: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner" placeholder="e.g. 1/4 or 5" />
+                <input type="text" onFocus={(e) => e.target.select()} value={enemy.cr} onChange={e => setEnemy({...enemy, cr: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner" placeholder="e.g. 1/4 or 5" />
               </div>
             </div>
           )}
@@ -204,6 +197,7 @@ export default function EnemyForge({ onSave, onClose }) {
                       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{stat}</span>
                       <input 
                         type="number" 
+                        onFocus={(e) => e.target.select()}
                         value={enemy.stats[stat]} 
                         onChange={(e) => handleStatChange(stat, e.target.value)}
                         className="w-12 bg-transparent text-white font-black text-xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
@@ -216,12 +210,12 @@ export default function EnemyForge({ onSave, onClose }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700/50 shadow-inner">
                   <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><Eye className="w-4 h-4 text-sky-400" /> Senses</label>
-                  <input type="text" value={enemy.senses} onChange={e => setEnemy({...enemy, senses: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500 shadow-inner" placeholder="e.g. darkvision 60 ft., passive Perception 12" />
+                  <input type="text" onFocus={(e) => e.target.select()} value={enemy.senses} onChange={e => setEnemy({...enemy, senses: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500 shadow-inner" placeholder="e.g. darkvision 60 ft., passive Perception 12" />
                 </div>
                 
                 <div className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700/50 shadow-inner">
                   <label className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Languages</label>
-                  <input type="text" value={enemy.languages} onChange={e => setEnemy({...enemy, languages: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500 shadow-inner" placeholder="e.g. Common, Draconic" />
+                  <input type="text" onFocus={(e) => e.target.select()} value={enemy.languages} onChange={e => setEnemy({...enemy, languages: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500 shadow-inner" placeholder="e.g. Common, Draconic" />
                 </div>
               </div>
             </div>
@@ -230,7 +224,6 @@ export default function EnemyForge({ onSave, onClose }) {
           {activeTab === 'actions' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
               
-              {/* Special Traits Forge */}
               <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 shadow-inner flex flex-col h-full">
                 <h3 className="text-sm font-black text-amber-400 flex items-center gap-2 uppercase tracking-widest border-b border-amber-900/30 pb-2 mb-4">
                   <Target className="w-4 h-4" /> Passive Traits
@@ -251,13 +244,12 @@ export default function EnemyForge({ onSave, onClose }) {
                 </div>
 
                 <form onSubmit={addTrait} className="bg-slate-900/80 p-4 rounded-xl border border-amber-900/50 shadow-inner mt-auto">
-                  <input type="text" placeholder="Trait Name (e.g. Pack Tactics)" value={newTrait.name} onChange={e => setNewTrait({...newTrait, name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs mb-2 focus:outline-none focus:border-amber-500" required />
+                  <input type="text" placeholder="Trait Name (e.g. Pack Tactics)" onFocus={(e) => e.target.select()} value={newTrait.name} onChange={e => setNewTrait({...newTrait, name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs mb-2 focus:outline-none focus:border-amber-500" required />
                   <textarea placeholder="Description..." value={newTrait.desc} onChange={e => setNewTrait({...newTrait, desc: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 text-xs mb-3 h-16 resize-none focus:outline-none focus:border-amber-500" required />
                   <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs uppercase tracking-wider py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"><Plus className="w-3 h-3" /> Add Trait</button>
                 </form>
               </div>
 
-              {/* Actions Forge */}
               <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-5 shadow-inner flex flex-col h-full">
                 <h3 className="text-sm font-black text-red-400 flex items-center gap-2 uppercase tracking-widest border-b border-red-900/30 pb-2 mb-4">
                   <Swords className="w-4 h-4" /> Actions & Attacks
@@ -290,12 +282,12 @@ export default function EnemyForge({ onSave, onClose }) {
 
                 <form onSubmit={addAction} className="bg-slate-900/80 p-4 rounded-xl border border-red-900/50 shadow-inner mt-auto">
                   <div className="flex gap-2 mb-2">
-                    <input type="text" placeholder="Action Name (e.g. Bite)" value={newAction.name} onChange={e => setNewAction({...newAction, name: e.target.value})} className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500" required />
-                    <input type="number" placeholder="+Hit (Opt)" value={newAction.hitBonus} onChange={e => setNewAction({...newAction, hitBonus: e.target.value})} className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-white text-xs text-center focus:outline-none focus:border-red-500" />
+                    <input type="text" placeholder="Action Name (e.g. Bite)" onFocus={(e) => e.target.select()} value={newAction.name} onChange={e => setNewAction({...newAction, name: e.target.value})} className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500" required />
+                    <input type="number" placeholder="+Hit (Opt)" onFocus={(e) => e.target.select()} value={newAction.hitBonus} onChange={e => setNewAction({...newAction, hitBonus: e.target.value})} className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-2 text-white text-xs text-center focus:outline-none focus:border-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
                   </div>
                   <div className="flex gap-2 mb-2">
-                    <input type="text" placeholder="Damage (e.g. 1d6 + 2)" value={newAction.damageDice} onChange={e => setNewAction({...newAction, damageDice: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500" />
-                    <input type="text" placeholder="Type (e.g. Piercing)" value={newAction.damageType} onChange={e => setNewAction({...newAction, damageType: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500" />
+                    <input type="text" placeholder="Damage (e.g. 1d6 + 2)" onFocus={(e) => e.target.select()} value={newAction.damageDice} onChange={e => setNewAction({...newAction, damageDice: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500" />
+                    <input type="text" placeholder="Type (e.g. Piercing)" onFocus={(e) => e.target.select()} value={newAction.damageType} onChange={e => setNewAction({...newAction, damageType: e.target.value})} className="w-1/2 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-red-500" />
                   </div>
                   <textarea placeholder="Description or effects..." value={newAction.desc} onChange={e => setNewAction({...newAction, desc: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-300 text-xs mb-3 h-12 resize-none focus:outline-none focus:border-red-500" required />
                   <button type="submit" className="w-full bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-sm"><Plus className="w-3 h-3" /> Add Action</button>
@@ -307,7 +299,6 @@ export default function EnemyForge({ onSave, onClose }) {
 
         </div>
 
-        {/* Footer Actions */}
         <div className="p-4 bg-slate-900/90 border-t border-slate-800 shrink-0 relative z-10 flex justify-end">
           <button 
             onClick={handleSubmit} 

@@ -258,7 +258,6 @@ export default function DMDashboard({ onLogout }) {
   return (
     <div className="relative min-h-[100dvh] overflow-hidden">
       
-      {/* Immersive Dark Fantasy Background */}
       <div className="fixed inset-0 bg-gradient-to-b from-indigo-950/40 via-slate-950 to-slate-950 pointer-events-none -z-10"></div>
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-600/10 via-fuchsia-600/5 to-transparent blur-[120px] rounded-full pointer-events-none -z-10 animate-pulse"></div>
 
@@ -301,7 +300,6 @@ export default function DMDashboard({ onLogout }) {
 
       <div className="max-w-[1600px] mx-auto p-4 md:p-8 pb-24 flex flex-col gap-8 relative z-10">
         
-        {/* Extracted DM Control Nav Component */}
         <DMControlNav 
           showScratchpad={showScratchpad}
           setShowScratchpad={setShowScratchpad}
@@ -315,7 +313,6 @@ export default function DMDashboard({ onLogout }) {
           onLogout={onLogout}
         />
 
-        {/* Combat / Environment Zone */}
         <div className="relative">
           {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>}
           
@@ -345,7 +342,6 @@ export default function DMDashboard({ onLogout }) {
           )}
         </div>
 
-        {/* Active Party Zone */}
         <div className="relative">
           <div className="absolute inset-0 bg-indigo-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>
           <h2 className="text-xl font-black text-white flex items-center gap-2 mb-4 border-b border-slate-700/50 pb-2 mt-4 uppercase tracking-widest drop-shadow-sm">
@@ -360,7 +356,6 @@ export default function DMDashboard({ onLogout }) {
           )}
         </div>
 
-        {/* Active Threats Zone */}
         <div className="relative">
           <div className="absolute inset-0 bg-red-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>
           
@@ -398,7 +393,14 @@ export default function DMDashboard({ onLogout }) {
                 <div className="w-px h-5 bg-slate-700 mx-1"></div>
 
                 <Calculator className="w-4 h-4 text-slate-500 mx-1 shrink-0" />
-                <input type="number" value={massMathAmount} onChange={(e) => setMassMathAmount(e.target.value)} placeholder="Amt..." className="w-20 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-sm font-bold focus:outline-none focus:border-red-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                <input 
+                  type="number" 
+                  value={massMathAmount} 
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => setMassMathAmount(e.target.value)} 
+                  placeholder="Amt..." 
+                  className="w-20 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-sm font-bold focus:outline-none focus:border-red-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" 
+                />
                 <button onClick={() => handleMassMath(true)} disabled={!massMathAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-black transition-colors flex items-center gap-1.5 border border-red-900/50 shadow-sm"><Flame className="w-3.5 h-3.5"/> Dmg</button>
                 <button onClick={() => handleMassMath(false)} disabled={!massMathAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-black transition-colors border border-emerald-900/50 shadow-sm">Heal</button>
               </div>

@@ -50,7 +50,6 @@ export default function TokenContextMenu({
       onMouseDown={e => e.stopPropagation()}
       onClick={e => e.stopPropagation()}
     >
-      {/* Header Area */}
       <div className="flex items-center gap-3 border-b border-slate-700/50 pb-3">
         <span className="text-sm font-black text-white uppercase tracking-wider drop-shadow-sm pr-4">
           {token.name}
@@ -61,6 +60,7 @@ export default function TokenContextMenu({
           <input 
             type="number" 
             value={hpVal}
+            onFocus={(e) => e.target.select()}
             onChange={(e) => onUpdateHpLive(token.id, e.target.value)}
             className="w-10 bg-transparent text-white text-sm font-black text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
@@ -74,7 +74,6 @@ export default function TokenContextMenu({
         </button>
       </div>
 
-      {/* Primary Tools */}
       <div className="flex gap-2 justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800/80 shadow-inner">
         <button onClick={() => onToggleSize(token.id)} className="text-indigo-400 hover:text-indigo-200 flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]" title="Size">
           <Maximize className="w-4 h-4" /> <span className="text-[9px] font-bold uppercase tracking-wider">{token.size || 1}x</span>
@@ -101,7 +100,6 @@ export default function TokenContextMenu({
         <button onClick={() => onRemoveToken(token.id)} className="text-slate-400 hover:text-red-400 flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]" title="Remove from Map"><Trash2 className="w-4 h-4" /><span className="text-[9px] font-bold uppercase tracking-wider">Del</span></button>
       </div>
 
-      {/* Conditions Box */}
       <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-700/50 shadow-inner">
         <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-2.5">Quick Conditions</p>
         <div className="flex flex-wrap gap-1.5 max-w-[240px]">

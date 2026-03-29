@@ -113,6 +113,7 @@ export default function ApiBestiaryImport({ onImportComplete }) {
         <input 
           type="text" 
           value={searchQuery}
+          onFocus={(e) => e.target.select()}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search 5e Monsters (e.g. Goblin, Adult Dragon)"
           className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
