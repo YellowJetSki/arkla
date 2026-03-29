@@ -107,7 +107,7 @@ export default function DMHandoutManager({ onClose }) {
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Direct Image URL</label>
                   <input 
-                    type="url" 
+                    type="text" 
                     required 
                     value={newHandout.url} 
                     onChange={e => setNewHandout({...newHandout, url: e.target.value})} 
