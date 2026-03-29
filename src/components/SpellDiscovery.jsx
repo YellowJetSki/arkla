@@ -89,6 +89,7 @@ export default function SpellDiscovery({ onAddSpell, allowAdd = true, maxSpellLe
           <input 
             type="text" 
             value={searchQuery}
+            onFocus={(e) => e.target.select()}
             onChange={(e) => {
                setSearchQuery(e.target.value);
                if (e.target.value === '') {

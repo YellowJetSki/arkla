@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 import { PREMADE_CHARACTERS } from '../data/campaignData';
-import { fetchSpeciesTraits } from '../services/arklaEngine'; // <-- NEW IMPORT
+import { fetchSpeciesTraits } from '../services/arklaEngine'; 
 import StatGrid from './shared/StatGrid';
 import QuickTraits from './shared/QuickTraits'; 
 import CollapsibleSection from './shared/CollapsibleSection';
@@ -370,6 +370,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             onOpenImage={() => setIsImageOpen(true)}
             onOpenShortRest={() => setIsShortRestOpen(true)}
             onOpenLongRest={() => setIsLongRestOpen(true)}
+            onOpenLevelUp={() => setIsLevelUpOpen(true)}
           />
 
           <div className="mb-6">

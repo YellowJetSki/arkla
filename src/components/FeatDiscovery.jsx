@@ -88,6 +88,7 @@ export default function FeatDiscovery({ onAddFeat, allowAdd = true, charLevel = 
           <input 
             type="text" 
             value={searchQuery}
+            onFocus={(e) => e.target.select()}
             onChange={(e) => {
                setSearchQuery(e.target.value);
                if (e.target.value === '') {

@@ -92,6 +92,7 @@ export default function EquipmentDiscovery({ onAddEquipment, onEquipWeapon }) {
           <input 
             type="text" 
             value={searchQuery}
+            onFocus={(e) => e.target.select()}
             onChange={(e) => {
                setSearchQuery(e.target.value);
                if (e.target.value === '') {
