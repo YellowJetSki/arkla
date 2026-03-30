@@ -444,15 +444,21 @@ export const fetchSpeciesTraits = async (rawSpeciesName) => {
     }
 
     const traitPromises = traitStubs.map(async (traitStub) => {
-      const traitRes = await fetch(`https://www.dnd5eapi.co${traitStub.url}`);
-      const traitDetail = await traitRes.json();
-      return {
-        name: applySanctuaryFilter(traitDetail.name),
-        desc: applySanctuaryFilter(Array.isArray(traitDetail.desc) ? traitDetail.desc.join('\n') : traitDetail.desc)
-      };
+      if (!traitStub.url) return null;
+      try {
+        const traitRes = await fetch(`https://www.dnd5eapi.co${traitStub.url}`);
+        if (!traitRes.ok) return null; // Safe fallback so one failing API endpoint doesn't break the whole species fetch
+        const traitDetail = await traitRes.json();
+        return {
+          name: applySanctuaryFilter(traitDetail.name),
+          desc: applySanctuaryFilter(Array.isArray(traitDetail.desc) ? traitDetail.desc.join('\n') : traitDetail.desc)
+        };
+      } catch (e) {
+        return null;
+      }
     });
 
-    const traits = await Promise.all(traitPromises);
+    const traits = (await Promise.all(traitPromises)).filter(t => t !== null);
 
     let mechanics = {
       speed: baseData.speed || 30,
@@ -486,13 +492,14 @@ export const fetchClassProgression = async (rawClassName, classLevel) => {
       features: hbData.levels[classLevel]?.features || [],
       resources: hbData.levels[classLevel]?.resources || [],
       spellSlots: null,
-      spellcastingInfo: null
+      spellcastingInfo: null,
+      pendingChoices: []
     };
   }
 
   const apiClass = CLASS_API_MAP[cleanName];
   if (!apiClass) {
-    return { hitDie: 8, features: [], resources: [], spellSlots: null, spellcastingInfo: null, error: 'Class not found in archives.' };
+    return { hitDie: 8, features: [], resources: [], spellSlots: null, spellcastingInfo: null, error: 'Class not found in archives.', pendingChoices: [] };
   }
 
   try {
@@ -505,6 +512,7 @@ export const fetchClassProgression = async (rawClassName, classLevel) => {
 
     const fetchedFeatures = [];
     const fetchedResources = [];
+    const pendingChoices = [];
     let spellSlots = null;
     let spellcastingInfo = null;
 
@@ -547,6 +555,29 @@ export const fetchClassProgression = async (rawClassName, classLevel) => {
       });
     }
 
+    // Capture required choices like "Favored Enemy"
+    if (levelData.feature_choices && levelData.feature_choices.length > 0) {
+      const choicePromises = levelData.feature_choices.map(async (stub) => {
+        try {
+          if (!stub.url) return null;
+          const res = await fetch(`https://www.dnd5eapi.co${stub.url}`);
+          if (!res.ok) return null;
+          const detail = await res.json();
+          return {
+            id: detail.index,
+            name: applySanctuaryFilter(detail.name),
+            choose: detail.choice?.choose || 1,
+            options: detail.choice?.from?.options?.map(o => ({
+              name: applySanctuaryFilter(o.item?.name || o.feature?.name || o.name || 'Unknown Option'),
+              url: o.item?.url || o.feature?.url || o.url
+            })).filter(o => o.url) || []
+          };
+        } catch (e) { return null; }
+      });
+      const results = await Promise.all(choicePromises);
+      pendingChoices.push(...results.filter(r => r !== null && r.options.length > 0));
+    }
+
     if (levelData.spellcasting) {
       spellcastingInfo = {
         cantripsKnown: levelData.spellcasting.cantrips_known || 0,
@@ -569,12 +600,13 @@ export const fetchClassProgression = async (rawClassName, classLevel) => {
       features: fetchedFeatures,
       resources: fetchedResources,
       spellSlots, 
-      spellcastingInfo
+      spellcastingInfo,
+      pendingChoices
     };
 
   } catch (error) {
     console.error("Engine API Error:", error);
-    return { hitDie: HIT_DICE_MAP[apiClass] || 8, features: [], resources: [], spellSlots: null, spellcastingInfo: null, error: 'Failed to commune with the D&D API.' };
+    return { hitDie: HIT_DICE_MAP[apiClass] || 8, features: [], resources: [], spellSlots: null, spellcastingInfo: null, pendingChoices: [], error: 'Failed to commune with the D&D API.' };
   }
 };
 
@@ -600,13 +632,11 @@ export const getStartingClassLimits = (className, wisMod = 0) => {
 };
 
 export const checkFeatPrerequisites = (feat, charStats, charSpecies) => {
-  // If no prerequisites exist on the feat, it is universally available
   if (!feat.prerequisites || feat.prerequisites.length === 0) return true;
 
   const safeSpecies = (charSpecies || '').toLowerCase();
 
   for (const prereq of feat.prerequisites) {
-    // Check Ability Score minimums (e.g., Minimum DEX 13)
     if (prereq.ability_score) {
       const requiredStat = prereq.ability_score.name.substring(0, 3).toUpperCase();
       const minimumValue = prereq.minimum_score;
@@ -615,10 +645,8 @@ export const checkFeatPrerequisites = (feat, charStats, charSpecies) => {
       }
     }
     
-    // Check Species Requirements (e.g., Elven Accuracy requires Elf/Half-Elf)
     if (prereq.race) {
       const requiredRace = prereq.race.name.toLowerCase();
-      // Simple substring check handles "Elf" matching "Wood Elf" or "Half-Elf"
       if (!safeSpecies.includes(requiredRace)) {
         return false;
       }

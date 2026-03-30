@@ -11,11 +11,13 @@ import { fetchSpeciesTraits, fetchClassProgression } from '../services/arklaEngi
 import StatGrid from './shared/StatGrid';
 import QuickTraits from './shared/QuickTraits'; 
 import CollapsibleSection from './shared/CollapsibleSection';
+import FeatureCard from './shared/FeatureCard';
 import ImageModal from './shared/ImageModal'; 
 import GlobalLoader from './shared/GlobalLoader';
 import DialogModal from './shared/DialogModal';
 
 import CharacterHeader from './character/CharacterHeader';
+import PendingChoicesManager from './character/PendingChoicesManager';
 import LevelUpModal from './LevelUpModal';
 import SessionResetModal from './SessionResetModal';
 import PlayerGuideModal from './PlayerGuideModal';
@@ -171,6 +173,10 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           updates.features = arrayUnion(...classData.features);
         }
         
+        if (classData.pendingChoices && classData.pendingChoices.length > 0) {
+          updates.pendingChoices = arrayUnion(...classData.pendingChoices);
+        }
+
         if (classData.resources?.length > 0) {
            const currentResources = char.resources ? [...char.resources] : [];
            classData.resources.forEach(res => {
@@ -467,7 +473,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             {activeTab === 'features' && (
               <div className="space-y-6">
                 
-                <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-2">
+                <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-2 mb-4">
                   <h3 className="text-lg font-bold text-white flex items-center gap-2"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
                   {!isDM ? (
                     <button 
@@ -533,28 +539,18 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                   />
                 )}
 
+                {char.pendingChoices && char.pendingChoices.length > 0 && !isDM && (
+                  <PendingChoicesManager charId={currentUser.charId} pendingChoices={char.pendingChoices} />
+                )}
+
                 <div className="space-y-4">
                   {(char.features || []).map((feat, i) => (
-                    <CollapsibleSection 
+                    <FeatureCard 
                       key={`feat-${i}`} 
-                      title={
-                        <div className="flex items-center gap-2">
-                          {feat.name}
-                          {isDM && (
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); removeFeature(feat); }}
-                              className="text-slate-500 hover:text-red-400 bg-slate-900 p-1.5 rounded transition-all shadow-inner ml-2"
-                              title="Delete Feature"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      } 
-                      defaultOpen={i === 0}
-                    >
-                      <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
-                    </CollapsibleSection>
+                      feat={feat}
+                      isDM={isDM}
+                      onRemove={removeFeature}
+                    />
                   ))}
                 </div>
               </div>
