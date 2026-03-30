@@ -3,6 +3,7 @@ import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { UserPlus, ChevronRight, ChevronLeft, Dices, X, Wand2, Backpack, BookOpen, Fingerprint, Plus, Trash2, Image as ImageIcon, Circle } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
+import { fetchSpeciesTraits, fetchClassProgression } from '../services/arklaEngine';
 
 export default function DMCharacterBuilder({ onClose }) {
   const [stepIndex, setStepIndex] = useState(0);
@@ -74,9 +75,42 @@ export default function DMCharacterBuilder({ onClose }) {
       const conMod = Math.floor((formData.stats.CON - 10) / 2);
       const dexMod = Math.floor((formData.stats.DEX - 10) / 2);
 
-      const customFeatures = isCustomSpecies 
-        ? speciesTraits.filter(t => t.name && t.desc).map(t => ({ name: `${formData.species} Trait: ${t.name}`, desc: t.desc }))
+      let finalSpeed = formData.speed;
+      let finalProfs = isCustomSpecies ? customProfs : { skills: '', tools: '', weapons: '', armor: '', languages: 'Common' };
+      let finalFeatures = isCustomSpecies 
+        ? speciesTraits.filter(t => t.name && t.desc).map(t => ({ name: `${formData.species || 'Custom'} Trait: ${t.name}`, desc: t.desc }))
         : [];
+      
+      let finalResources = [];
+      let finalSpellSlots = {};
+      let hitDieMax = 10; // Default fallback
+
+      // 🧠 ENGINE INTEGRATION: Auto-fetch Standard Species Traits
+      if (!isCustomSpecies && formData.species) {
+        const { traits, mechanics, error } = await fetchSpeciesTraits(formData.species);
+        if (!error && mechanics) {
+           finalSpeed = mechanics.speed || finalSpeed;
+           finalProfs.languages = mechanics.languages?.join(', ') || 'Common';
+           
+           const mappedTraits = traits.map(t => ({ name: `${formData.species} Trait: ${t.name}`, desc: t.desc }));
+           finalFeatures = [...finalFeatures, ...mappedTraits];
+        }
+      }
+
+      // 🧠 ENGINE INTEGRATION: Auto-fetch Level 1 Class Features & Hit Dice
+      if (formData.class) {
+        const classData = await fetchClassProgression(formData.class, 1);
+        if (!classData.error) {
+           hitDieMax = typeof classData.hitDie === 'number' ? classData.hitDie : parseInt(classData.hitDie?.replace('d', '')) || 10;
+           
+           const classFeatures = (classData.features || []).map(f => ({ name: `${formData.class} Feature: ${f.name}`, desc: f.desc }));
+           finalFeatures = [...finalFeatures, ...classFeatures];
+           finalResources = classData.resources || [];
+           finalSpellSlots = classData.spellSlots || {};
+        }
+      }
+
+      const startingHp = hitDieMax + conMod;
 
       const newChar = {
         name: formData.name,
@@ -87,12 +121,12 @@ export default function DMCharacterBuilder({ onClose }) {
         theme: formData.theme,
         exp: 0,
         alignment: formData.alignment,
-        hp: 10 + conMod,
-        maxHp: 10 + conMod,
+        hp: startingHp,
+        maxHp: startingHp,
         tempHp: 0,
-        hitDice: { current: 1, max: 1, type: 'd10' },
+        hitDice: { current: 1, max: 1, type: `d${hitDieMax}` },
         ac: 10 + dexMod,
-        speed: formData.speed,
+        speed: finalSpeed,
         initiative: '--',
         spellSave: '--',
         spellAttack: '--',
@@ -101,21 +135,21 @@ export default function DMCharacterBuilder({ onClose }) {
         isConcentrating: false,
         conditions: [],
         hasCompletedTutorial: false,
-        hasFetchedSpecies: isCustomSpecies, // Bypasses engine if homebrewed
-        hasFetchedClass: false,
+        hasFetchedSpecies: true, // Engine already handled it
+        hasFetchedClass: true,   // Engine already handled it
         journal: '',
         stats: formData.stats,
         currency: { assarions: 0, quadrans: 0, leptons: 0 },
         imageUrl: formData.imageUrl,
         img: formData.tokenImg,
         deathSaves: { successes: 0, failures: 0 },
-        resources: [],
-        spellSlots: {},
+        resources: finalResources,
+        spellSlots: finalSpellSlots,
         spells: [],
         dmNotes: '',
         attacks: [],
-        proficiencies: isCustomSpecies ? customProfs : { skills: '', tools: '', weapons: '', armor: '', languages: 'Common' },
-        features: customFeatures,
+        proficiencies: finalProfs,
+        features: finalFeatures,
         inventory: formData.inventory,
         traits: { personality: '', ideal: '', bond: '', flaws: '' },
         backstory: formData.backstory,
@@ -206,7 +240,7 @@ export default function DMCharacterBuilder({ onClose }) {
                       <option value="Wizard" />
                       <option value="Pirate" />
                     </datalist>
-                    <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">The engine will attempt to auto-fetch Level 1 features for standard classes. For Arkla-specific classes, leave this as their title and manually add traits later.</p>
+                    <p className="text-[10px] text-slate-500 mt-2 leading-relaxed">The engine will auto-fetch Level 1 features, Hit Dice, and class resources for standard classes instantly.</p>
                   </div>
                 </div>
 
@@ -348,7 +382,9 @@ export default function DMCharacterBuilder({ onClose }) {
             {stepIndex < steps.length - 1 ? (
                <button onClick={() => setStepIndex(s => s + 1)} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg">Next Step <ChevronRight className="w-5 h-5" /></button>
             ) : (
-               <button onClick={handleFinish} disabled={isSaving || !formData.name} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)]">Construct Character</button>
+               <button onClick={handleFinish} disabled={isSaving || !formData.name} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+                 {isSaving ? 'Scribing Data...' : 'Construct Character'}
+               </button>
             )}
           </div>
 
