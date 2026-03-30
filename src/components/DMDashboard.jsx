@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, Users, Calculator, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud, Hammer, UserPlus, Wand2 } from 'lucide-react';
+import { Skull, Users, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud, Hammer, UserPlus, Wand2, Book, Package, Image as ImageIcon, Map as MapIcon, ShieldAlert, Trash2, PowerOff, UploadCloud } from 'lucide-react';
 
-import DMControlNav from './DMControlNav';
 import DMPlayerCard from './DMPlayerCard';
 import DMEnemyCard from './DMEnemyCard';
 import InitiativeTracker from './InitiativeTracker';
@@ -13,7 +12,6 @@ import DMHandoutManager from './DMHandoutManager';
 import DMBattleMap from './battlemap/DMBattleMap'; 
 import DMReferenceModal from './DMReferenceModal';
 import DialogModal from './shared/DialogModal';
-import ApiBestiaryImport from './ApiBestiaryImport';
 import DebouncedTextarea from './shared/DebouncedTextarea';
 import EnemyForge from './EnemyForge';
 import DMCharacterBuilder from './DMCharacterBuilder';
@@ -22,14 +20,12 @@ import DMSpellForge from './DMSpellForge';
 export default function DMDashboard({ onLogout }) {
   const [unlockedCharacters, setUnlockedCharacters] = useState([]);
   const [activeEnemies, setActiveEnemies] = useState([]);
-  
   const [selectedEnemies, setSelectedEnemies] = useState([]);
   
   const [activeManager, setActiveManager] = useState(null); 
   const [isBattleMode, setIsBattleMode] = useState(false); 
   
   const [showScratchpad, setShowScratchpad] = useState(false);
-  const [showBestiary, setShowBestiary] = useState(false); 
   const [isForgingEnemy, setIsForgingEnemy] = useState(false);
   const [isForgingSpell, setIsForgingSpell] = useState(false);
   const [isBuildingCharacter, setIsBuildingCharacter] = useState(false);
@@ -47,7 +43,6 @@ export default function DMDashboard({ onLogout }) {
   const [massMathAmount, setMassMathAmount] = useState('');
   const fileInputRef = useRef(null);
 
-  // Expose cache for character builder to access active session array
   useEffect(() => { window.unlockedCharactersCache = unlockedCharacters; }, [unlockedCharacters]);
 
   let touchStartX = 0;
@@ -87,17 +82,13 @@ export default function DMDashboard({ onLogout }) {
   };
 
   const selectAllEnemies = () => {
-    if (selectedEnemies.length === activeEnemies.length) {
-      setSelectedEnemies([]); 
-    } else {
-      setSelectedEnemies(activeEnemies.map(e => e.id)); 
-    }
+    if (selectedEnemies.length === activeEnemies.length) setSelectedEnemies([]); 
+    else setSelectedEnemies(activeEnemies.map(e => e.id)); 
   };
 
   const confirmResetSession = () => {
     setDialog({
-      isOpen: true,
-      title: 'Wipe Board?',
+      isOpen: true, title: 'Wipe Board?',
       message: 'This will wipe all enemies and destroy the active battle map. Players will remain in the session. Are you sure?',
       type: 'confirm',
       onConfirm: async () => {
@@ -113,32 +104,24 @@ export default function DMDashboard({ onLogout }) {
           setIsBattleMode(false);
           closeDialog();
           showToast('Board & Enemies Wiped');
-        } catch (error) {
-          console.error("Error wiping board:", error);
-        }
+        } catch (error) { console.error(error); }
       }
     });
   };
 
   const confirmClearConditions = () => {
     setDialog({
-      isOpen: true,
-      title: 'Sweep Conditions?',
-      message: 'This will remove ALL active conditions (Poisoned, Stunned, etc.) and Concentration from every player and enemy on the board.',
+      isOpen: true, title: 'Sweep Conditions?',
+      message: 'This will remove ALL active conditions and Concentration from every player and enemy on the board.',
       type: 'confirm',
       onConfirm: async () => {
         try {
           const batch = writeBatch(db);
-          
           for (const charId of unlockedCharacters) {
-            const charRef = doc(db, 'characters', charId);
-            batch.update(charRef, { conditions: [], isConcentrating: false });
+            batch.update(doc(db, 'characters', charId), { conditions: [], isConcentrating: false });
           }
-          
           const enemyDocs = await getDocs(collection(db, 'active_enemies'));
-          enemyDocs.forEach((docSnap) => {
-            batch.update(docSnap.ref, { conditions: [] });
-          });
+          enemyDocs.forEach((docSnap) => batch.update(docSnap.ref, { conditions: [] }));
 
           const mapRef = doc(db, 'campaign', 'battlemap');
           const mapSnap = await getDoc(mapRef);
@@ -150,13 +133,10 @@ export default function DMDashboard({ onLogout }) {
             });
             batch.update(mapRef, { tokens: mapTokens });
           }
-
           await batch.commit();
           closeDialog();
           showToast('All Conditions Swept');
-        } catch (error) {
-          console.error("Error sweeping conditions:", error);
-        }
+        } catch (error) { console.error(error); }
       }
     });
   };
@@ -167,10 +147,7 @@ export default function DMDashboard({ onLogout }) {
 
     try {
       const batch = writeBatch(db);
-      const targets = selectedEnemies.length > 0 
-        ? activeEnemies.filter(e => selectedEnemies.includes(e.id))
-        : activeEnemies;
-
+      const targets = selectedEnemies.length > 0 ? activeEnemies.filter(e => selectedEnemies.includes(e.id)) : activeEnemies;
       const mapRef = doc(db, 'campaign', 'battlemap');
       const mapSnap = await getDoc(mapRef);
       let mapTokens = mapSnap.exists() ? mapSnap.data().tokens || {} : {};
@@ -180,26 +157,16 @@ export default function DMDashboard({ onLogout }) {
         const ref = doc(db, 'active_enemies', enemy.id);
         const current = enemy.currentHp ?? enemy.hp;
         const newHp = isDamage ? Math.max(0, current - amt) : Math.min(enemy.hp, current + amt);
-        
         batch.update(ref, { currentHp: newHp });
-        
-        if (mapTokens[enemy.id]) {
-           mapTokens[enemy.id].hp = newHp;
-           tokensChanged = true;
-        }
+        if (mapTokens[enemy.id]) { mapTokens[enemy.id].hp = newHp; tokensChanged = true; }
       });
       
-      if (tokensChanged) {
-         batch.update(mapRef, { tokens: mapTokens });
-      }
-
+      if (tokensChanged) batch.update(mapRef, { tokens: mapTokens });
       await batch.commit();
       setMassMathAmount('');
       setSelectedEnemies([]); 
       showToast(isDamage ? `Applied ${amt} Mass Damage` : `Applied ${amt} Mass Healing`);
-    } catch (error) {
-      console.error("Mass Math Error:", error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   const handleExportCampaign = async () => {
@@ -215,7 +182,7 @@ export default function DMDashboard({ onLogout }) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `arkla_full_campaign_backup_${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `arkla_backup_${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -233,9 +200,8 @@ export default function DMDashboard({ onLogout }) {
         if (!importedData.characters || !importedData.campaign) return;
 
         setDialog({
-          isOpen: true,
-          title: 'WARNING: DANGEROUS OVERWRITE',
-          message: 'This will completely wipe and replace ALL characters, encounters, and stashes with the backup file data. Are you absolutely sure?',
+          isOpen: true, title: 'DANGEROUS OVERWRITE',
+          message: 'This will completely wipe and replace ALL characters, encounters, and stashes. Are you absolutely sure?',
           type: 'confirm',
           onConfirm: async () => {
             const batch = writeBatch(db);
@@ -253,87 +219,84 @@ export default function DMDashboard({ onLogout }) {
   };
 
   return (
-    <div className="relative min-h-[100dvh] overflow-hidden">
+    <div className="flex flex-col h-[100dvh] bg-slate-950 overflow-hidden text-slate-300 font-sans">
       
-      <div className="fixed inset-0 bg-gradient-to-b from-indigo-950/40 via-slate-950 to-slate-950 pointer-events-none -z-10"></div>
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-600/10 via-fuchsia-600/5 to-transparent blur-[120px] rounded-full pointer-events-none -z-10 animate-pulse"></div>
-
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       {toast && (
         <div 
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-          onClick={() => setToast('')}
-          className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-[0_0_30px_rgba(99,102,241,0.3)] border border-indigo-500/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2 cursor-pointer touch-pan-x"
+          onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onClick={() => setToast('')}
+          className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-[0_0_30px_rgba(99,102,241,0.3)] border border-indigo-500/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2 cursor-pointer"
         >
           <Sparkles className="w-4 h-4" /> {toast}
         </div>
       )}
 
-      {isForgingEnemy && (
-        <EnemyForge onClose={() => setIsForgingEnemy(false)} />
-      )}
-
-      {isForgingSpell && (
-        <DMSpellForge onClose={() => setIsForgingSpell(false)} />
-      )}
-
-      {isBuildingCharacter && (
-        <DMCharacterBuilder onClose={() => setIsBuildingCharacter(false)} />
-      )}
+      {isForgingEnemy && <EnemyForge onClose={() => setIsForgingEnemy(false)} />}
+      {isForgingSpell && <DMSpellForge onClose={() => setIsForgingSpell(false)} />}
+      {isBuildingCharacter && <DMCharacterBuilder onClose={() => setIsBuildingCharacter(false)} />}
+      {activeManager === 'encounters' && <DMEncounterManager onClose={() => setActiveManager(null)} />}
+      {activeManager === 'items' && <DMItemManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
+      {activeManager === 'handouts' && <DMHandoutManager onClose={() => setActiveManager(null)} />}
+      {activeManager === 'rules' && <DMReferenceModal onClose={() => setActiveManager(null)} />}
 
       {showScratchpad && (
         <div className="fixed bottom-6 right-6 w-80 h-80 bg-[#fdf6e3] rounded-xl shadow-2xl z-[9999] border border-amber-300/50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
-          <div className="bg-amber-200/80 backdrop-blur-sm px-4 py-3 flex justify-between items-center border-b border-amber-300/50 shadow-sm cursor-default shrink-0">
+          <div className="bg-amber-200/80 backdrop-blur-sm px-4 py-3 flex justify-between items-center border-b border-amber-300/50 shadow-sm shrink-0">
             <span className="text-amber-900 font-black text-xs flex items-center gap-2 tracking-widest uppercase"><PenTool className="w-4 h-4"/> DM Scratchpad</span>
             <button onClick={() => setShowScratchpad(false)} className="text-amber-700 hover:text-red-600 hover:bg-amber-300/50 p-1 rounded transition-colors"><X className="w-4 h-4"/></button>
           </div>
           <div className="flex-1 relative">
-            <DebouncedTextarea 
-              initialValue={scratchpad}
-              onSave={saveScratchpad}
-              placeholder="Jot down quick notes, hidden HP, DC checks..."
-              className="w-full h-full p-4 bg-transparent text-amber-950 text-sm focus:outline-none resize-none font-medium custom-scrollbar leading-relaxed"
-            />
+            <DebouncedTextarea initialValue={scratchpad} onSave={saveScratchpad} placeholder="Jot down quick notes, hidden HP..." className="w-full h-full p-4 bg-transparent text-amber-950 text-sm focus:outline-none resize-none font-medium custom-scrollbar leading-relaxed" />
           </div>
         </div>
       )}
 
-      <div className="max-w-[1600px] mx-auto p-4 md:p-8 pb-24 flex flex-col gap-8 relative z-10">
-        
-        <DMControlNav 
-          showScratchpad={showScratchpad}
-          setShowScratchpad={setShowScratchpad}
-          handleExportCampaign={handleExportCampaign}
-          fileInputRef={fileInputRef}
-          handleImportCampaign={handleImportCampaign}
-          activeManager={activeManager}
-          setActiveManager={setActiveManager}
-          confirmClearConditions={confirmClearConditions}
-          confirmResetSession={confirmResetSession}
-          onLogout={onLogout}
-        />
+      {/* HEADER COMMAND NAV */}
+      <header className="h-14 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between px-4 shrink-0 z-20">
+        <div className="flex items-center gap-4">
+          <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5"/> Arkla DM
+          </h1>
+          <div className="hidden md:flex items-center gap-2 border-l border-slate-700 pl-4">
+            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><Book className="w-4 h-4"/> Rules Ref</button>
+            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><Package className="w-4 h-4"/> Item Vault</button>
+            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><ImageIcon className="w-4 h-4"/> Handouts</button>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-400 hover:text-amber-300 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Scratchpad"><PenTool className="w-4 h-4"/></button>
+          <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportCampaign} />
+          <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Import Campaign"><UploadCloud className="w-4 h-4"/></button>
+          <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Export Campaign"><DownloadCloud className="w-4 h-4"/></button>
+          <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
+          <button onClick={confirmClearConditions} className="text-fuchsia-400 hover:text-fuchsia-300 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Clear All Conditions"><Sparkles className="w-4 h-4"/></button>
+          <button onClick={confirmResetSession} className="text-red-400 hover:text-red-300 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4"/></button>
+          <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Logout"><PowerOff className="w-4 h-4"/></button>
+        </div>
+      </header>
 
-        <div className="relative">
-          {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>}
-          
-          {isBattleMode ? (
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 animate-in slide-in-from-top-4 duration-500">
-              <div className="xl:col-span-1 h-[70vh]">
-                <InitiativeTracker 
-                  unlockedCharacters={unlockedCharacters} 
-                  activeEnemies={activeEnemies} 
-                  isBattleMode={isBattleMode}
-                  onLaunchBattle={() => setIsBattleMode(true)}
-                  onExitBattle={() => setIsBattleMode(false)}
-                />
-              </div>
-              <div className="xl:col-span-3">
-                <DMBattleMap />
-              </div>
-            </div>
-          ) : (
+      {/* THREE-PANE VTT LAYOUT */}
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative z-10">
+        
+        {/* LEFT PANEL: THE PARTY */}
+        <aside className="w-full lg:w-[320px] xl:w-[350px] border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-900/40 flex flex-col shrink-0 h-[40vh] lg:h-full">
+          <div className="p-3 border-b border-slate-800 flex justify-between items-center bg-indigo-950/20 shrink-0">
+             <h2 className="text-xs font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2"><Users className="w-4 h-4"/> The Party</h2>
+             <button onClick={() => setIsBuildingCharacter(true)} className="text-[10px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded flex items-center gap-1 shadow-sm"><UserPlus className="w-3 h-3"/> New</button>
+          </div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3">
+             {unlockedCharacters.length === 0 ? (
+               <div className="text-center p-4 text-xs text-slate-500 italic border border-slate-800 border-dashed rounded-xl">Waiting for players...</div>
+             ) : (
+               unlockedCharacters.map(id => <DMPlayerCard key={id} charId={id} />)
+             )}
+          </div>
+        </aside>
+
+        {/* CENTER PANEL: THE BOARD */}
+        <section className="flex-1 flex flex-col min-w-0 bg-slate-950 relative border-b lg:border-b-0 lg:border-r border-slate-800 h-[60vh] lg:h-full">
+          <div className="shrink-0 bg-slate-900/80 border-b border-slate-800 max-h-[35vh] overflow-y-auto custom-scrollbar relative z-10">
             <InitiativeTracker 
               unlockedCharacters={unlockedCharacters} 
               activeEnemies={activeEnemies} 
@@ -341,116 +304,57 @@ export default function DMDashboard({ onLogout }) {
               onLaunchBattle={() => setIsBattleMode(true)}
               onExitBattle={() => setIsBattleMode(false)}
             />
-          )}
-        </div>
-
-        <div className="relative">
-          <div className="absolute inset-0 bg-indigo-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>
-          <div className="flex justify-between items-center mb-4 border-b border-slate-700/50 pb-2 mt-4">
-            <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-sm">
-              <Users className="w-5 h-5 text-indigo-400" /> Active Party
-            </h2>
-            <button 
-              onClick={() => setIsBuildingCharacter(true)}
-              className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white px-3 py-1.5 rounded-lg text-[10px] uppercase font-black tracking-widest transition-colors flex items-center gap-1.5 border border-indigo-500/50 shadow-sm"
-            >
-              <UserPlus className="w-3.5 h-3.5" /> Create Character
-            </button>
           </div>
-          {unlockedCharacters.length === 0 ? (
-            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-700 border-dashed rounded-2xl p-8 text-center text-slate-500 shadow-inner">Waiting for players to connect...</div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              {unlockedCharacters.map(charId => <DMPlayerCard key={charId} charId={charId} />)}
-            </div>
-          )}
-        </div>
+          <div className="flex-1 relative overflow-hidden">
+            {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>}
+            <DMBattleMap />
+          </div>
+        </section>
 
-        <div className="relative">
-          <div className="absolute inset-0 bg-red-500/5 blur-[150px] rounded-full pointer-events-none -z-10"></div>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-slate-700/50 pb-3 mt-8">
-            <div className="flex items-center gap-4 flex-wrap">
-              <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-sm">
-                <Skull className="w-5 h-5 text-red-500" /> Active Threats
-              </h2>
-              
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setShowBestiary(!showBestiary)}
-                  className={`text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border shadow-sm ${showBestiary ? 'bg-indigo-600 text-white border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.3)]' : 'bg-slate-900 border-slate-700 text-indigo-400 hover:text-white hover:border-indigo-500/50'}`}
-                >
-                  <DownloadCloud className="w-3.5 h-3.5" /> API Search
-                </button>
-                <button 
-                  onClick={() => setIsForgingEnemy(!isForgingEnemy)}
-                  className={`text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border shadow-sm ${isForgingEnemy ? 'bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.3)]' : 'bg-slate-900 border-slate-700 text-red-400 hover:text-white hover:border-red-500/50'}`}
-                >
-                  <Hammer className="w-3.5 h-3.5" /> Forge Monster
-                </button>
-                <button 
-                  onClick={() => setIsForgingSpell(!isForgingSpell)}
-                  className={`text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border shadow-sm ${isForgingSpell ? 'bg-fuchsia-600 text-white border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.3)]' : 'bg-slate-900 border-slate-700 text-fuchsia-400 hover:text-white hover:border-fuchsia-500/50'}`}
-                >
-                  <Wand2 className="w-3.5 h-3.5" /> Forge Spell
-                </button>
-              </div>
-            </div>
-
-            {activeEnemies.length > 0 && (
-              <div className="flex gap-2 items-center bg-slate-900/80 p-2 rounded-xl border border-slate-700/50 backdrop-blur-sm shadow-inner">
-                <button 
-                  onClick={selectAllEnemies}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${selectedEnemies.length > 0 ? 'bg-indigo-600 text-white border border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white border border-slate-700'}`}
-                >
-                  {selectedEnemies.length > 0 ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-                  {selectedEnemies.length > 0 ? `${selectedEnemies.length} Sel` : 'All'}
-                </button>
-                <div className="w-px h-5 bg-slate-700 mx-1"></div>
-
-                <Calculator className="w-4 h-4 text-slate-500 mx-1 shrink-0" />
-                <input 
-                  type="number" 
-                  value={massMathAmount} 
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => setMassMathAmount(e.target.value)} 
-                  placeholder="Amt..." 
-                  className="w-20 bg-slate-950 border border-slate-600 rounded-lg px-2 py-1.5 text-white text-sm font-bold focus:outline-none focus:border-red-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" 
-                />
-                <button onClick={() => handleMassMath(true)} disabled={!massMathAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-black transition-colors flex items-center gap-1.5 border border-red-900/50 shadow-sm"><Flame className="w-3.5 h-3.5"/> Dmg</button>
-                <button onClick={() => handleMassMath(false)} disabled={!massMathAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-black transition-colors border border-emerald-900/50 shadow-sm">Heal</button>
-              </div>
-            )}
+        {/* RIGHT PANEL: THREATS */}
+        <aside className="w-full lg:w-[350px] xl:w-[400px] bg-slate-900/40 flex flex-col shrink-0 h-[50vh] lg:h-full">
+          <div className="p-3 border-b border-slate-800 flex justify-between items-center bg-red-950/20 shrink-0">
+             <h2 className="text-xs font-black text-red-400 uppercase tracking-widest flex items-center gap-2"><Skull className="w-4 h-4"/> Threats</h2>
+             <div className="flex gap-1.5">
+                <button onClick={() => setActiveManager('encounters')} className="text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-white px-2 py-1 rounded flex items-center gap-1 border border-slate-600" title="Stage Encounters"><MapIcon className="w-3 h-3"/> Stag</button>
+                <button onClick={() => setIsForgingSpell(true)} className="text-[10px] font-bold bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-2 py-1 rounded flex items-center gap-1 shadow-sm" title="Forge Spell"><Wand2 className="w-3 h-3"/> Spl</button>
+                <button onClick={() => setIsForgingEnemy(true)} className="text-[10px] font-bold bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded flex items-center gap-1 shadow-sm" title="Forge Monster"><Hammer className="w-3 h-3"/> Mon</button>
+             </div>
           </div>
 
-          {showBestiary && (
-             <div className="mb-6 animate-in slide-in-from-top-2 fade-in duration-300">
-               <ApiBestiaryImport onImportComplete={() => setShowBestiary(false)} />
+          {activeEnemies.length > 0 && (
+             <div className="p-3 border-b border-slate-800 bg-slate-900/80 flex flex-col gap-2 shrink-0">
+               <div className="flex items-center justify-between">
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mass Apply</span>
+                 <button onClick={selectAllEnemies} className="text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-white px-2 py-1 rounded flex items-center gap-1 border border-slate-600">
+                   {selectedEnemies.length > 0 ? <CheckSquare className="w-3 h-3"/> : <Square className="w-3 h-3"/>}
+                   {selectedEnemies.length > 0 ? `${selectedEnemies.length} Sel` : 'All'}
+                 </button>
+               </div>
+               <div className="flex gap-2">
+                 <input type="number" value={massMathAmount} onChange={e => setMassMathAmount(e.target.value)} placeholder="Amt..." className="w-16 bg-slate-950 border border-slate-700 rounded text-white text-xs px-2 py-1 focus:outline-none focus:border-red-500 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                 <button onClick={() => handleMassMath(true)} disabled={!massMathAmount} className="flex-1 bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white text-[10px] font-black uppercase tracking-widest rounded border border-red-900/50 transition-colors flex items-center justify-center gap-1"><Flame className="w-3 h-3"/> Dmg</button>
+                 <button onClick={() => handleMassMath(false)} disabled={!massMathAmount} className="flex-1 bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white text-[10px] font-black uppercase tracking-widest rounded border border-emerald-900/50 transition-colors">Heal</button>
+               </div>
              </div>
           )}
 
-          {activeEnemies.length === 0 ? (
-            <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-700 border-dashed rounded-2xl p-8 text-center text-slate-500 shadow-inner">The board is clear. Summon enemies to begin.</div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {activeEnemies.map(enemy => (
-                <DMEnemyCard 
-                  key={enemy.id} 
-                  enemy={enemy} 
-                  isSelected={selectedEnemies.includes(enemy.id)}
-                  onToggleSelect={() => toggleEnemySelection(enemy.id)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-      </div>
-
-      {activeManager === 'encounters' && <DMEncounterManager onClose={() => setActiveManager(null)} />}
-      {activeManager === 'items' && <DMItemManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
-      {activeManager === 'handouts' && <DMHandoutManager onClose={() => setActiveManager(null)} />}
-      {activeManager === 'rules' && <DMReferenceModal onClose={() => setActiveManager(null)} />}
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3">
+             {activeEnemies.length === 0 ? (
+               <div className="text-center p-4 text-xs text-slate-500 italic border border-slate-800 border-dashed rounded-xl">No active threats on the board.</div>
+             ) : (
+               activeEnemies.map(enemy => (
+                 <DMEnemyCard 
+                   key={enemy.id} 
+                   enemy={enemy} 
+                   isSelected={selectedEnemies.includes(enemy.id)}
+                   onToggleSelect={() => toggleEnemySelection(enemy.id)}
+                 />
+               ))
+             )}
+          </div>
+        </aside>
+      </main>
     </div>
   );
 }
