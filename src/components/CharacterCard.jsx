@@ -450,12 +450,26 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 ) : (
                    <div className="space-y-4">
                      {char.features.map((feat, i) => (
-                       <FeatureCard 
+                       <CollapsibleSection 
                          key={`feat-${i}`} 
-                         feat={feat}
-                         isDM={isDM}
-                         onRemove={removeFeature}
-                       />
+                         title={
+                           <div className="flex items-center gap-2">
+                             {feat.name}
+                             {isDM && (
+                               <button 
+                                 onClick={(e) => { e.stopPropagation(); removeFeature(feat); }}
+                                 className="text-slate-500 hover:text-red-400 bg-slate-900 p-1.5 rounded transition-all shadow-inner ml-2"
+                                 title="Delete Feature"
+                               >
+                                 <Trash2 className="w-3.5 h-3.5" />
+                               </button>
+                             )}
+                           </div>
+                         } 
+                         defaultOpen={i === 0}
+                       >
+                         <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
+                       </CollapsibleSection>
                      ))}
                    </div>
                 )}
