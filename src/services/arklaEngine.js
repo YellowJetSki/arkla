@@ -577,3 +577,53 @@ export const fetchClassProgression = async (rawClassName, classLevel) => {
     return { hitDie: HIT_DICE_MAP[apiClass] || 8, features: [], resources: [], spellSlots: null, spellcastingInfo: null, error: 'Failed to commune with the D&D API.' };
   }
 };
+
+// ==========================================
+// 🧠 ENGINE INTELLIGENCE & VALIDATION
+// ==========================================
+
+export const getStartingClassLimits = (className, wisMod = 0) => {
+  const safeClass = className ? className.toLowerCase().split(' ')[0] : '';
+  const limits = { skills: 2, cantrips: 0, spells: 0 };
+  
+  if (safeClass === 'rogue') limits.skills = 4;
+  if (safeClass === 'bard') { limits.skills = 3; limits.cantrips = 2; limits.spells = 4; }
+  if (safeClass === 'cleric') { limits.cantrips = 3; limits.spells = Math.max(1, wisMod + 1); }
+  if (safeClass === 'druid') { limits.cantrips = 2; limits.spells = Math.max(1, wisMod + 1); }
+  if (safeClass === 'sorcerer' || safeClass === 'mage') { limits.cantrips = 4; limits.spells = 2; }
+  if (safeClass === 'warlock' || safeClass === 'dealt') { limits.cantrips = 2; limits.spells = 2; }
+  if (safeClass === 'wizard') { limits.cantrips = 3; limits.spells = 6; }
+  if (safeClass === 'ranger' || safeClass === 'paladin') { limits.skills = 3; limits.cantrips = 0; limits.spells = 2; }
+  if (safeClass === 'pirate') { limits.skills = 3; limits.cantrips = 0; limits.spells = 0; }
+  
+  return limits;
+};
+
+export const checkFeatPrerequisites = (feat, charStats, charSpecies) => {
+  // If no prerequisites exist on the feat, it is universally available
+  if (!feat.prerequisites || feat.prerequisites.length === 0) return true;
+
+  const safeSpecies = (charSpecies || '').toLowerCase();
+
+  for (const prereq of feat.prerequisites) {
+    // Check Ability Score minimums (e.g., Minimum DEX 13)
+    if (prereq.ability_score) {
+      const requiredStat = prereq.ability_score.name.substring(0, 3).toUpperCase();
+      const minimumValue = prereq.minimum_score;
+      if ((charStats[requiredStat] || 10) < minimumValue) {
+        return false; 
+      }
+    }
+    
+    // Check Species Requirements (e.g., Elven Accuracy requires Elf/Half-Elf)
+    if (prereq.race) {
+      const requiredRace = prereq.race.name.toLowerCase();
+      // Simple substring check handles "Elf" matching "Wood Elf" or "Half-Elf"
+      if (!safeSpecies.includes(requiredRace)) {
+        return false;
+      }
+    }
+  }
+
+  return true; 
+};

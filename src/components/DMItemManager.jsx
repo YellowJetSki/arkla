@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { X, Backpack, Send, PackagePlus, ShieldAlert } from 'lucide-react';
+import { X, Backpack, Send, PackagePlus, ShieldAlert, Hammer } from 'lucide-react';
 import ApiBestiaryImport from './ApiBestiaryImport'; // We can reuse the logic/UI from here later, or keep it distinct
 import EquipmentDiscovery from './EquipmentDiscovery';
+import DMItemForge from './DMItemForge';
 import DialogModal from './shared/DialogModal';
 
 export default function DMItemManager({ onClose, activePlayers }) {
   const [stashedItems, setStashedItems] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState('');
+  const [showForge, setShowForge] = useState(false);
   
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
@@ -66,6 +68,8 @@ export default function DMItemManager({ onClose, activePlayers }) {
     <>
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
+      {showForge && <DMItemForge onClose={() => setShowForge(false)} />}
+
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
         <div className="bg-slate-900 border border-indigo-500/50 rounded-2xl w-full max-w-4xl shadow-[0_0_40px_rgba(99,102,241,0.2)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500">
           
@@ -83,7 +87,15 @@ export default function DMItemManager({ onClose, activePlayers }) {
             {/* LEFT: Discovery/Prep */}
             <div className="space-y-6">
               <div>
-                <h3 className="font-bold text-white mb-2">1. Prep Gear & Artifacts</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-white">1. Prep Gear & Artifacts</h3>
+                  <button 
+                    onClick={() => setShowForge(true)}
+                    className="bg-emerald-900/40 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-xs uppercase font-black tracking-widest transition-colors flex items-center gap-1.5 border border-emerald-500/30"
+                  >
+                    <Hammer className="w-3.5 h-3.5" /> Forge Custom
+                  </button>
+                </div>
                 <p className="text-xs text-slate-400 mb-4">Search the API. Found items will be saved to your secret Stash until you assign them.</p>
                 <EquipmentDiscovery onAddEquipment={handleStashApiItem} />
               </div>

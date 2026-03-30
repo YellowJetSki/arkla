@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Plus, BookOpen, Lock, ChevronDown } from 'lucide-react';
-import { getFeatStubs, fetchDetailedStubs } from '../services/arklaEngine';
+import { getFeatStubs, fetchDetailedStubs, checkFeatPrerequisites } from '../services/arklaEngine';
 
 export default function FeatDiscovery({ charSpecies = '', charStats = {}, onAddFeat, allowAdd = true, charLevel = 1 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,36 +62,34 @@ export default function FeatDiscovery({ charSpecies = '', charStats = {}, onAddF
   };
 
   const checkPrereqs = (feat) => {
-    if (!feat.prerequisites || feat.prerequisites.length === 0) return { locked: false, reason: '' };
+    // We defer to the engine for our strict check
+    const isEngineLocked = !checkFeatPrerequisites(feat, charStats, charSpecies);
     
-    let isLocked = false;
     let reasons = [];
+    const reqText = feat.prerequisites?.map(p => p.ability_score ? `${p.ability_score.name} ${p.minimum_score}` : '').join(', ') || '';
 
-    const reqText = feat.prerequisites.map(p => p.ability_score ? `${p.ability_score.name} ${p.minimum_score}` : '').join(', ');
-    const descLower = (Array.isArray(feat.desc) ? feat.desc.join(' ') : feat.desc || '').toLowerCase();
-
-    feat.prerequisites.forEach(p => {
+    feat.prerequisites?.forEach(p => {
       if (p.ability_score) {
-        const statName = p.ability_score.name;
+        const statName = p.ability_score.name.substring(0, 3).toUpperCase();
         const currentStat = charStats[statName] || 10;
         if (currentStat < p.minimum_score) {
-          isLocked = true;
           reasons.push(`${statName} ${p.minimum_score} Req`);
         }
       }
     });
 
+    const descLower = (Array.isArray(feat.desc) ? feat.desc.join(' ') : feat.desc || '').toLowerCase();
     const speciesSafe = charSpecies.toLowerCase();
-    if (descLower.includes('prerequisite: elf') && !speciesSafe.includes('elf')) { isLocked = true; reasons.push('Elf Req'); }
-    if (descLower.includes('prerequisite: dwarf') && !speciesSafe.includes('dwarf')) { isLocked = true; reasons.push('Dwarf Req'); }
-    if (descLower.includes('prerequisite: halfling') && !speciesSafe.includes('halfling')) { isLocked = true; reasons.push('Halfling Req'); }
+    
+    if (descLower.includes('prerequisite: elf') && !speciesSafe.includes('elf')) { reasons.push('Elf Req'); }
+    if (descLower.includes('prerequisite: dwarf') && !speciesSafe.includes('dwarf')) { reasons.push('Dwarf Req'); }
+    if (descLower.includes('prerequisite: halfling') && !speciesSafe.includes('halfling')) { reasons.push('Halfling Req'); }
 
-    if (reqText.includes('Level') && !isLocked) {
-       isLocked = true;
+    if (reqText.includes('Level') && isEngineLocked && reasons.length === 0) {
        reasons.push('Level Req');
     }
 
-    return { locked: isLocked, reason: reasons.join(', ') };
+    return { locked: isEngineLocked, reason: reasons.join(', ') || 'Requirements Not Met' };
   };
 
   const hasMore = visibleFeats.length < filteredStubs.length;
@@ -158,7 +156,7 @@ export default function FeatDiscovery({ charSpecies = '', charStats = {}, onAddF
                   <span className={`font-black text-lg block mb-1 ${isTooHigh ? 'text-slate-500' : 'text-amber-300 drop-shadow-sm'}`}>{feat.name}</span>
                   {feat.prerequisites && feat.prerequisites.length > 0 && (
                     <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border shadow-inner inline-block ${isTooHigh ? 'bg-red-950/30 text-red-400 border-red-900/50' : 'bg-slate-900/80 text-slate-400 border-slate-700'}`}>
-                      Req: {feat.prerequisites.map(p => p.ability_score ? `${p.ability_score.name} ${p.minimum_score}` : 'Special').join(', ')}
+                      Req: {feat.prerequisites.map(p => p.ability_score ? `${p.ability_score.name} ${p.minimum_score}` : p.race ? p.race.name : 'Special').join(', ')}
                     </span>
                   )}
                 </div>

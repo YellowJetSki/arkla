@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, Heart, Backpack, Tent, ChevronRight, CheckCircle2, ArrowUpCircle, Compass, Target, Flame, X } from 'lucide-react';
 import SpellDiscovery from './SpellDiscovery';
-import { CLASS_SKILLS_MAP, ALL_SKILLS } from '../services/arklaEngine';
+import { CLASS_SKILLS_MAP, ALL_SKILLS, getStartingClassLimits } from '../services/arklaEngine';
 
 const THEMES = {
   indigo: { name: 'Tenari Void', desc: 'The lingering, arcane resonance of the magic-wielding giants of old.', bg: 'bg-indigo-600', ring: 'ring-indigo-500', border: 'border-indigo-500/50', text: 'text-indigo-400' },
@@ -9,24 +9,6 @@ const THEMES = {
   rose: { name: 'Dragonfire Rose', desc: 'A harsh, primal reminder of the nefarious dragons that once tormented the realm.', bg: 'bg-rose-600', ring: 'ring-rose-500', border: 'border-rose-500/50', text: 'text-rose-400' },
   amber: { name: "Crown's Radiance", desc: 'The authoritative, golden banner of Emperor Hearn and the Republic.', bg: 'bg-amber-600', ring: 'ring-amber-500', border: 'border-amber-500/50', text: 'text-amber-400' },
   sky: { name: "Privateer's Sky", desc: 'The boundless horizon sought by port-town rebels raising the black flag.', bg: 'bg-sky-600', ring: 'ring-sky-500', border: 'border-sky-500/50', text: 'text-sky-400' },
-};
-
-const getClassLimits = (char) => {
-  const className = char.classes?.[0]?.name?.toLowerCase().split(' ')[0] || '';
-  const wisMod = Math.max(1, Math.floor(((char.stats?.WIS || 10) - 10) / 2));
-  
-  const limits = { skills: 2, cantrips: 0, spells: 0 };
-  
-  if (className === 'rogue') limits.skills = 4;
-  if (className === 'bard') { limits.skills = 3; limits.cantrips = 2; limits.spells = 4; }
-  if (className === 'cleric') { limits.cantrips = 3; limits.spells = wisMod + 1; }
-  if (className === 'druid') { limits.cantrips = 2; limits.spells = wisMod + 1; }
-  if (className === 'sorcerer') { limits.cantrips = 4; limits.spells = 2; }
-  if (className === 'warlock') { limits.cantrips = 2; limits.spells = 2; }
-  if (className === 'wizard') { limits.cantrips = 3; limits.spells = 6; }
-  if (className === 'ranger' || className === 'paladin') { limits.skills = 3; limits.cantrips = 0; limits.spells = 2; }
-  
-  return limits;
 };
 
 export default function OnboardingWizard({ char, onComplete }) {
@@ -41,8 +23,11 @@ export default function OnboardingWizard({ char, onComplete }) {
   const firstName = (char.name || 'Traveler').split(' ')[0];
   const welcomeText = `Welcome, ${firstName}. Your legacy begins now.`;
 
-  const limits = getClassLimits(char);
+  const wisMod = Math.floor(((char.stats?.WIS || 10) - 10) / 2);
   const charClassSafe = char.classes?.[0]?.name?.toLowerCase().split(' ')[0];
+  
+  // The engine now acts as the single source of truth for class rules
+  const limits = getStartingClassLimits(charClassSafe, wisMod);
   const allowedSkills = CLASS_SKILLS_MAP[charClassSafe] || ALL_SKILLS; 
 
   const needsSkills = (!char.proficiencies?.skills || char.proficiencies.skills.trim() === '');
