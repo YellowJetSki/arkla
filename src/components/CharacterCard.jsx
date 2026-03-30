@@ -98,13 +98,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         setChar(docSnap.data());
         isMounted.current = true;
       } else {
-        if (isMounted.current) {
-          if (!isDM) setIsKicked(true);
-        } else {
-          if (!isDM && !isKicked) {
-            setIsKicked(true);
-          }
-        }
+        if (!isDM) setIsKicked(true);
       }
     });
 
@@ -488,11 +482,11 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
             {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} charId={currentUser.charId} />}
 
-            {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} />}
+            {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
 
             {activeTab === 'journal' && <JournalTab char={char} updateField={updateField} activeTheme={activeTheme} />}
 
-            {activeTab === 'settings' && <SettingsTab char={char} updateField={updateField} activeTheme={activeTheme} />}
+            {activeTab === 'settings' && <SettingsTab char={char} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
             
           </div>
         </div>

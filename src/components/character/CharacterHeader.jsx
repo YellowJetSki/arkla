@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, writeBatch, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Skull, Maximize, Star, Heart, Shield, Tent, Moon, ArrowUpCircle } from 'lucide-react';
 
@@ -50,18 +50,13 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
     
     try {
+      // INSTANT DUAL-SYNC
       const batch = writeBatch(db);
-      const charRef = doc(db, 'characters', charId);
-      batch.update(charRef, updates);
-
-      const mapRef = doc(db, 'campaign', 'battlemap');
-      const mapDoc = await getDoc(mapRef);
-      if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-         const mapTokens = mapDoc.data().tokens;
-         mapTokens[charId].hp = boundedHp;
-         if (newTempVal !== null) mapTokens[charId].tempHp = updates.tempHp;
-         batch.update(mapRef, { tokens: mapTokens });
-      }
+      batch.update(doc(db, 'characters', charId), updates);
+      
+      const mapUpdates = { [`tokens.${charId}.hp`]: boundedHp };
+      if (newTempVal !== null) mapUpdates[`tokens.${charId}.tempHp`] = updates.tempHp;
+      batch.update(doc(db, 'campaign', 'battlemap'), mapUpdates);
       
       await batch.commit();
     } catch (err) {
@@ -100,18 +95,13 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
     
     try {
+      // INSTANT DUAL-SYNC
       const batch = writeBatch(db);
-      const charRef = doc(db, 'characters', charId);
-      batch.update(charRef, updates);
-
-      const mapRef = doc(db, 'campaign', 'battlemap');
-      const mapDoc = await getDoc(mapRef);
-      if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-         const mapTokens = mapDoc.data().tokens;
-         mapTokens[charId].hp = currentHp;
-         mapTokens[charId].tempHp = currentTemp;
-         batch.update(mapRef, { tokens: mapTokens });
-      }
+      batch.update(doc(db, 'characters', charId), updates);
+      batch.update(doc(db, 'campaign', 'battlemap'), { 
+         [`tokens.${charId}.hp`]: currentHp,
+         [`tokens.${charId}.tempHp`]: currentTemp
+      });
       
       await batch.commit();
     } catch (err) {
@@ -135,6 +125,7 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     }
   };
 
+  // ... rest of the component handles rendering
   const activeConditions = char.conditions || [];
   const isUnconscious = (char.hp || 0) <= 0;
   const isPoisoned = activeConditions.includes('Poisoned');
@@ -159,10 +150,7 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
             src={`/${charId}.png`} 
             alt={char.name} 
             className={`w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105 ${isUnconscious ? 'grayscale' : ''}`} 
-            onError={(e) => { 
-              e.currentTarget.onerror = null; 
-              e.currentTarget.src = 'https://via.placeholder.com/800x400?text=No+Image'; 
-            }} 
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://via.placeholder.com/800x400?text=No+Image'; }} 
           />
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent pointer-events-none z-10"></div>
