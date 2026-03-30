@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, Users, Calculator, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud, Hammer, UserPlus } from 'lucide-react';
+import { Skull, Users, Calculator, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud, Hammer, UserPlus, Wand2 } from 'lucide-react';
 
 import DMControlNav from './DMControlNav';
 import DMPlayerCard from './DMPlayerCard';
@@ -17,6 +17,7 @@ import ApiBestiaryImport from './ApiBestiaryImport';
 import DebouncedTextarea from './shared/DebouncedTextarea';
 import EnemyForge from './EnemyForge';
 import DMCharacterBuilder from './DMCharacterBuilder';
+import DMSpellForge from './DMSpellForge';
 
 export default function DMDashboard({ onLogout }) {
   const [unlockedCharacters, setUnlockedCharacters] = useState([]);
@@ -30,6 +31,7 @@ export default function DMDashboard({ onLogout }) {
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [showBestiary, setShowBestiary] = useState(false); 
   const [isForgingEnemy, setIsForgingEnemy] = useState(false);
+  const [isForgingSpell, setIsForgingSpell] = useState(false);
   const [isBuildingCharacter, setIsBuildingCharacter] = useState(false);
   const [scratchpad, setScratchpad] = useState(() => localStorage.getItem('dm_scratchpad') || '');
 
@@ -89,16 +91,6 @@ export default function DMDashboard({ onLogout }) {
       setSelectedEnemies([]); 
     } else {
       setSelectedEnemies(activeEnemies.map(e => e.id)); 
-    }
-  };
-
-  const handleSaveCustomEnemy = async (newEnemyObj) => {
-    try {
-      await setDoc(doc(db, 'active_enemies', newEnemyObj.id), newEnemyObj);
-      setIsForgingEnemy(false);
-      showToast('Custom Monster Forged!');
-    } catch (error) {
-      console.error("Failed to add enemy to bestiary:", error);
     }
   };
 
@@ -280,10 +272,11 @@ export default function DMDashboard({ onLogout }) {
       )}
 
       {isForgingEnemy && (
-        <EnemyForge 
-          onSave={handleSaveCustomEnemy}
-          onClose={() => setIsForgingEnemy(false)}
-        />
+        <EnemyForge onClose={() => setIsForgingEnemy(false)} />
+      )}
+
+      {isForgingSpell && (
+        <DMSpellForge onClose={() => setIsForgingSpell(false)} />
       )}
 
       {isBuildingCharacter && (
@@ -394,6 +387,12 @@ export default function DMDashboard({ onLogout }) {
                   className={`text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border shadow-sm ${isForgingEnemy ? 'bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.3)]' : 'bg-slate-900 border-slate-700 text-red-400 hover:text-white hover:border-red-500/50'}`}
                 >
                   <Hammer className="w-3.5 h-3.5" /> Forge Monster
+                </button>
+                <button 
+                  onClick={() => setIsForgingSpell(!isForgingSpell)}
+                  className={`text-[10px] uppercase font-black tracking-widest px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 border shadow-sm ${isForgingSpell ? 'bg-fuchsia-600 text-white border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.3)]' : 'bg-slate-900 border-slate-700 text-fuchsia-400 hover:text-white hover:border-fuchsia-500/50'}`}
+                >
+                  <Wand2 className="w-3.5 h-3.5" /> Forge Spell
                 </button>
               </div>
             </div>

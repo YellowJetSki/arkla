@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Plus, PackagePlus, Swords, Info, ChevronDown } from 'lucide-react';
 import { getEquipmentStubs, fetchDetailedStubs } from '../services/arklaEngine';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 export default function EquipmentDiscovery({ onAddEquipment, onEquipWeapon }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,10 +19,25 @@ export default function EquipmentDiscovery({ onAddEquipment, onEquipWeapon }) {
     const initItems = async () => {
       setIsSearching(true);
       const stubs = await getEquipmentStubs();
-      setAllStubs(stubs);
-      setFilteredStubs(stubs);
       
-      const initialDetails = await fetchDetailedStubs(stubs.slice(0, CHUNK_SIZE));
+      let homebrewStubs = [];
+      try {
+        const snap = await getDocs(collection(db, 'homebrew_items'));
+        homebrewStubs = snap.docs.map(doc => ({ 
+          index: doc.id, 
+          name: doc.data().name, 
+          url: 'custom', 
+          isCustom: true, 
+          ...doc.data() 
+        }));
+      } catch (e) { console.error("Error fetching homebrew items:", e); }
+      
+      const combinedStubs = [...homebrewStubs, ...stubs];
+
+      setAllStubs(combinedStubs);
+      setFilteredStubs(combinedStubs);
+      
+      const initialDetails = await fetchDetailedStubs(combinedStubs.slice(0, CHUNK_SIZE));
       setVisibleItems(initialDetails);
       setIsSearching(false);
     };
@@ -122,7 +139,10 @@ export default function EquipmentDiscovery({ onAddEquipment, onEquipWeapon }) {
               
               <div className="flex justify-between items-start mb-3 relative z-10">
                 <div className="pr-4">
-                  <span className="font-black text-lg block mb-1 text-emerald-300 drop-shadow-sm">{item.name}</span>
+                  <span className="font-black text-lg block mb-1 text-emerald-300 drop-shadow-sm">
+                    {item.name}
+                    {item.isCustom && <span className="text-[9px] ml-2 text-emerald-400 uppercase tracking-widest border border-emerald-500/30 px-1 rounded bg-emerald-900/20">Homebrew</span>}
+                  </span>
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider bg-slate-900/80 px-2 py-1 rounded border border-slate-700 inline-block shadow-inner">
                     {item.equipment_category?.name || 'Item'}
                   </span>
