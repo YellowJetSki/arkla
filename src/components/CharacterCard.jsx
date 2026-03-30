@@ -259,7 +259,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
       prerequisites: customFeat.prerequisite ? [{ ability_score: { name: customFeat.prerequisite }, minimum_score: customFeat.minScore }] : [] 
     };
     
-    await setDoc(doc(db, 'custom_feats', 'feat_' + Date.now()), newFeat);
+    await setDoc(doc(db, 'homebrew_feats', 'hb_feat_' + Date.now()), newFeat);
     
     await updateDoc(doc(db, 'characters', currentUser.charId), {
       features: arrayUnion(newFeat)
@@ -267,7 +267,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     
     setIsForgingFeat(false);
     setCustomFeat({ name: '', prerequisite: '', minScore: 13, desc: '' });
-    setSaveToast('Feat Forged & Added!');
+    setSaveToast('Feat Forged & Added to Archives!');
     setTimeout(() => setSaveToast(''), 2500);
   };
 
@@ -528,7 +528,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                     charSpecies={char.species}
                     charStats={char.stats}
                     onAddFeat={addFeature} 
-                    allowAdd={isDM} 
+                    allowAdd={false} 
                     charLevel={char.level} 
                   />
                 )}

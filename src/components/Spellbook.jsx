@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Shield, Settings, BrainCircuit, Hammer, X, Filter, Trash2 } from 'lucide-react';
 import CollapsibleSection from './shared/CollapsibleSection';
@@ -107,19 +107,38 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     e.preventDefault();
     if (!customSpell.name || !customSpell.desc) return;
     
-    // Save perfectly matching the API object structure
-    await addSpellToGrimoire({
+    // Perfectly match the 5e API structure
+    const formattedSpell = {
       name: customSpell.name,
       level: Number(customSpell.level),
       casting_time: customSpell.castTime,
       range: customSpell.range,
       components: customSpell.components.split(',').map(c => c.trim()),
       duration: customSpell.duration,
-      desc: customSpell.desc
-    });
-    
-    setCustomSpell({ name: '', level: 0, castTime: '1 Action', range: '60 feet', components: 'V, S', duration: 'Instantaneous', desc: '' });
-    setIsForgingSpell(false);
+      desc: customSpell.desc.split('\n'), // Split to array to match API desc formatting
+      isHomebrew: true,
+      index: `hb_spell_${Date.now()}`
+    };
+
+    try {
+      // 1. Save globally to the Archives so Discovery can find it
+      await setDoc(doc(db, 'homebrew_spells', formattedSpell.index), formattedSpell);
+      
+      // 2. Add it directly to the current character's Grimoire as well
+      await addSpellToGrimoire({
+        name: formattedSpell.name,
+        level: formattedSpell.level,
+        castTime: formattedSpell.casting_time,
+        desc: formattedSpell.desc.join('\n') // Re-join for character sheet display
+      });
+      
+      setCustomSpell({ name: '', level: 0, castTime: '1 Action', range: '60 feet', components: 'V, S', duration: 'Instantaneous', desc: '' });
+      setIsForgingSpell(false);
+      showDialog({ isOpen: true, title: 'Success', message: 'Spell added to Grimoire and Universal Archives.', type: 'alert' });
+    } catch (err) {
+      console.error("Failed to forge custom spell:", err);
+      showDialog({ isOpen: true, title: 'Error', message: 'Failed to forge spell.', type: 'alert' });
+    }
   };
 
   const updateSlotMax = async (level, newMax) => {

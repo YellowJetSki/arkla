@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Search, Loader2, Plus, BookOpen, Lock, ChevronDown } from 'lucide-react';
 import { getFeatStubs, fetchDetailedStubs, checkFeatPrerequisites } from '../services/arklaEngine';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 export default function FeatDiscovery({ charSpecies = '', charStats = {}, onAddFeat, allowAdd = true, charLevel = 1 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -17,10 +19,25 @@ export default function FeatDiscovery({ charSpecies = '', charStats = {}, onAddF
     const initFeats = async () => {
       setIsSearching(true);
       const stubs = await getFeatStubs();
-      setAllStubs(stubs);
-      setFilteredStubs(stubs);
       
-      const initialDetails = await fetchDetailedStubs(stubs.slice(0, CHUNK_SIZE));
+      let homebrewStubs = [];
+      try {
+        const snap = await getDocs(collection(db, 'homebrew_feats'));
+        homebrewStubs = snap.docs.map(doc => ({ 
+          index: doc.id, 
+          name: doc.data().name, 
+          url: 'custom', 
+          isCustom: true, 
+          ...doc.data() 
+        }));
+      } catch (e) { console.error("Error fetching homebrew feats:", e); }
+      
+      const combinedStubs = [...homebrewStubs, ...stubs];
+
+      setAllStubs(combinedStubs);
+      setFilteredStubs(combinedStubs);
+      
+      const initialDetails = await fetchDetailedStubs(combinedStubs.slice(0, CHUNK_SIZE));
       setVisibleFeats(initialDetails);
       setIsSearching(false);
     };
@@ -62,7 +79,6 @@ export default function FeatDiscovery({ charSpecies = '', charStats = {}, onAddF
   };
 
   const checkPrereqs = (feat) => {
-    // We defer to the engine for our strict check
     const isEngineLocked = !checkFeatPrerequisites(feat, charStats, charSpecies);
     
     let reasons = [];
@@ -153,7 +169,10 @@ export default function FeatDiscovery({ charSpecies = '', charStats = {}, onAddF
 
               <div className="flex justify-between items-start mb-3 relative z-10">
                 <div className="pr-4">
-                  <span className={`font-black text-lg block mb-1 ${isTooHigh ? 'text-slate-500' : 'text-amber-300 drop-shadow-sm'}`}>{feat.name}</span>
+                  <span className={`font-black text-lg block mb-1 ${isTooHigh ? 'text-slate-500' : 'text-amber-300 drop-shadow-sm'}`}>
+                     {feat.name}
+                     {feat.isCustom && <span className="text-[9px] ml-2 text-amber-400 uppercase tracking-widest border border-amber-500/30 px-1 rounded bg-amber-900/20">Custom</span>}
+                  </span>
                   {feat.prerequisites && feat.prerequisites.length > 0 && (
                     <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border shadow-inner inline-block ${isTooHigh ? 'bg-red-950/30 text-red-400 border-red-900/50' : 'bg-slate-900/80 text-slate-400 border-slate-700'}`}>
                       Req: {feat.prerequisites.map(p => p.ability_score ? `${p.ability_score.name} ${p.minimum_score}` : p.race ? p.race.name : 'Special').join(', ')}

@@ -77,10 +77,27 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
     
     let formattedText = `• ${customItem.name} (${customItem.category})`;
     
+    // Engine Integration: Build universal object for the homebrew vault
+    const globalItem = {
+      index: `hb_item_${Date.now()}`,
+      name: customItem.name,
+      equipment_category: { name: customItem.category },
+      desc: customItem.desc ? customItem.desc.split('\n') : [''],
+      isHomebrew: true,
+    };
+    
     if (customItem.category === 'Weapon') {
       formattedText += `\nDamage: ${customItem.damageDice || 'N/A'} ${customItem.damageType}`;
       if (customItem.properties) {
         formattedText += ` (${customItem.properties})`;
+      }
+
+      globalItem.damage = {
+        damage_dice: customItem.damageDice || '1d4',
+        damage_type: { name: customItem.damageType || 'Bludgeoning' }
+      };
+      if (customItem.properties) {
+        globalItem.properties = customItem.properties.split(',').map(p => ({ name: p.trim() }));
       }
 
       const newAttack = {
@@ -95,7 +112,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         await updateDoc(doc(db, 'characters', charId), { attacks: arrayUnion(newAttack) });
         showDialog({
           title: 'Weapon Forged & Linked',
-          message: `${customItem.name} has been added to the inventory AND instantly pinned to the Combat Tab!`,
+          message: `${customItem.name} has been added to the inventory, pinned to the Combat Tab, AND scribed to the Universal Item Vault!`,
           type: 'alert',
           onConfirm: () => showDialog({ isOpen: false })
         });
@@ -105,16 +122,33 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
 
     } else if (customItem.category === 'Armor') {
       formattedText += `\nAC: ${customItem.ac || 10}`;
+      globalItem.armor_class = { base: parseInt(customItem.ac) || 10, dex_bonus: true, max_bonus: null };
     }
     
     if (customItem.desc) {
       formattedText += `\n${customItem.desc}`;
     }
     
+    // Save to Universal Vault
+    try {
+      await setDoc(doc(db, 'homebrew_items', globalItem.index), globalItem);
+    } catch (err) {
+      console.error("Failed to save to global items vault:", err);
+    }
+    
     await addEquipmentToInventory(formattedText);
     
     setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, desc: '' });
     setIsForgingItem(false);
+    
+    if (customItem.category !== 'Weapon') {
+      showDialog({
+        title: 'Item Forged',
+        message: `${customItem.name} has been added to the inventory AND scribed to the Universal Item Vault!`,
+        type: 'alert',
+        onConfirm: () => showDialog({ isOpen: false })
+      });
+    }
   };
 
   const handleShareToParty = async (itemString, index) => {
