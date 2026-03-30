@@ -1,209 +1,182 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, writeBatch, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Shield, Eye, Maximize2, UserX, ChevronDown, ChevronUp, Sword, Zap, Sparkles } from 'lucide-react';
-import CharacterCard from './CharacterCard';
-import { parseAndScaleAttack } from '../services/arklaEngine';
+import { Shield, Activity, Heart, Eye, Target, Sparkles, Plus, Minus, Wind, PawPrint, Droplets, Droplet } from 'lucide-react';
+import DMEditSheet from './DMEditSheet';
+import { CONDITIONS_LIST } from '../data/campaignData';
 
 export default function DMPlayerCard({ charId }) {
   const [char, setChar] = useState(null);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [kickConfirm, setKickConfirm] = useState(false); 
-  const [showSummary, setShowSummary] = useState(false);
-  
-  const [activeSpell, setActiveSpell] = useState(null);
-  const [activeFeature, setActiveFeature] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    if (!charId) return;
-
-    const charRef = doc(db, 'characters', charId);
-    const unsub = onSnapshot(charRef, (docSnap) => {
+    const unsubscribe = onSnapshot(doc(db, 'characters', charId), (docSnap) => {
       if (docSnap.exists()) setChar(docSnap.data());
     });
-    return () => unsub();
+    return () => unsubscribe();
   }, [charId]);
 
-  const handleKickPlayer = async () => {
-    try {
-      const batch = writeBatch(db);
-      batch.update(doc(db, 'campaign', 'main_session'), { unlockedCharacters: arrayRemove(charId) });
-      batch.update(doc(db, 'characters', charId), { hasCompletedTutorial: false });
-      await batch.commit();
-    } catch (error) {
-      console.error("Failed to kick player:", error);
+  const updateHp = async (amount) => {
+    if (!char) return;
+    const newHp = Math.max(0, Math.min(char.maxHp, char.hp + amount));
+    
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'characters', charId), { hp: newHp });
+    
+    // Sync with battlemap token if it exists
+    const mapRef = doc(db, 'campaign', 'battlemap');
+    const mapSnap = await getDoc(mapRef);
+    if (mapSnap.exists() && mapSnap.data().tokens && mapSnap.data().tokens[charId]) {
+       batch.update(mapRef, { [`tokens.${charId}.hp`]: newHp });
     }
+    await batch.commit();
+  };
+
+  const handleResourceToggle = async (resourceIndex, newCurrentValue) => {
+    if (!char || !char.resources) return;
+    const updatedResources = [...char.resources];
+    updatedResources[resourceIndex] = {
+      ...updatedResources[resourceIndex],
+      current: newCurrentValue
+    };
+    await updateDoc(doc(db, 'characters', charId), { resources: updatedResources });
   };
 
   if (!char) return null;
 
-  const hpPercent = Math.max(0, Math.min(100, ((char.hp || 0) / (char.maxHp || 1)) * 100));
-  const hpColor = hpPercent > 50 ? 'bg-emerald-500' : hpPercent > 20 ? 'bg-yellow-500' : 'bg-red-500';
-  const isUnconscious = (char.hp || 0) <= 0;
-  
-  const totalLevel = char.classes ? char.classes.reduce((sum, c) => sum + c.level, 0) : (char.level || 1);
+  const hpPercentage = (char.hp / char.maxHp) * 100;
+  let hpColor = 'bg-emerald-500';
+  if (hpPercentage < 50) hpColor = 'bg-amber-500';
+  if (hpPercentage < 20) hpColor = 'bg-red-500';
 
-  const wisScore = char.stats?.WIS || 10;
-  const wisMod = Math.floor((wisScore - 10) / 2);
-  const proficiencyBonus = Math.ceil((totalLevel / 4) + 1);
-  const hasPerception = (char.proficiencies?.skills || '').toLowerCase().includes('perception');
-  const passivePerception = 10 + wisMod + (hasPerception ? proficiencyBonus : 0);
-
-  // Safely check descriptions to prevent a crash if a homebrew feature lacks text
-  const bonusActions = (char.features || []).filter(f => f.desc?.toLowerCase().includes('bonus action'));
-  const reactions = (char.features || []).filter(f => f.desc?.toLowerCase().includes('reaction'));
-  const passives = (char.features || []).filter(f => 
-    !f.desc?.toLowerCase().includes('bonus action') && 
-    !f.desc?.toLowerCase().includes('reaction')
-  );
-
-  const dynamicAttacks = (char.attacks || []).map(atk => parseAndScaleAttack(atk, char.stats, totalLevel));
+  const activeConditions = char.conditions || [];
+  const resources = char.resources || [];
+  const companion = char.companion || null;
+  const isCompanionActive = companion && (!companion.isDormant || char.level >= companion.awakeLevel);
 
   return (
-    <>
-      {kickConfirm && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-sm w-full p-5 shadow-2xl">
-            <h3 className="text-lg font-bold mb-2 text-red-400 flex items-center gap-2">
-              <UserX className="w-5 h-5"/> Kick Player?
-            </h3>
-            <p className="text-sm text-slate-300 mb-6 leading-relaxed">
-              Are you sure you want to kick <strong>{char.name}</strong> from the active session? This will also reset their tutorial status.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setKickConfirm(false)} className="px-4 py-2 text-slate-400 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-bold text-sm">Cancel</button>
-              <button onClick={() => { handleKickPlayer(); setKickConfirm(false); }} className="px-4 py-2 bg-red-600 hover:bg-red-500 transition-colors text-white rounded-lg font-bold text-sm">Kick Player</button>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700 rounded-2xl p-5 shadow-xl relative overflow-hidden group">
+      
+      {isEditing && <DMEditSheet char={char} charId={charId} onCancel={() => setIsEditing(false)} />}
+      
+      {/* Background Aura */}
+      <div className={`absolute top-0 right-0 w-32 h-32 blur-[50px] rounded-full pointer-events-none opacity-20 bg-${char.theme || 'indigo'}-500`}></div>
 
-      <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-md flex flex-col relative transition-all hover:border-indigo-500/30">
-        {isUnconscious && <div className="absolute inset-0 bg-red-950/20 pointer-events-none z-10" />}
+      <div className="flex justify-between items-start mb-4 relative z-10">
+        <div>
+          <h3 className="text-xl font-black text-white flex items-center gap-2 drop-shadow-sm">
+            {char.name} 
+            {activeConditions.length > 0 && <span className="flex w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" title="Has Conditions"></span>}
+          </h3>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Level {char.level} {char.species} {char.class}</p>
+        </div>
         
-        <div className="flex items-center gap-4 p-3">
-          <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-slate-700 relative shadow-inner">
-            <img src={`/${charId}.png`} alt={char.name} className={`w-full h-full object-cover object-top ${isUnconscious ? 'grayscale' : ''}`} onError={(e) => { e.target.src = 'https://via.placeholder.com/150?text=No+Image'; }} />
-            {char.tempHp > 0 && <div className="absolute bottom-0 right-0 bg-blue-600 border-t border-l border-blue-400 text-white text-[10px] font-black px-1.5 py-0.5 rounded-tl-lg shadow-lg">+{char.tempHp}</div>}
-          </div>
+        <div className="flex items-center gap-2">
+          {char.inspiration && <Sparkles className="w-5 h-5 text-amber-400 drop-shadow-[0_0_5px_rgba(245,158,11,0.8)]" title="Has Inspiration" />}
+          <button onClick={() => setIsEditing(true)} className="text-slate-500 hover:text-white transition-colors bg-slate-950 p-1.5 rounded-lg border border-slate-800 shadow-inner">
+            <Eye className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className={`font-black truncate text-sm sm:text-base ${isUnconscious ? 'text-red-400' : 'text-white'}`}>{char.name}</h3>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setShowSummary(!showSummary)} className="text-slate-400 hover:text-amber-400 p-1.5 bg-slate-800 rounded-lg border border-slate-700 hover:border-amber-500/50 transition-colors shadow-sm" title="Toggle Cheat Sheet">
-                  {showSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
-                <button onClick={() => setKickConfirm(true)} className="text-slate-400 hover:text-red-400 p-1.5 bg-slate-800 rounded-lg border border-slate-700 hover:border-red-500/50 transition-colors shadow-sm" title="Kick from Session">
-                  <UserX className="w-4 h-4" />
-                </button>
-                <button onClick={() => setIsExpanded(true)} className="text-slate-400 hover:text-indigo-400 p-1.5 bg-slate-800 rounded-lg border border-slate-700 hover:border-indigo-500/50 transition-colors shadow-sm" title="Open Full Sheet">
-                  <Maximize2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-3 text-xs text-slate-300">
-              <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded border border-slate-800 shadow-inner">
-                <Shield className="w-3 h-3 text-indigo-400" /> <span className="font-bold">{char.ac || 10}</span>
-              </div>
-              <div className="flex items-center gap-1.5 bg-slate-950 px-2 py-1 rounded border border-slate-800 shadow-inner">
-                <Eye className="w-3 h-3 text-emerald-400" /> <span className="font-bold">PP: {passivePerception}</span>
-              </div>
-            </div>
+      {/* Primary Vitals */}
+      <div className="grid grid-cols-4 gap-3 mb-5 relative z-10">
+        <div className="col-span-2 bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col items-center justify-center shadow-inner relative overflow-hidden">
+          <div className="absolute bottom-0 left-0 h-1 transition-all duration-500 w-full bg-slate-800">
+             <div className={`h-full ${hpColor} transition-all duration-500`} style={{ width: `${hpPercentage}%` }}></div>
           </div>
+          <div className="flex justify-between items-center w-full mb-1">
+             <button onClick={() => updateHp(-1)} className="text-slate-500 hover:text-red-400 p-1"><Minus className="w-3 h-3"/></button>
+             <div className="flex items-center gap-1.5 text-red-400">
+               <Heart className="w-3 h-3" />
+               <span className="text-[10px] font-black uppercase tracking-widest">HP</span>
+             </div>
+             <button onClick={() => updateHp(1)} className="text-slate-500 hover:text-emerald-400 p-1"><Plus className="w-3 h-3"/></button>
+          </div>
+          <span className="text-xl font-black text-white">
+            {char.hp} <span className="text-sm text-slate-500">/ {char.maxHp}</span>
+          </span>
         </div>
 
-        <div className="px-3 pb-3">
-          <div className="h-5 bg-slate-950 rounded-lg border border-slate-800 overflow-hidden relative flex items-center justify-center shadow-inner">
-            <div className={`absolute left-0 top-0 bottom-0 ${hpColor} transition-all duration-500 opacity-80`} style={{ width: `${hpPercent}%` }}></div>
-            <span className="relative z-10 text-[10px] font-black text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] tracking-widest">{char.hp} / {char.maxHp} HP</span>
-          </div>
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col items-center justify-center shadow-inner">
+          <Shield className="w-3 h-3 text-amber-400 mb-1" />
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">AC</span>
+          <span className="text-lg font-black text-white">{char.ac}</span>
+        </div>
+        
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col items-center justify-center shadow-inner">
+          <Activity className="w-3 h-3 text-emerald-400 mb-1" />
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Init</span>
+          <span className="text-lg font-black text-white">{char.initiative}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+        
+        {/* Trackers */}
+        <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 shadow-inner">
+           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Droplets className="w-3 h-3"/> Trackers</h4>
+           {resources.length === 0 ? (
+             <p className="text-[10px] text-slate-500 italic">No trackers equipped.</p>
+           ) : (
+             <div className="space-y-2 max-h-24 overflow-y-auto custom-scrollbar pr-1">
+               {resources.map((res, idx) => (
+                 <div key={idx} className="flex items-center justify-between bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800">
+                    <span className="text-xs font-bold text-white truncate max-w-[80px]">{res.name}</span>
+                    {res.isPool ? (
+                      <span className="text-xs font-black text-indigo-400">{res.current}/{res.max}</span>
+                    ) : (
+                      <div className="flex gap-0.5">
+                        {Array.from({ length: res.max }).map((_, slotIdx) => (
+                          <button 
+                            key={slotIdx}
+                            onClick={() => handleResourceToggle(idx, slotIdx < res.current ? slotIdx : slotIdx + 1)}
+                            className={`w-3 h-3 rounded-[2px] border ${slotIdx < res.current ? 'bg-indigo-500 border-indigo-400' : 'bg-slate-800 border-slate-600'}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                 </div>
+               ))}
+             </div>
+           )}
         </div>
 
-        {showSummary && (
-          <div className="bg-slate-950 border-t border-slate-800 p-3 max-h-60 overflow-y-auto custom-scrollbar animate-in slide-in-from-top-2">
-            
-            <div className="mb-3">
-              <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Sword className="w-3 h-3" /> Attacks / Actions</h4>
-              <div className="space-y-1.5">
-                {dynamicAttacks.map((atk, i) => (
-                  <div key={i} className="flex justify-between items-center text-xs bg-slate-900 p-1.5 rounded border border-slate-800">
-                    <span className="font-bold text-slate-300 truncate">{atk.name}</span>
-                    <span className="text-slate-400 font-mono shrink-0">{atk.hit} • {atk.damage}</span>
-                  </div>
-                ))}
-                {dynamicAttacks.length === 0 && <p className="text-[10px] text-slate-500 italic">No weapon attacks.</p>}
-              </div>
-            </div>
-
-            {(bonusActions.length > 0 || reactions.length > 0) && (
-              <div className="mb-3">
-                <h4 className="text-[10px] font-black text-amber-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Zap className="w-3 h-3" /> Quick Features</h4>
-                <div className="space-y-1.5">
-                  {bonusActions.map((feat, i) => (
-                    <div key={`ba-${i}`} className="text-xs bg-slate-900 p-1.5 rounded border border-slate-800">
-                      <span className="font-bold text-amber-300 mr-2">Bonus:</span><span className="text-slate-400">{feat.name}</span>
-                    </div>
-                  ))}
-                  {reactions.map((feat, i) => (
-                    <div key={`re-${i}`} className="text-xs bg-slate-900 p-1.5 rounded border border-slate-800">
-                      <span className="font-bold text-purple-300 mr-2">Reaction:</span><span className="text-slate-400">{feat.name}</span>
-                    </div>
-                  ))}
+        {/* Companion */}
+        {companion && (
+          <div className={`bg-slate-800/50 p-3 rounded-xl border ${isCompanionActive ? 'border-emerald-900/50' : 'border-slate-700/50 opacity-50'} shadow-inner`}>
+             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center justify-between gap-1.5">
+               <span className="flex items-center gap-1.5"><PawPrint className={`w-3 h-3 ${isCompanionActive ? 'text-emerald-400' : 'text-slate-500'}`}/> {companion.name}</span>
+               {!isCompanionActive && <span className="text-[8px] bg-slate-900 px-1 py-0.5 rounded text-slate-500">DORMANT</span>}
+             </h4>
+             <div className="flex justify-between items-center bg-slate-950 px-3 py-2 rounded-lg border border-slate-800">
+                <div className="flex flex-col items-center">
+                   <span className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">HP</span>
+                   <span className="text-sm font-black text-white">{companion.hp}</span>
                 </div>
-              </div>
-            )}
-
-            {passives.length > 0 && (
-              <div className="mb-3">
-                <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Eye className="w-3 h-3" /> Passives & Senses</h4>
-                <div className="flex flex-wrap gap-1">
-                  {passives.map((feat, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => setActiveFeature(activeFeature === i ? null : i)} 
-                      className={`text-[10px] ${activeFeature === i ? 'bg-emerald-600 text-white' : 'bg-emerald-950/40 text-emerald-300'} border border-emerald-900/50 px-1.5 py-0.5 rounded truncate max-w-[120px] transition-colors`}
-                    >
-                      {feat.name}
-                    </button>
-                  ))}
+                <div className="flex flex-col items-center">
+                   <span className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">AC</span>
+                   <span className="text-sm font-black text-white">{companion.ac}</span>
                 </div>
-                {activeFeature !== null && (
-                  <div className="mt-1.5 bg-emerald-950/40 border border-emerald-500/30 p-2 rounded text-xs text-emerald-200 animate-in fade-in slide-in-from-top-1 whitespace-pre-wrap">
-                    {passives[activeFeature].desc}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {char.spells && char.spells.length > 0 && (
-              <div>
-                <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Sparkles className="w-3 h-3" /> Magic Arsenal</h4>
-                <div className="flex flex-wrap gap-1">
-                  {char.spells.map((spell, i) => (
-                    <button 
-                      key={i} 
-                      onClick={() => setActiveSpell(activeSpell === i ? null : i)} 
-                      className={`text-[10px] ${activeSpell === i ? 'bg-indigo-600 text-white' : 'bg-indigo-950/40 text-indigo-300'} border border-indigo-900/50 px-1.5 py-0.5 rounded truncate max-w-[120px] transition-colors`}
-                    >
-                      {spell.name}
-                    </button>
-                  ))}
+                <div className="flex flex-col items-center">
+                   <span className="text-[9px] text-slate-500 font-bold uppercase mb-0.5">Spd</span>
+                   <span className="text-sm font-black text-white">{companion.speed}</span>
                 </div>
-                {activeSpell !== null && (
-                  <div className="mt-1.5 bg-indigo-950/40 border border-indigo-500/30 p-2 rounded text-xs text-indigo-200 animate-in fade-in slide-in-from-top-1 whitespace-pre-wrap">
-                    {char.spells[activeSpell].desc}
-                  </div>
-                )}
-              </div>
-            )}
+             </div>
           </div>
         )}
 
       </div>
 
-      {isExpanded && <CharacterCard currentUser={{ charId }} onLogout={() => setIsExpanded(false)} isDM={true} onClose={() => setIsExpanded(false)} />}
-    </>
+      {activeConditions.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-1.5 relative z-10">
+          {activeConditions.map(cond => (
+            <span key={cond} className="text-[10px] font-bold uppercase tracking-wider bg-red-950/40 text-red-400 border border-red-900/50 px-2 py-1 rounded shadow-sm">
+              {cond}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

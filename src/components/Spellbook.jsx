@@ -3,16 +3,13 @@ import { doc, setDoc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 
 import { db } from '../services/firebase';
 import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Shield, Settings, BrainCircuit, Hammer, X, Filter, Trash2 } from 'lucide-react';
 import CollapsibleSection from './shared/CollapsibleSection';
-import SpellDiscovery from './SpellDiscovery';
 
 const SPELL_FILTERS = ['All', 'Cantrips', 'Leveled', 'Concentration', 'Action', 'Bonus', 'Reaction'];
 
 export default function Spellbook({ char, charId, isDM, showDialog }) {
-  const [showSearch, setShowSearch] = useState(false);
   const [isEditingSlots, setIsEditingSlots] = useState(false); 
   const [isForgingSpell, setIsForgingSpell] = useState(false);
   
-  // Comprehensive API-matched state
   const [customSpell, setCustomSpell] = useState({ 
     name: '', 
     level: 0, 
@@ -28,10 +25,6 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
 
   const spellSlots = char.spellSlots || {};
   const spells = char.spells || [];
-
-  const currentMaxSpellLevel = Object.keys(spellSlots).length > 0 
-    ? Math.max(...Object.keys(spellSlots).map(Number)) 
-    : 0;
 
   const handleSlotToggle = async (level, currentIndex, max) => {
     if (isDM) return; 
@@ -107,7 +100,6 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     e.preventDefault();
     if (!customSpell.name || !customSpell.desc) return;
     
-    // Perfectly match the 5e API structure
     const formattedSpell = {
       name: customSpell.name,
       level: Number(customSpell.level),
@@ -115,26 +107,24 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
       range: customSpell.range,
       components: customSpell.components.split(',').map(c => c.trim()),
       duration: customSpell.duration,
-      desc: customSpell.desc.split('\n'), // Split to array to match API desc formatting
+      desc: customSpell.desc.split('\n'),
       isHomebrew: true,
       index: `hb_spell_${Date.now()}`
     };
 
     try {
-      // 1. Save globally to the Archives so Discovery can find it
-      await setDoc(doc(db, 'homebrew_spells', formattedSpell.index), formattedSpell);
-      
-      // 2. Add it directly to the current character's Grimoire as well
       await addSpellToGrimoire({
         name: formattedSpell.name,
         level: formattedSpell.level,
         castTime: formattedSpell.casting_time,
-        desc: formattedSpell.desc.join('\n') // Re-join for character sheet display
+        range: formattedSpell.range,
+        duration: formattedSpell.duration,
+        desc: formattedSpell.desc.join('\n')
       });
       
       setCustomSpell({ name: '', level: 0, castTime: '1 Action', range: '60 feet', components: 'V, S', duration: 'Instantaneous', desc: '' });
       setIsForgingSpell(false);
-      showDialog({ isOpen: true, title: 'Success', message: 'Spell added to Grimoire and Universal Archives.', type: 'alert' });
+      showDialog({ isOpen: true, title: 'Success', message: 'Spell added to Grimoire.', type: 'alert' });
     } catch (err) {
       console.error("Failed to forge custom spell:", err);
       showDialog({ isOpen: true, title: 'Error', message: 'Failed to forge spell.', type: 'alert' });
@@ -161,7 +151,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'Cantrips') return spell.level === 0;
     if (activeFilter === 'Leveled') return spell.level > 0;
-    if (activeFilter === 'Concentration') return spell.desc.toLowerCase().includes('concentration') || (spell.duration || '').toLowerCase().includes('concentration');
+    if (activeFilter === 'Concentration') return (spell.desc || '').toLowerCase().includes('concentration') || (spell.duration || '').toLowerCase().includes('concentration');
     if (activeFilter === 'Action') return (spell.castTime || spell.casting_time || '').toLowerCase().includes('1 action');
     if (activeFilter === 'Bonus') return (spell.castTime || spell.casting_time || '').toLowerCase().includes('bonus action');
     if (activeFilter === 'Reaction') return (spell.castTime || spell.casting_time || '').toLowerCase().includes('reaction');
@@ -269,7 +259,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
           </div>
         ) : (
           Object.keys(spellSlots).length === 0 ? (
-            <p className="text-sm text-slate-500 italic relative z-10 bg-slate-900/50 p-4 rounded-xl border border-slate-800 border-dashed text-center">No spell slots configured for this character. {isDM ? "Click Config to add them." : "Slots are gained upon leveling up."}</p>
+            <p className="text-sm text-slate-500 italic relative z-10 bg-slate-900/50 p-4 rounded-xl border border-slate-800 border-dashed text-center">No spell slots configured for this character. {isDM && "Click Config to add them."}</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 relative z-10">
               {Object.entries(spellSlots).map(([level, data]) => (
@@ -296,19 +286,12 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
       <div className="space-y-4">
         <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-3">
           <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest"><BookOpen className="w-5 h-5 text-fuchsia-400" /> Book of Magic</h3>
-          {!isDM ? (
-            <button 
-              onClick={() => setShowSearch(!showSearch)}
-              className={`text-[10px] md:text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${showSearch ? 'bg-slate-700 border-slate-500 text-white shadow-[0_0_15px_rgba(255,255,255,0.1)]' : 'bg-slate-800/80 border-slate-700 text-fuchsia-400 hover:text-white hover:bg-slate-700'}`}
-            >
-              <Search className="w-3.5 h-3.5" /> {showSearch ? 'Close Archives' : 'Discover Spells'}
-            </button>
-          ) : (
+          {isDM && (
             <button 
               onClick={() => setIsForgingSpell(!isForgingSpell)}
               className={`text-[10px] md:text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isForgingSpell ? 'bg-fuchsia-700 border-fuchsia-500 text-white shadow-[0_0_15px_rgba(217,70,239,0.3)]' : 'bg-slate-800/80 border-slate-700 text-fuchsia-400 hover:text-white hover:bg-slate-700'}`}
             >
-              <Hammer className="w-3.5 h-3.5" /> {isForgingSpell ? 'Close Forge' : 'Forge Custom'}
+              <Hammer className="w-3.5 h-3.5" /> {isForgingSpell ? 'Close Forge' : 'Add Spell'}
             </button>
           )}
         </div>
@@ -330,7 +313,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
 
         {isDM && isForgingSpell && (
           <form onSubmit={handleForgeCustomSpell} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-fuchsia-500/30 shadow-inner mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
-            <h4 className="text-sm font-black text-fuchsia-400 flex items-center gap-2 uppercase tracking-widest border-b border-fuchsia-900/50 pb-2"><Hammer className="w-4 h-4" /> Homebrew Spell Forge</h4>
+            <h4 className="text-sm font-black text-fuchsia-400 flex items-center gap-2 uppercase tracking-widest border-b border-fuchsia-900/50 pb-2"><Hammer className="w-4 h-4" /> Spell Forge</h4>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-2">
@@ -376,11 +359,9 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
           </form>
         )}
 
-        {showSearch && !isDM && <SpellDiscovery onAddSpell={addSpellToGrimoire} allowAdd={isDM} maxSpellLevel={isDM ? 9 : currentMaxSpellLevel} />}
-
         {Object.keys(groupedSpells).length === 0 ? (
           <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-2xl p-8 text-center text-slate-500 italic">
-            {spells.length === 0 ? (isDM ? 'Forge spells here.' : 'Use Discover Spells to find new magic.') : 'No spells match this filter.'}
+            {spells.length === 0 ? (isDM ? 'Forge spells here.' : 'No magic inscribed.') : 'No spells match this filter.'}
           </div>
         ) : (
           Object.entries(groupedSpells).map(([levelName, levelSpells]) => (

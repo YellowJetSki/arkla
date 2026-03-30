@@ -31,12 +31,21 @@ export default function PartyLootTab({ partyLoot, setActiveLoot, charId, showDia
 
       if (charSnap.exists()) {
         const charData = charSnap.data();
-        const currentInv = charData.inventory || '';
+        const currentInv = charData.inventory || [];
         
         const parsed = parseLootItem(item.desc);
-        const newInvText = `• ${parsed.name}${parsed.desc ? '\n  ' + parsed.desc : ''}`;
         
-        const newInv = currentInv.trim() ? `${currentInv}\n\n${newInvText}` : newInvText;
+        // Reconstruct into the new object array format
+        const newItemObj = {
+           id: `item_${Date.now()}`,
+           name: item.name || parsed.name,
+           category: 'Adventuring Gear', // Fallback, the player can edit this
+           desc: parsed.desc,
+           imageUrl: item.url || '',
+           quantity: 1
+        };
+        
+        const newInv = [...currentInv, newItemObj];
 
         await setDoc(charRef, { inventory: newInv }, { merge: true });
 
@@ -50,7 +59,7 @@ export default function PartyLootTab({ partyLoot, setActiveLoot, charId, showDia
         
         showDialog({
           title: 'Loot Claimed!',
-          message: `${parsed.name} has been added to your personal inventory.`,
+          message: `${newItemObj.name} has been added to your personal inventory.`,
           type: 'alert',
           onConfirm: () => showDialog({ isOpen: false })
         });
@@ -112,13 +121,11 @@ export default function PartyLootTab({ partyLoot, setActiveLoot, charId, showDia
               <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 border-b border-slate-700 pb-2 mb-4">Visual Handouts</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {visualHandouts.map(item => (
-                  <button 
-                    key={item.id} 
-                    onClick={() => setActiveLoot(item)} 
-                    className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-lg group text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer block"
-                  >
-                    <div className="h-48 w-full overflow-hidden bg-slate-950 relative">
-                      {/* The Fix: Graceful fallback for blocked cross-origin URLs */}
+                  <div key={item.id} className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-lg flex flex-col">
+                    <button 
+                      onClick={() => setActiveLoot(item)} 
+                      className="h-48 w-full overflow-hidden bg-slate-950 relative group cursor-pointer focus:outline-none"
+                    >
                       <img 
                         src={item.url} 
                         alt={item.name} 
@@ -130,8 +137,20 @@ export default function PartyLootTab({ partyLoot, setActiveLoot, charId, showDia
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent opacity-80 pointer-events-none"></div>
                       <h4 className="absolute bottom-3 left-3 right-3 font-bold text-emerald-400 truncate drop-shadow-md pointer-events-none">{item.name}</h4>
+                    </button>
+                    
+                    <div className="p-3 flex justify-between items-center bg-slate-900">
+                       <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">From: {item.source || 'DM'}</span>
+                       <div className="flex gap-2">
+                         <button onClick={() => claimLoot(item)} className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-400 hover:text-white px-2 py-1 rounded text-[10px] font-bold transition-colors border border-indigo-500/30 flex items-center gap-1">
+                           <UserPlus className="w-3 h-3" /> Claim
+                         </button>
+                         <button onClick={() => deleteLoot(item.id)} className="text-slate-500 hover:text-red-400 p-1">
+                           <Trash2 className="w-3 h-3" />
+                         </button>
+                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -155,7 +174,7 @@ export default function PartyLootTab({ partyLoot, setActiveLoot, charId, showDia
                       >
                         <div className="flex-1 pr-4">
                           <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-bold text-indigo-300">{parsed.name}</h4>
+                            <h4 className="font-bold text-indigo-300">{item.name || parsed.name}</h4>
                             {parsed.desc && (
                               <div className="text-slate-500">
                                 {isOpen ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}

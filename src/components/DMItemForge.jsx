@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Hammer, X, Save, Sword, Shield } from 'lucide-react';
+import { Hammer, X, Save, Sword, Shield, Image as ImageIcon } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 
 export default function DMItemForge({ onClose }) {
@@ -16,6 +16,7 @@ export default function DMItemForge({ onClose }) {
     desc: [''],
     cost: { quantity: 0, unit: 'gp' },
     weight: 0,
+    imageUrl: '',
     properties: [],
     // Weapon specifics
     damage: { damage_dice: '', damage_type: { name: 'Slashing' } },
@@ -57,7 +58,6 @@ export default function DMItemForge({ onClose }) {
 
     setIsSaving(true);
     try {
-      // Format descriptions correctly for the API reader
       const formattedItem = {
         ...item,
         desc: typeof item.desc === 'string' ? item.desc.split('\n') : item.desc,
@@ -115,6 +115,11 @@ export default function DMItemForge({ onClose }) {
                 <select value={item.rarity.name} onChange={e => setItem({...item, rarity: { name: e.target.value }})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 shadow-inner">
                   {['Common', 'Uncommon', 'Rare', 'Very Rare', 'Legendary', 'Artifact'].map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="flex items-center gap-1 block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5"><ImageIcon className="w-3 h-3" /> Artifact Image URL (Optional)</label>
+                <input type="url" value={item.imageUrl} onChange={e => setItem({...item, imageUrl: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="https://..." />
               </div>
             </div>
 

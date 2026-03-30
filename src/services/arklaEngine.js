@@ -1,6 +1,8 @@
 // ==========================================
-// ⚙️ THE ARKLA ENGINE (FULL 5E INTEGRATION & MATH)
-// Connects to D&D 5e API, applies Sanctuary Filters, maps mechanics, and handles multi-classing.
+// ⚙️ THE ARKLA ENGINE (LITE VERSION)
+// Handles purely mathematical calculations, stat derivations, 
+// Sanctuary terminology filters, and attack scaling.
+// No external API dependencies.
 // ==========================================
 
 export const ALL_SKILLS = [
@@ -11,19 +13,10 @@ export const ALL_SKILLS = [
   'Stealth (DEX)', 'Survival (WIS)'
 ];
 
-export const CLASS_SKILLS_MAP = {
-  barbarian: ['Animal Handling (WIS)', 'Athletics (STR)', 'Intimidation (CHA)', 'Nature (INT)', 'Perception (WIS)', 'Survival (WIS)'],
-  bard: ALL_SKILLS,
-  cleric: ['History (INT)', 'Insight (WIS)', 'Medicine (WIS)', 'Persuasion (CHA)', 'Religion (INT)'],
-  druid: ['Arcana (INT)', 'Animal Handling (WIS)', 'Insight (WIS)', 'Medicine (WIS)', 'Nature (INT)', 'Perception (WIS)', 'Religion (INT)', 'Survival (WIS)'],
-  fighter: ['Acrobatics (DEX)', 'Animal Handling (WIS)', 'Athletics (STR)', 'History (INT)', 'Insight (WIS)', 'Intimidation (CHA)', 'Perception (WIS)', 'Survival (WIS)'],
-  monk: ['Acrobatics (DEX)', 'Athletics (STR)', 'History (INT)', 'Insight (WIS)', 'Religion (INT)', 'Stealth (DEX)'],
-  paladin: ['Athletics (STR)', 'Insight (WIS)', 'Intimidation (CHA)', 'Medicine (WIS)', 'Persuasion (CHA)', 'Religion (INT)'],
-  ranger: ['Animal Handling (WIS)', 'Athletics (STR)', 'Insight (WIS)', 'Investigation (INT)', 'Nature (INT)', 'Perception (WIS)', 'Stealth (DEX)', 'Survival (WIS)'],
-  rogue: ['Acrobatics (DEX)', 'Athletics (STR)', 'Deception (CHA)', 'Insight (WIS)', 'Intimidation (CHA)', 'Investigation (INT)', 'Perception (WIS)', 'Performance (CHA)', 'Persuasion (CHA)', 'Sleight of Hand (DEX)', 'Stealth (DEX)'],
-  sorcerer: ['Arcana (INT)', 'Deception (CHA)', 'Insight (WIS)', 'Intimidation (CHA)', 'Persuasion (CHA)', 'Religion (INT)'],
-  warlock: ['Arcana (INT)', 'Deception (CHA)', 'History (INT)', 'Intimidation (CHA)', 'Investigation (INT)', 'Nature (INT)', 'Religion (INT)'],
-  wizard: ['Arcana (INT)', 'History (INT)', 'Insight (WIS)', 'Investigation (INT)', 'Medicine (WIS)', 'Religion (INT)']
+export const SPELLCASTING_STATS = {
+  'bard': 'CHA', 'cleric': 'WIS', 'druid': 'WIS', 'paladin': 'CHA',
+  'ranger': 'WIS', 'sorcerer': 'CHA', 'warlock': 'CHA', 'wizard': 'INT',
+  'monk': 'WIS', 'dealt': 'CHA', 'mage': 'CHA', 'pirate': 'CHA', 'artificer': 'INT'
 };
 
 // --- CORE MATH & DERIVATIONS ---
@@ -39,8 +32,17 @@ export const calculateSpellcastingStats = (classesArray, stats) => {
   let primaryCastingStat = 'CHA'; 
   let highestCasterLevel = 0;
 
-  (classesArray || []).forEach(cls => {
-    const cleanName = cls.name.split(' ')[0].toLowerCase();
+  // Fallback for single-string class names (e.g. "Fighter 3 / Rogue 1")
+  let parsedClasses = classesArray;
+  if (typeof classesArray === 'string') {
+     parsedClasses = classesArray.split('/').map(c => ({
+        name: c.trim().split(' ')[0],
+        level: parseInt(c.trim().split(' ')[1]) || 1
+     }));
+  }
+
+  (parsedClasses || []).forEach(cls => {
+    const cleanName = cls.name.toLowerCase();
     const castingStat = SPELLCASTING_STATS[cleanName];
     if (castingStat && cls.level > highestCasterLevel) {
       highestCasterLevel = cls.level;
@@ -48,7 +50,7 @@ export const calculateSpellcastingStats = (classesArray, stats) => {
     }
   });
 
-  const totalLevel = (classesArray || []).reduce((sum, cls) => sum + cls.level, 0) || 1;
+  const totalLevel = (parsedClasses || []).reduce((sum, cls) => sum + cls.level, 0) || 1;
   const pb = getProficiencyBonus(totalLevel);
   const mod = getModifier(stats[primaryCastingStat] || 10);
 
@@ -59,8 +61,7 @@ export const calculateSpellcastingStats = (classesArray, stats) => {
   };
 };
 
-export const parseAndScaleAttack = (attack, stats, totalLevel, classesArray = []) => {
-  // Pure homebrew attacks without notes are bypassed to preserve DM intent
+export const parseAndScaleAttack = (attack, stats, totalLevel, className = '') => {
   if (!attack.notes && attack.notes !== '') return attack;
 
   const mods = {
@@ -76,7 +77,6 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, classesArray = []
   const properties = (attack.notes || '').toLowerCase();
   const attackName = (attack.name || '').toLowerCase();
   
-  // 1. Determine Base Weapon Stat
   const isFinesse = properties.includes('finesse');
   const isRanged = properties.includes('ammunition') || properties.includes('thrown') || properties.includes('range');
   const isHeavy = properties.includes('heavy');
@@ -85,15 +85,13 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, classesArray = []
   let activeStat = isRanged ? 'DEX' : 'STR';
   if (isFinesse && mods.DEX > mods.STR) activeStat = 'DEX';
 
-  // 2. Class Specific Overrides (Monk Martial Arts)
-  const isMonk = classesArray.some(c => c.name.toLowerCase().includes('monk') && c.level >= 1);
+  const isMonk = className.toLowerCase().includes('monk');
   const isMonkWeapon = isMonk && !isHeavy && !isTwoHanded && (properties.includes('simple') || attackName.includes('shortsword') || attackName.includes('unarmed') || attackName.includes('quarterstaff') || attackName.includes('shuriken') || attackName.includes('dart'));
   
   if (isMonkWeapon && mods.DEX > mods[activeStat]) {
     activeStat = 'DEX';
   }
 
-  // 3. Homebrew / Subclass / Spell Override (e.g. "Use: CHA" for Hexblades)
   const overrideMatch = properties.match(/use:\s*([a-z]{3})/i);
   if (overrideMatch) {
     const forcedStat = overrideMatch[1].toUpperCase();
@@ -117,64 +115,6 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, classesArray = []
   }
 
   return { ...attack, hit: formattedHit, damage: formattedDamage };
-};
-
-// --- MULTI-CLASS SPELL SLOT CALCULATOR ---
-const FULL_CASTERS = ['bard', 'cleric', 'druid', 'sorcerer', 'wizard'];
-const HALF_CASTERS = ['paladin', 'ranger'];
-const ARTIFICER = ['artificer']; 
-
-const MULTICLASS_SLOT_TABLE = [
-  [], // 0
-  [2], // 1
-  [3], // 2
-  [4, 2], // 3
-  [4, 3], // 4
-  [4, 3, 2], // 5
-  [4, 3, 3], // 6
-  [4, 3, 3, 1], // 7
-  [4, 3, 3, 2], // 8
-  [4, 3, 3, 3, 1], // 9
-  [4, 3, 3, 3, 2], // 10
-  [4, 3, 3, 3, 2, 1], // 11
-  [4, 3, 3, 3, 2, 1], // 12
-  [4, 3, 3, 3, 2, 1, 1], // 13
-  [4, 3, 3, 3, 2, 1, 1], // 14
-  [4, 3, 3, 3, 2, 1, 1, 1], // 15
-  [4, 3, 3, 3, 2, 1, 1, 1], // 16
-  [4, 3, 3, 3, 2, 1, 1, 1, 1], // 17
-  [4, 3, 3, 3, 3, 1, 1, 1, 1], // 18
-  [4, 3, 3, 3, 3, 2, 1, 1, 1], // 19
-  [4, 3, 3, 3, 3, 2, 2, 1, 1]  // 20
-];
-
-export const calculateCombinedSpellSlots = (classesArray) => {
-  let casterLevel = 0;
-
-  classesArray.forEach(cls => {
-    const cleanName = cls.name.split(' ')[0].toLowerCase();
-    if (FULL_CASTERS.includes(cleanName)) {
-      casterLevel += cls.level;
-    } else if (HALF_CASTERS.includes(cleanName)) {
-      casterLevel += Math.floor(cls.level / 2);
-    } else if (ARTIFICER.includes(cleanName)) {
-      casterLevel += Math.ceil(cls.level / 2);
-    } 
-  });
-
-  if (casterLevel === 0) return {};
-
-  const slotArray = MULTICLASS_SLOT_TABLE[Math.min(casterLevel, 20)];
-  let slots = {};
-  
-  slotArray.forEach((maxSlots, index) => {
-    if (maxSlots > 0) {
-      const levelString = (index + 1).toString();
-      slots[levelString] = { max: maxSlots, current: maxSlots };
-    }
-  });
-
-  return slots;
 };
 
 // --- CONDITION AUTOMATION HOOKS ---
@@ -206,52 +146,7 @@ export const getConditionMechanics = (activeConditions) => {
   return mechanics;
 };
 
-// --- API MAPS & CONSTANTS ---
-const CLASS_API_MAP = {
-  'dealt': 'warlock',     
-  'mage': 'sorcerer',     
-  'fighter': 'fighter',
-  'monk': 'monk',
-  'paladin': 'paladin',
-  'rogue': 'rogue',
-  'ranger': 'ranger',
-  'cleric': 'cleric',
-  'bard': 'bard',
-  'druid': 'druid',
-  'barbarian': 'barbarian',
-  'wizard': 'wizard'
-};
-
-const SPECIES_API_MAP = {
-  'dragonborn': { type: 'races', index: 'dragonborn' },
-  'dwarf': { type: 'races', index: 'dwarf' },
-  'elf': { type: 'races', index: 'elf' },
-  'gnome': { type: 'races', index: 'gnome' },
-  'half-elf': { type: 'races', index: 'half-elf' },
-  'half-orc': { type: 'races', index: 'half-orc' },
-  'halfling': { type: 'races', index: 'halfling' },
-  'human': { type: 'races', index: 'human' },
-  'tiefling': { type: 'races', index: 'tiefling' },
-  'wood': { type: 'subraces', index: 'wood-elf', parent: 'elf' },
-  'high': { type: 'subraces', index: 'high-elf', parent: 'elf' },
-  'rock': { type: 'subraces', index: 'rock-gnome', parent: 'gnome' },
-  'forest': { type: 'subraces', index: 'forest-gnome', parent: 'gnome' },
-  'hill': { type: 'subraces', index: 'hill-dwarf', parent: 'dwarf' },
-  'mountain': { type: 'subraces', index: 'mountain-dwarf', parent: 'dwarf' }
-};
-
-const HIT_DICE_MAP = {
-  'barbarian': 12, 'fighter': 10, 'paladin': 10, 'ranger': 10, 'pirate': 10,
-  'bard': 8, 'cleric': 8, 'druid': 8, 'monk': 8, 'rogue': 8, 'dealt': 8, 'warlock': 8,
-  'mage': 6, 'sorcerer': 6, 'wizard': 6
-};
-
-export const SPELLCASTING_STATS = {
-  'bard': 'CHA', 'cleric': 'WIS', 'druid': 'WIS', 'paladin': 'CHA',
-  'ranger': 'WIS', 'sorcerer': 'CHA', 'warlock': 'CHA', 'wizard': 'INT',
-  'monk': 'WIS', 'dealt': 'CHA', 'mage': 'CHA', 'pirate': 'CHA'
-};
-
+// --- SANCTUARY TERMINOLOGY FILTER ---
 const SANCTUARY_REPLACEMENTS = {
   'fiend': 'powerful fey',
   'fiends': 'fey',
@@ -282,376 +177,4 @@ export const applySanctuaryFilter = (text) => {
     });
   });
   return safeText;
-};
-
-const RESOURCE_HOOKS = {
-  'Rage': { maxType: 'API_RAGE', recharge: 'long' },
-  'Bardic Inspiration': { maxType: 'CHA', recharge: 'long' }, 
-  'Channel Divinity': { maxType: 'API_CD', recharge: 'short' },
-  'Wild Shape': { maxType: 2, recharge: 'short' },
-  'Action Surge': { maxType: 1, recharge: 'short' }, 
-  'Second Wind': { maxType: 1, recharge: 'short' },
-  'Indomitable': { maxType: 'API_INDOMITABLE', recharge: 'long' },
-  'Ki': { maxType: 'CLASS_LEVEL', recharge: 'short' }, 
-  'Lay on Hands': { maxType: 'PALADIN_HP', recharge: 'long' }, 
-  'Divine Sense': { maxType: 'API_CD', recharge: 'long' }, 
-  'Font of Magic': { maxType: 'CLASS_LEVEL', recharge: 'long', rename: 'Sorcery Points' }, 
-  'Tides of Chaos': { maxType: 1, recharge: 'long' }, 
-  'Hexblade\'s Curse': { maxType: 1, recharge: 'short', filterRename: 'Dealt\'s Curse' } 
-};
-
-export const HOMEBREW_CLASSES = {
-  'pirate': {
-    hitDie: 10,
-    levels: {
-      1: {
-        features: [{ name: "Pirate's Bounty", desc: "(Bonus Action). Mark a target within 60ft for 1 minute. Advantage on Intimidation/Persuasion against them. They subtract 1d4 from attacks against you, and you deal an extra 1d6 damage to them." }],
-        resources: [{ name: "Pirate's Bounty", maxType: 'PB', recharge: 'long' }]
-      },
-      3: {
-        features: [{ name: "Flint Lock", desc: "(Action). Ranged Spell Attack. Hit: 2d10 bludgeoning. Target must make a CON save or be Stunned until the start of your next turn." }],
-        resources: [{ name: "Flint Lock", maxType: 'CHA', recharge: 'long' }]
-      },
-      7: {
-        features: [{ name: "Tsunami", desc: "(Action). 15ft cone of water. STR save. Fail: 4d6 bludgeoning, pushed 15ft away, knocked Prone. Success: Half damage, not pushed." }],
-        resources: [{ name: "Tsunami", maxType: 1, recharge: 'short' }]
-      },
-      11: {
-        features: [{ name: "Ocean's Rage", desc: "(Action). Summon a spectral sea beast on a target within 60ft. Roll 1d6! (1-2: Giant Turtle, 3-4: Megalodon, 5-6: The Kraken)." }],
-        resources: [{ name: "Ocean's Rage", maxType: 1, recharge: 'long' }]
-      }
-    }
-  }
-};
-
-// ==========================================
-// FALLBACK: SRD FEAT DATABASE
-// ==========================================
-const CUSTOM_FEATS = [
-  { index: "actor", name: "Actor", desc: "Increase your CHA score by 1. You have advantage on Deception and Performance checks when trying to pass yourself off as a different person. You can mimic the speech of another person or the sounds made by other creatures.", prerequisites: [] },
-  { index: "alert", name: "Alert", desc: "Always on the lookout for danger. You gain +5 to Initiative, can't be surprised while conscious, and unseen attackers don't gain advantage against you.", prerequisites: [] },
-  { index: "athlete", name: "Athlete", desc: "Increase your STR or DEX score by 1. Standing up from prone only costs 5 feet of movement. Climbing doesn't cost extra movement. You can make a running jump after moving only 5 feet.", prerequisites: [] },
-  { index: "charger", name: "Charger", desc: "When you use your action to Dash, you can use a bonus action to make one melee weapon attack or to shove a creature.", prerequisites: [] },
-  { index: "crossbow-expert", name: "Crossbow Expert", desc: "You ignore the loading quality of crossbows. Being within 5 feet of a hostile creature doesn't impose disadvantage on your ranged attack rolls. When you use the Attack action and attack with a one handed weapon, you can use a bonus action to attack with a hand crossbow you are holding.", prerequisites: [] },
-  { index: "dual-wielder", name: "Dual Wielder", desc: "You gain a +1 bonus to AC while wielding a separate melee weapon in each hand. You can use two-weapon fighting even when the one-handed melee weapons aren't light. You can draw or stow two one-handed weapons when you would normally be able to draw or stow only one.", prerequisites: [] },
-  { index: "lucky", name: "Lucky", desc: "You have 3 luck points. Whenever you make an attack roll, an ability check, or a saving throw, you can spend one luck point to roll an additional d20. You can choose to spend one of your luck points after you roll the die, but before the outcome is determined.", prerequisites: [] },
-  { index: "magic-initiate", name: "Magic Initiate", desc: "Choose a class. You learn two cantrips of your choice from that class's spell list. In addition, choose one 1st-level spell to learn from that same list. Using this feat, you can cast the spell once at its lowest level, and you must finish a long rest before you can cast it in this way again.", prerequisites: [] },
-  { index: "mobile", name: "Mobile", desc: "Your speed increases by 10 feet. When you use the Dash action, difficult terrain doesn't cost you extra movement on that turn. When you make a melee attack against a creature, you don't provoke opportunity attacks from that creature for the rest of the turn.", prerequisites: [] },
-  { index: "observant", name: "Observant", desc: "Increase your INT or WIS score by 1. If you can see a creature's mouth while it is speaking a language you understand, you can interpret what it's saying by reading its lips. You have a +5 bonus to your passive Wisdom (Perception) and passive Intelligence (Investigation) scores.", prerequisites: [] },
-  { index: "polearm-master", name: "Polearm Master", desc: "When you take the Attack action and attack with only a glaive, halberd, quarterstaff, or spear, you can use a bonus action to make a melee attack with the opposite end of the weapon. While you are wielding a glaive, halberd, pike, quarterstaff, or spear, other creatures provoke an opportunity attack from you when they enter your reach.", prerequisites: [] },
-  { index: "resilient", name: "Resilient", desc: "Choose one ability score. You increase the chosen ability score by 1, to a maximum of 20. You gain proficiency in saving throws using the chosen ability.", prerequisites: [] },
-  { index: "sentinel", name: "Sentinel", desc: "When you hit a creature with an opportunity attack, the creature's speed becomes 0 for the rest of the turn. Creatures provoke opportunity attacks from you even if they take the Disengage action before leaving your reach. When a creature within 5 feet of you makes an attack against a target other than you, you can use your reaction to make a melee weapon attack against the attacking creature.", prerequisites: [] },
-  { index: "sharpshooter", name: "Sharpshooter", desc: "Attacking at long range doesn't impose disadvantage on your ranged weapon attack rolls. Your ranged weapon attacks ignore half cover and three-quarters cover. Before you make an attack with a ranged weapon that you are proficient with, you can choose to take a -5 penalty to the attack roll. If the attack hits, you add +10 to the attack's damage.", prerequisites: [] },
-  { index: "tough", name: "Tough", desc: "Your hit point maximum increases by an amount equal to twice your level when you gain this feat. Whenever you gain a level thereafter, your hit point maximum increases by an additional 2 hit points.", prerequisites: [] },
-  { index: "war-caster", name: "War Caster", desc: "You have advantage on CON saving throws that you make to maintain your concentration on a spell when you take damage. You can perform the somatic components of spells even when you have weapons or a shield in one or both hands. When a hostile creature's movement provokes an opportunity attack from you, you can use your reaction to cast a spell at the creature, rather than making an opportunity attack.", prerequisites: [] }
-];
-
-const cachedSpellStubs = {};
-let cachedFeatStubs = null;
-let cachedEquipmentStubs = null;
-
-export const getSpellStubs = async (className = '') => {
-  const stdClasses = ['bard', 'cleric', 'druid', 'paladin', 'ranger', 'sorcerer', 'warlock', 'wizard'];
-  const safeClass = className ? className.toLowerCase().split(' ')[0] : 'all';
-  const isStd = stdClasses.includes(safeClass);
-  const cacheKey = isStd ? safeClass : 'all';
-
-  if (cachedSpellStubs[cacheKey]) return cachedSpellStubs[cacheKey];
-
-  let url = 'https://www.dnd5eapi.co/api/spells';
-  if (isStd) {
-    url = `https://www.dnd5eapi.co/api/classes/${safeClass}/spells`;
-  }
-  
-  const res = await fetch(url);
-  if (!res.ok) return [];
-  const data = await res.json();
-  cachedSpellStubs[cacheKey] = data.results;
-  return cachedSpellStubs[cacheKey];
-};
-
-export const getFeatStubs = async () => {
-  if (cachedFeatStubs) return cachedFeatStubs;
-  try {
-    const res = await fetch('https://www.dnd5eapi.co/api/feats');
-    const data = await res.json();
-    const customStubs = CUSTOM_FEATS.map(f => ({ index: f.index, name: f.name, url: 'custom', isCustom: true, ...f }));
-    cachedFeatStubs = [...data.results, ...customStubs];
-  } catch(e) {
-    cachedFeatStubs = CUSTOM_FEATS.map(f => ({ index: f.index, name: f.name, url: 'custom', isCustom: true, ...f }));
-  }
-  
-  cachedFeatStubs.sort((a,b) => a.name.localeCompare(b.name));
-  return cachedFeatStubs;
-};
-
-export const getEquipmentStubs = async () => {
-  if (cachedEquipmentStubs) return cachedEquipmentStubs;
-  const res = await fetch('https://www.dnd5eapi.co/api/equipment');
-  const data = await res.json();
-  cachedEquipmentStubs = data.results;
-  return cachedEquipmentStubs;
-};
-
-export const fetchDetailedStubs = async (stubs) => {
-  const promises = stubs.map(async (stub) => {
-    if (stub.isCustom) return stub; 
-    try {
-      const res = await fetch(`https://www.dnd5eapi.co${stub.url}`);
-      const detail = await res.json();
-      return {
-        ...detail,
-        name: applySanctuaryFilter(detail.name),
-        desc: applySanctuaryFilter(Array.isArray(detail.desc) ? detail.desc.join('\n') : detail.desc)
-      };
-    } catch (e) {
-      console.error(`Failed to fetch details for ${stub.url}`);
-      return null;
-    }
-  });
-  const results = await Promise.all(promises);
-  return results.filter(r => r !== null);
-};
-
-export const fetchSpeciesTraits = async (rawSpeciesName) => {
-  const words = rawSpeciesName.toLowerCase().split(' ');
-  const firstWord = words[0];
-  const secondWord = words.length > 1 ? words[1] : '';
-
-  let apiPointer = SPECIES_API_MAP[firstWord];
-  if (!apiPointer && secondWord) apiPointer = SPECIES_API_MAP[secondWord];
-
-  if (!apiPointer) return { traits: [], error: 'Species not found in SRD.' };
-
-  try {
-    let baseData = null;
-    let subData = null;
-
-    if (apiPointer.type === 'subraces') {
-      const parentRes = await fetch(`https://www.dnd5eapi.co/api/races/${apiPointer.parent}`);
-      baseData = await parentRes.json();
-      
-      const subRes = await fetch(`https://www.dnd5eapi.co/api/subraces/${apiPointer.index}`);
-      subData = await subRes.json();
-    } else {
-      const res = await fetch(`https://www.dnd5eapi.co/api/races/${apiPointer.index}`);
-      baseData = await res.json();
-    }
-    
-    let traitStubs = [...(baseData.traits || [])];
-    if (subData && subData.racial_traits) {
-      traitStubs = [...traitStubs, ...subData.racial_traits];
-    }
-
-    const traitPromises = traitStubs.map(async (traitStub) => {
-      if (!traitStub.url) return null;
-      try {
-        const traitRes = await fetch(`https://www.dnd5eapi.co${traitStub.url}`);
-        if (!traitRes.ok) return null; // Safe fallback so one failing API endpoint doesn't break the whole species fetch
-        const traitDetail = await traitRes.json();
-        return {
-          name: applySanctuaryFilter(traitDetail.name),
-          desc: applySanctuaryFilter(Array.isArray(traitDetail.desc) ? traitDetail.desc.join('\n') : traitDetail.desc)
-        };
-      } catch (e) {
-        return null;
-      }
-    });
-
-    const traits = (await Promise.all(traitPromises)).filter(t => t !== null);
-
-    let mechanics = {
-      speed: baseData.speed || 30,
-      size: baseData.size || 'Medium',
-      languages: (baseData.languages || []).map(l => l.name),
-      abilityBonuses: []
-    };
-
-    if (baseData.ability_bonuses) mechanics.abilityBonuses.push(...baseData.ability_bonuses);
-    if (subData && subData.ability_bonuses) mechanics.abilityBonuses.push(...subData.ability_bonuses);
-
-    if (subData && subData.racial_traits) {
-       const hasFleetOfFoot = subData.racial_traits.some(t => t.index === 'fleet-of-foot');
-       if (hasFleetOfFoot) mechanics.speed = 35;
-    }
-
-    return { traits, mechanics, error: null };
-  } catch (error) {
-    console.error("Species API Error:", error);
-    return { traits: [], mechanics: null, error: 'Failed to fetch species data.' };
-  }
-};
-
-export const fetchClassProgression = async (rawClassName, classLevel) => {
-  const cleanName = rawClassName.split(' ')[0].toLowerCase();
-  
-  if (HOMEBREW_CLASSES[cleanName]) {
-    const hbData = HOMEBREW_CLASSES[cleanName];
-    return {
-      hitDie: hbData.hitDie,
-      features: hbData.levels[classLevel]?.features || [],
-      resources: hbData.levels[classLevel]?.resources || [],
-      spellSlots: null,
-      spellcastingInfo: null,
-      pendingChoices: []
-    };
-  }
-
-  const apiClass = CLASS_API_MAP[cleanName];
-  if (!apiClass) {
-    return { hitDie: 8, features: [], resources: [], spellSlots: null, spellcastingInfo: null, error: 'Class not found in archives.', pendingChoices: [] };
-  }
-
-  try {
-    const classRes = await fetch(`https://www.dnd5eapi.co/api/classes/${apiClass}`);
-    const classData = await classRes.json();
-    const hitDie = classData.hit_die || HIT_DICE_MAP[apiClass] || 8;
-
-    const levelRes = await fetch(`https://www.dnd5eapi.co/api/classes/${apiClass}/levels/${classLevel}`);
-    const levelData = await levelRes.json();
-
-    const fetchedFeatures = [];
-    const fetchedResources = [];
-    const pendingChoices = [];
-    let spellSlots = null;
-    let spellcastingInfo = null;
-
-    if (apiClass === 'bard' && classLevel === 5) fetchedResources.push({ name: 'Bardic Inspiration', upgrade: true, recharge: 'short' });
-    if (apiClass === 'fighter' && classLevel === 17) fetchedResources.push({ name: 'Action Surge', upgrade: true, maxType: 2 });
-
-    if (levelData.features && levelData.features.length > 0) {
-      const featurePromises = levelData.features.map(async (featStub) => {
-        const featRes = await fetch(`https://www.dnd5eapi.co${featStub.url}`);
-        return await featRes.json();
-      });
-      
-      const featureDetails = await Promise.all(featurePromises);
-
-      featureDetails.forEach(feat => {
-        const rawDesc = Array.isArray(feat.desc) ? feat.desc.join('\n') : (feat.desc || '');
-        const safeDesc = applySanctuaryFilter(rawDesc);
-        
-        let originalName = feat.name;
-        if (originalName.includes('Hexblade')) originalName = originalName.replace('Hexblade', 'Dealt');
-        
-        const safeName = applySanctuaryFilter(originalName);
-        fetchedFeatures.push({ name: safeName, desc: safeDesc });
-
-        const hookKey = Object.keys(RESOURCE_HOOKS).find(k => feat.name.includes(k));
-        if (hookKey) {
-          const hook = RESOURCE_HOOKS[hookKey];
-          let maxVal = 1;
-          
-          if (hook.maxType === 'API_RAGE') maxVal = levelData.class_specific?.rage_count || 2;
-          else if (hook.maxType === 'API_CD') maxVal = levelData.class_specific?.channel_divinity_charges || 1;
-          else if (hook.maxType === 'API_INDOMITABLE') maxVal = levelData.class_specific?.indomitable_uses || 1;
-          else if (hook.maxType === 'PALADIN_HP') maxVal = classLevel * 5; 
-          else if (hook.maxType === 'CLASS_LEVEL') maxVal = classLevel;
-          else maxVal = hook.maxType; 
-
-          const resourceName = hook.rename || hook.filterRename || safeName;
-          fetchedResources.push({ name: resourceName, maxType: maxVal, recharge: hook.recharge, isPool: hook.maxType === 'PALADIN_HP' });
-        }
-      });
-    }
-
-    // Capture required choices like "Favored Enemy"
-    if (levelData.feature_choices && levelData.feature_choices.length > 0) {
-      const choicePromises = levelData.feature_choices.map(async (stub) => {
-        try {
-          if (!stub.url) return null;
-          const res = await fetch(`https://www.dnd5eapi.co${stub.url}`);
-          if (!res.ok) return null;
-          const detail = await res.json();
-          return {
-            id: detail.index,
-            name: applySanctuaryFilter(detail.name),
-            choose: detail.choice?.choose || 1,
-            options: detail.choice?.from?.options?.map(o => ({
-              name: applySanctuaryFilter(o.item?.name || o.feature?.name || o.name || 'Unknown Option'),
-              url: o.item?.url || o.feature?.url || o.url
-            })).filter(o => o.url) || []
-          };
-        } catch (e) { return null; }
-      });
-      const results = await Promise.all(choicePromises);
-      pendingChoices.push(...results.filter(r => r !== null && r.options.length > 0));
-    }
-
-    if (levelData.spellcasting) {
-      spellcastingInfo = {
-        cantripsKnown: levelData.spellcasting.cantrips_known || 0,
-        spellsKnown: levelData.spellcasting.spells_known || 0
-      };
-      
-      if (apiClass === 'warlock') {
-        spellSlots = {};
-        for (let i = 1; i <= 9; i++) {
-          const slotsForLevel = levelData.spellcasting[`spell_slots_level_${i}`];
-          if (slotsForLevel > 0) {
-            spellSlots[i.toString()] = { max: slotsForLevel, current: slotsForLevel };
-          }
-        }
-      }
-    }
-
-    return {
-      hitDie,
-      features: fetchedFeatures,
-      resources: fetchedResources,
-      spellSlots, 
-      spellcastingInfo,
-      pendingChoices
-    };
-
-  } catch (error) {
-    console.error("Engine API Error:", error);
-    return { hitDie: HIT_DICE_MAP[apiClass] || 8, features: [], resources: [], spellSlots: null, spellcastingInfo: null, pendingChoices: [], error: 'Failed to commune with the D&D API.' };
-  }
-};
-
-// ==========================================
-// 🧠 ENGINE INTELLIGENCE & VALIDATION
-// ==========================================
-
-export const getStartingClassLimits = (className, wisMod = 0) => {
-  const safeClass = className ? className.toLowerCase().split(' ')[0] : '';
-  const limits = { skills: 2, cantrips: 0, spells: 0 };
-  
-  if (safeClass === 'rogue') limits.skills = 4;
-  if (safeClass === 'bard') { limits.skills = 3; limits.cantrips = 2; limits.spells = 4; }
-  if (safeClass === 'cleric') { limits.cantrips = 3; limits.spells = Math.max(1, wisMod + 1); }
-  if (safeClass === 'druid') { limits.cantrips = 2; limits.spells = Math.max(1, wisMod + 1); }
-  if (safeClass === 'sorcerer' || safeClass === 'mage') { limits.cantrips = 4; limits.spells = 2; }
-  if (safeClass === 'warlock' || safeClass === 'dealt') { limits.cantrips = 2; limits.spells = 2; }
-  if (safeClass === 'wizard') { limits.cantrips = 3; limits.spells = 6; }
-  if (safeClass === 'ranger' || safeClass === 'paladin') { limits.skills = 3; limits.cantrips = 0; limits.spells = 2; }
-  if (safeClass === 'pirate') { limits.skills = 3; limits.cantrips = 0; limits.spells = 0; }
-  
-  return limits;
-};
-
-export const checkFeatPrerequisites = (feat, charStats, charSpecies) => {
-  if (!feat.prerequisites || feat.prerequisites.length === 0) return true;
-
-  const safeSpecies = (charSpecies || '').toLowerCase();
-
-  for (const prereq of feat.prerequisites) {
-    if (prereq.ability_score) {
-      const requiredStat = prereq.ability_score.name.substring(0, 3).toUpperCase();
-      const minimumValue = prereq.minimum_score;
-      if ((charStats[requiredStat] || 10) < minimumValue) {
-        return false; 
-      }
-    }
-    
-    if (prereq.race) {
-      const requiredRace = prereq.race.name.toLowerCase();
-      if (!safeSpecies.includes(requiredRace)) {
-        return false;
-      }
-    }
-  }
-
-  return true; 
 };

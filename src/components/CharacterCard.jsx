@@ -1,23 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
-  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Search, Hammer, Trash2, Plus
+  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint
 } from 'lucide-react';
 
-import { PREMADE_CHARACTERS } from '../data/campaignData';
-import { fetchSpeciesTraits, fetchClassProgression } from '../services/arklaEngine'; 
 import StatGrid from './shared/StatGrid';
 import QuickTraits from './shared/QuickTraits'; 
-import CollapsibleSection from './shared/CollapsibleSection';
 import FeatureCard from './shared/FeatureCard';
 import ImageModal from './shared/ImageModal'; 
 import GlobalLoader from './shared/GlobalLoader';
 import DialogModal from './shared/DialogModal';
 
 import CharacterHeader from './character/CharacterHeader';
-import PendingChoicesManager from './character/PendingChoicesManager';
 import LevelUpModal from './LevelUpModal';
 import SessionResetModal from './SessionResetModal';
 import PlayerGuideModal from './PlayerGuideModal';
@@ -34,7 +30,7 @@ import BioTab from './tabs/BioTab';
 import PartyLootTab from './tabs/PartyLootTab';
 import JournalTab from './tabs/JournalTab';
 import SettingsTab from './tabs/SettingsTab';
-import FeatDiscovery from './FeatDiscovery'; 
+import CompanionTab from './tabs/CompanionTab'; 
 
 import BattleMapLayer from './battlemap/BattleMapLayer';
 import StickyBattleNav from './battlemap/StickyBattleNav';
@@ -72,10 +68,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [isBattleMapOpen, setIsBattleMapOpen] = useState(false);
   const [saveToast, setSaveToast] = useState(''); 
 
-  const [showFeatSearch, setShowFeatSearch] = useState(false);
   const [isForgingFeat, setIsForgingFeat] = useState(false);
-  
-  const [customFeat, setCustomFeat] = useState({ name: '', prerequisite: '', minScore: 13, desc: '' });
+  const [customFeat, setCustomFeat] = useState({ name: '', desc: '', hasTracker: false, trackerMax: 1, trackerRecharge: 'long' });
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', inputPlaceholder: '', onConfirm: null });
 
   const showDialog = (options) => setDialog({ ...options, isOpen: true });
@@ -103,17 +97,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         setChar(docSnap.data());
         isMounted.current = true;
       } else {
-        if (isMounted.current) {
-          if (!isDM) setIsKicked(true);
-        } else {
-          if (!isDM && !isKicked) {
-            const initialData = PREMADE_CHARACTERS[currentUser.charId];
-            if (initialData) {
-              setDoc(charRef, { ...initialData });
-              setChar({ ...initialData }); 
-            } else setIsKicked(true);
-          }
-        }
+        if (!isDM) setIsKicked(true);
       }
     });
 
@@ -134,73 +118,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
     return () => { unsubscribeSession(); unsubscribeChar(); unsubscribeLoot(); };
   }, [currentUser.charId, isDM, isKicked]);
-
-  useEffect(() => {
-    const autoFetchTraits = async () => {
-      if (!char || isDM || !char.species || char.hasFetchedSpecies) return;
-      try {
-        const speciesData = await fetchSpeciesTraits(char.species);
-        if (speciesData && !speciesData.error && speciesData.traits.length > 0) {
-          const newTraits = speciesData.traits.map(t => ({
-            name: `${char.species} Trait: ${t.name}`,
-            desc: t.desc
-          }));
-          await updateDoc(doc(db, 'characters', currentUser.charId), {
-            features: arrayUnion(...newTraits),
-            hasFetchedSpecies: true,
-            speed: speciesData.mechanics?.speed || char.speed || 30
-          });
-          setSaveToast(`${char.species} Traits Auto-Scribed!`);
-          setTimeout(() => setSaveToast(''), 3000);
-        } else {
-          await updateDoc(doc(db, 'characters', currentUser.charId), { hasFetchedSpecies: true });
-        }
-      } catch (err) {
-        console.error("Failed to auto-fetch species traits", err);
-      }
-    };
-    autoFetchTraits();
-  }, [char?.species, char?.hasFetchedSpecies, isDM, currentUser.charId]);
-
-  useEffect(() => {
-    const autoFetchClass = async () => {
-      if (!char || isDM || !char.classes || char.hasFetchedClass) return;
-      try {
-        const classData = await fetchClassProgression(char.classes[0].name, 1);
-        let updates = { hasFetchedClass: true };
-        
-        if (classData.features?.length > 0) {
-          updates.features = arrayUnion(...classData.features);
-        }
-        
-        if (classData.pendingChoices && classData.pendingChoices.length > 0) {
-          updates.pendingChoices = arrayUnion(...classData.pendingChoices);
-        }
-
-        if (classData.resources?.length > 0) {
-           const currentResources = char.resources ? [...char.resources] : [];
-           classData.resources.forEach(res => {
-              let calculatedMax = 1;
-              if (res.maxType === 'PB') calculatedMax = 2; 
-              else if (res.maxType === 'LEVEL' || res.maxType === 'CLASS_LEVEL') calculatedMax = 1;
-              else if (['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'].includes(res.maxType)) {
-                calculatedMax = Math.max(1, Math.floor(((char.stats[res.maxType] || 10) - 10) / 2));
-              } else if (typeof res.maxType === 'number') calculatedMax = res.maxType;
-              
-              currentResources.push({ name: res.name, max: calculatedMax, current: calculatedMax, recharge: res.recharge, isPool: res.isPool });
-           });
-           updates.resources = currentResources;
-        }
-
-        await updateDoc(doc(db, 'characters', currentUser.charId), updates);
-        setSaveToast(`${char.classes[0].name} Features Scribed!`);
-        setTimeout(() => setSaveToast(''), 3000);
-      } catch (err) {
-        console.error("Failed to auto-fetch class traits", err);
-      }
-    };
-    autoFetchClass();
-  }, [char?.hasFetchedClass, isDM, currentUser.charId, char?.classes, char?.stats]);
 
   const updateField = async (field, value) => {
     if (!char) return;
@@ -231,15 +148,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     await updateDoc(doc(db, 'characters', currentUser.charId), { resources: updatedResources });
   };
 
-  const addFeature = async (featData) => {
-    await updateDoc(doc(db, 'characters', currentUser.charId), {
-      features: arrayUnion(featData)
-    });
-    setShowFeatSearch(false);
-    setSaveToast('Feat Added to Sheet');
-    setTimeout(() => setSaveToast(''), 2500);
-  };
-
   const removeFeature = async (featToRemove) => {
     showDialog({
       title: 'Remove Feature?',
@@ -260,20 +168,35 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     if (!customFeat.name || !customFeat.desc) return;
     
     const newFeat = { 
+      id: `feat_${Date.now()}`,
       name: customFeat.name, 
-      desc: customFeat.desc, 
-      prerequisites: customFeat.prerequisite ? [{ ability_score: { name: customFeat.prerequisite }, minimum_score: customFeat.minScore }] : [] 
+      desc: customFeat.desc
     };
+
+    let updates = { features: arrayUnion(newFeat) };
+
+    if (customFeat.hasTracker) {
+      const newRes = {
+        id: `res_${Date.now()}`,
+        name: customFeat.name,
+        max: Number(customFeat.trackerMax),
+        current: Number(customFeat.trackerMax),
+        recharge: customFeat.trackerRecharge,
+        isPool: false
+      };
+      
+      if (char.resources) {
+         updates.resources = [...char.resources, newRes];
+      } else {
+         updates.resources = [newRes];
+      }
+    }
     
-    await setDoc(doc(db, 'homebrew_feats', 'hb_feat_' + Date.now()), newFeat);
-    
-    await updateDoc(doc(db, 'characters', currentUser.charId), {
-      features: arrayUnion(newFeat)
-    });
+    await updateDoc(doc(db, 'characters', currentUser.charId), updates);
     
     setIsForgingFeat(false);
-    setCustomFeat({ name: '', prerequisite: '', minScore: 13, desc: '' });
-    setSaveToast('Feat Forged & Added to Archives!');
+    setCustomFeat({ name: '', desc: '', hasTracker: false, trackerMax: 1, trackerRecharge: 'long' });
+    setSaveToast(customFeat.hasTracker ? 'Feature & Tracker Added!' : 'Feature Added!');
     setTimeout(() => setSaveToast(''), 2500);
   };
 
@@ -289,38 +212,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
       theme: wizardData.theme,
       hasCompletedTutorial: true
     };
-
-    if (wizardData.spells && wizardData.spells.length > 0) {
-      updates.spells = wizardData.spells;
-    }
-    
-    if (wizardData.skills && wizardData.skills.length > 0) {
-      updates.proficiencies = {
-         ...(char.proficiencies || {}),
-         skills: wizardData.skills.join(', ')
-      };
-    }
-
     await updateDoc(doc(db, 'characters', currentUser.charId), updates);
-  };
-
-  const restoreCharacter = async (importedData) => {
-    try {
-      await setDoc(doc(db, 'characters', currentUser.charId), {
-        ...importedData,
-        hasCompletedTutorial: true 
-      });
-      setSaveToast('Character Restored from Backup!');
-      setTimeout(() => setSaveToast(''), 3000);
-    } catch (error) {
-      console.error("Restore failed", error);
-      showDialog({
-        title: 'Error',
-        message: 'Failed to restore character to the database.',
-        type: 'alert',
-        onConfirm: closeDialog
-      });
-    }
   };
 
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
@@ -342,6 +234,21 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     return warnings;
   };
   const combatWarnings = getConditionWarnings(activeConditions);
+
+  const availableTabs = [
+    { id: 'combat', icon: Swords, label: 'Combat' }, 
+    { id: 'spells', icon: Flame, label: 'Spells' }, 
+    { id: 'features', icon: Sparkles, label: 'Features' }, 
+    { id: 'inventory', icon: Backpack, label: 'Inventory' }, 
+    { id: 'partyLoot', icon: Gem, label: 'Party Loot' }, 
+    { id: 'bio', icon: BookOpen, label: 'Bio' }, 
+    { id: 'journal', icon: PenTool, label: 'Journal' },
+    { id: 'settings', icon: Settings, label: 'Settings' }
+  ];
+
+  if (char.companion) {
+     availableTabs.splice(3, 0, { id: 'companion', icon: PawPrint, label: 'Companion' });
+  }
 
   return (
     <CardWrapper>
@@ -409,6 +316,21 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             </div>
           )}
 
+          {isDM && char.levelUpPending && (
+            <div className="bg-amber-900/50 border border-amber-500/50 rounded-xl p-4 mb-6 shadow-[0_0_15px_rgba(245,158,11,0.2)] flex justify-between items-center animate-pulse">
+              <div className="flex items-center gap-3 text-amber-400">
+                <BellRing className="w-6 h-6" />
+                <div>
+                  <h4 className="font-bold uppercase tracking-widest text-sm">Level Up Pending</h4>
+                  <p className="text-xs text-amber-200/70">{char.name} has signaled an ascension. Update their stats and features.</p>
+                </div>
+              </div>
+              <button onClick={() => setIsEditMode(true)} className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors">
+                Resolve & Edit
+              </button>
+            </div>
+          )}
+
           <CharacterHeader 
             char={char} 
             charId={currentUser.charId} 
@@ -428,16 +350,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
           <div className={`sticky top-0 z-30 pt-1 pb-3 -mx-3 px-3 md:-mx-8 md:px-8 border-b border-slate-800/80 shadow-md mb-6 ${isDM ? 'bg-slate-950/90 backdrop-blur-xl' : 'bg-slate-950/60 backdrop-blur-2xl'}`}>
             <div className={`bg-slate-900/80 p-1.5 rounded-xl border border-slate-800/80 shadow-inner flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-1 sm:gap-2 justify-between snap-x snap-mandatory backdrop-blur-md`}>
-              {[
-                { id: 'combat', icon: Swords, label: 'Combat' }, 
-                { id: 'spells', icon: Flame, label: 'Spells' }, 
-                { id: 'features', icon: Sparkles, label: 'Features' }, 
-                { id: 'inventory', icon: Backpack, label: 'Inventory' }, 
-                { id: 'partyLoot', icon: Gem, label: 'Party Loot' }, 
-                { id: 'bio', icon: BookOpen, label: 'Bio' }, 
-                { id: 'journal', icon: PenTool, label: 'Journal' },
-                { id: 'settings', icon: Settings, label: 'Settings' }
-              ].map(tab => (
+              {availableTabs.map(tab => (
                 <button 
                   key={tab.id} id={`tab-btn-${tab.id}`} onClick={() => setActiveTab(tab.id)} 
                   className={`snap-center flex-1 min-w-[50px] sm:min-w-[70px] flex items-center justify-center gap-2 px-2 py-2.5 rounded-lg font-medium text-xs md:text-sm whitespace-nowrap transition-all relative ${activeTab === tab.id ? `${activeTheme.bg} text-white shadow-md` : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'}`}
@@ -475,96 +388,90 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 
                 <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-2 mb-4">
                   <h3 className="text-lg font-bold text-white flex items-center gap-2"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
-                  {!isDM ? (
-                    <button 
-                      onClick={() => setShowFeatSearch(!showFeatSearch)}
-                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${showFeatSearch ? 'bg-slate-700 border-slate-500 text-white' : `bg-slate-800/80 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
-                    >
-                      <Search className="w-3 h-3" /> {showFeatSearch ? 'Close' : 'Discover Feats'}
-                    </button>
-                  ) : (
+                  {isDM && (
                     <button 
                       onClick={() => setIsForgingFeat(!isForgingFeat)}
                       className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isForgingFeat ? 'bg-amber-700 border-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.3)]' : `bg-slate-800/80 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
                     >
-                      <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Close Forge' : 'Forge Custom Feat'}
+                      <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Close Forge' : 'Add Feature'}
                     </button>
                   )}
                 </div>
 
                 {isDM && isForgingFeat && (
                   <form onSubmit={handleForgeCustomFeat} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-amber-500/30 mb-6 animate-in fade-in slide-in-from-top-2 space-y-4 shadow-inner relative z-10">
-                    <h4 className="text-sm font-black text-amber-400 flex items-center gap-2 uppercase tracking-widest border-b border-amber-900/50 pb-2"><Hammer className="w-4 h-4" /> Homebrew Feat Forge</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <h4 className="text-sm font-black text-amber-400 flex items-center gap-2 uppercase tracking-widest border-b border-amber-900/50 pb-2"><Hammer className="w-4 h-4" /> Feature Forge</h4>
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Feat Name</label>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Feature Name</label>
                         <input type="text" required value={customFeat.name} onChange={e => setCustomFeat({...customFeat, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner" placeholder="e.g. Sharpshooter" />
                       </div>
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ability Req.</label>
-                          <select value={customFeat.prerequisite} onChange={e => setCustomFeat({...customFeat, prerequisite: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner">
-                            <option value="">None</option>
-                            <option value="STR">STR</option>
-                            <option value="DEX">DEX</option>
-                            <option value="CON">CON</option>
-                            <option value="INT">INT</option>
-                            <option value="WIS">WIS</option>
-                            <option value="CHA">CHA</option>
-                          </select>
-                        </div>
-                        <div className="w-20">
-                           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Min.</label>
-                           <input type="number" disabled={!customFeat.prerequisite} value={customFeat.minScore} onChange={e => setCustomFeat({...customFeat, minScore: Number(e.target.value)})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner text-center disabled:opacity-50" />
-                        </div>
+
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                        <label className="flex items-center gap-2 cursor-pointer mb-3">
+                          <input type="checkbox" checked={customFeat.hasTracker} onChange={(e) => setCustomFeat({...customFeat, hasTracker: e.target.checked})} className="w-4 h-4 rounded border-slate-600 text-amber-500 bg-slate-800 focus:ring-amber-500" />
+                          <span className="text-sm font-bold text-slate-300">Needs Resource Tracker?</span>
+                        </label>
+                        
+                        {customFeat.hasTracker && (
+                          <div className="flex gap-4 animate-in fade-in">
+                            <div className="flex-1">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Max Slots</label>
+                              <input type="number" value={customFeat.trackerMax} onChange={(e) => setCustomFeat({...customFeat, trackerMax: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                            </div>
+                            <div className="flex-1">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Recharges On</label>
+                              <select value={customFeat.trackerRecharge} onChange={(e) => setCustomFeat({...customFeat, trackerRecharge: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+                                <option value="short">Short Rest</option>
+                                <option value="long">Long Rest</option>
+                                <option value="none">Never</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="sm:col-span-2">
+
+                      <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
-                        <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-amber-500 resize-y shadow-inner leading-relaxed" placeholder="Describe the stat bumps and mechanics..." />
+                        <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-amber-500 resize-y shadow-inner leading-relaxed" placeholder="Describe the mechanics..." />
                       </div>
                     </div>
                     <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] flex items-center justify-center gap-2 mt-2">
-                      <Plus className="w-4 h-4" /> Add to Character
+                      <Plus className="w-4 h-4" /> Inject Feature
                     </button>
                   </form>
                 )}
 
-                {showFeatSearch && !isDM && (
-                  <FeatDiscovery 
-                    charSpecies={char.species}
-                    charStats={char.stats}
-                    onAddFeat={addFeature} 
-                    allowAdd={false} 
-                    charLevel={char.level} 
-                  />
+                {(!char.features || char.features.length === 0) ? (
+                   <div className="text-center p-8 bg-slate-900/50 border border-slate-800 border-dashed rounded-xl">
+                      <p className="text-slate-500 text-sm italic">No features assigned yet.</p>
+                   </div>
+                ) : (
+                   <div className="space-y-4">
+                     {char.features.map((feat, i) => (
+                       <FeatureCard 
+                         key={`feat-${i}`} 
+                         feat={feat}
+                         isDM={isDM}
+                         onRemove={removeFeature}
+                       />
+                     ))}
+                   </div>
                 )}
-
-                {char.pendingChoices && char.pendingChoices.length > 0 && !isDM && (
-                  <PendingChoicesManager charId={currentUser.charId} pendingChoices={char.pendingChoices} />
-                )}
-
-                <div className="space-y-4">
-                  {(char.features || []).map((feat, i) => (
-                    <FeatureCard 
-                      key={`feat-${i}`} 
-                      feat={feat}
-                      isDM={isDM}
-                      onRemove={removeFeature}
-                    />
-                  ))}
-                </div>
               </div>
             )}
+
+            {activeTab === 'companion' && <CompanionTab char={char} activeTheme={activeTheme} />}
 
             {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
 
             {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} charId={currentUser.charId} />}
 
-            {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
+            {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} />}
 
             {activeTab === 'journal' && <JournalTab char={char} updateField={updateField} activeTheme={activeTheme} />}
 
-            {activeTab === 'settings' && <SettingsTab char={char} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
+            {activeTab === 'settings' && <SettingsTab char={char} updateField={updateField} activeTheme={activeTheme} />}
             
           </div>
         </div>
