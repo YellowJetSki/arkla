@@ -98,7 +98,13 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         setChar(docSnap.data());
         isMounted.current = true;
       } else {
-        if (!isDM) setIsKicked(true);
+        if (isMounted.current) {
+          if (!isDM) setIsKicked(true);
+        } else {
+          if (!isDM && !isKicked) {
+            setIsKicked(true);
+          }
+        }
       }
     });
 

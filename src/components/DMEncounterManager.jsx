@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { collection, doc, setDoc, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { ShieldAlert, X, Plus, Play, Trash2, Map, Users } from 'lucide-react';
-import { PREMADE_ENEMIES } from '../data/campaignData';
 import DialogModal from './shared/DialogModal';
 
 export default function DMEncounterManager({ onClose }) {
@@ -15,7 +14,8 @@ export default function DMEncounterManager({ onClose }) {
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
-  const allAvailableEnemies = [...PREMADE_ENEMIES, ...homebrewEnemies];
+  // All available enemies are now strictly what the DM has created/imported
+  const allAvailableEnemies = [...homebrewEnemies];
 
   useEffect(() => {
     const encountersRef = doc(db, 'campaign', 'encounters');
@@ -27,13 +27,12 @@ export default function DMEncounterManager({ onClose }) {
 
     const fetchHomebrew = async () => {
       const snap = await getDocs(collection(db, 'active_enemies'));
-      // We can pull from active_enemies as a quick "recent" bestiary, or a dedicated bestiary collection
       const activeDocs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
       
       const homebrewSnap = await getDocs(collection(db, 'homebrew_enemies'));
       const savedDocs = homebrewSnap.docs.map(d => ({ ...d.data(), id: d.id }));
       
-      // Combine and deduplicate by name
+      // Combine and deduplicate by name so the dropdown is clean
       const combined = [...activeDocs, ...savedDocs];
       const uniqueEnemies = Array.from(new Map(combined.map(item => [item.name, item])).values());
       
@@ -149,7 +148,6 @@ export default function DMEncounterManager({ onClose }) {
                   <div className="flex gap-2">
                     <select value={selectedEnemyId} onChange={e => setSelectedEnemyId(e.target.value)} className="flex-1 bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner">
                       <option value="">Select Enemy from Bestiary...</option>
-                      <optgroup label="Premade Templates">{PREMADE_ENEMIES.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>
                       {homebrewEnemies.length > 0 && <optgroup label="Your Forged Monsters">{homebrewEnemies.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</optgroup>}
                     </select>
                     <button onClick={handleAddDraftEnemy} disabled={!selectedEnemyId} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-4 py-2 rounded-xl transition-colors shadow-md"><Plus className="w-5 h-5" /></button>
