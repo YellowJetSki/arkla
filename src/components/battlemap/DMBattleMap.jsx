@@ -404,9 +404,8 @@ export default function DMBattleMap() {
   };
 
   return (
-    <div className="space-y-4">
-      <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
-
+    <div className="flex-1 flex flex-col bg-slate-950 min-h-0 relative">
+      
       {/* Custom Input Modal for Token Images */}
       {imagePrompt.isOpen && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
@@ -445,7 +444,8 @@ export default function DMBattleMap() {
         onRestorePreset={handleRestorePreset}
       />
 
-      <div className="bg-slate-900/80 backdrop-blur-md border border-indigo-500/50 rounded-2xl p-4 shadow-[0_0_30px_rgba(99,102,241,0.15)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Control Bar */}
+      <div className="bg-slate-900/80 backdrop-blur-md border-b border-indigo-500/50 p-3 shadow-[0_0_30px_rgba(99,102,241,0.15)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0 z-20">
         <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-sm">
           <Map className="w-5 h-5" /> Battlefield
         </h2>
@@ -481,26 +481,26 @@ export default function DMBattleMap() {
 
           <button 
             onClick={launchDisplayTab}
-            className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-4 py-2 rounded-xl font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shadow-sm shrink-0 uppercase tracking-wider"
+            className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"
             title="Cast to a second monitor"
           >
-            <MonitorPlay className="w-3.5 h-3.5" /> Cast Display
+            <MonitorPlay className="w-3.5 h-3.5" /> Cast
           </button>
 
           <button 
             onClick={() => setIsPresetsOpen(true)}
-            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-4 py-2 rounded-xl font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shadow-sm shrink-0 uppercase tracking-wider"
+            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"
           >
             <Save className="w-3.5 h-3.5" /> Presets
           </button>
 
-          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 px-4 py-2 rounded-xl font-bold text-[10px] md:text-xs flex items-center gap-2 transition-colors shadow-sm shrink-0 uppercase tracking-wider">
+          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider">
             <Settings className="w-3.5 h-3.5" /> Config
           </button>
           
           <button 
             onClick={togglePublish} 
-            className={`px-5 py-2 rounded-xl font-black text-[10px] md:text-xs flex items-center gap-2 transition-all shadow-md shrink-0 uppercase tracking-widest ${mapData.isPublished ? 'bg-emerald-600 text-white border border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-800'}`}
+            className={`px-4 py-1.5 rounded-lg font-black text-[10px] md:text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 uppercase tracking-widest ${mapData.isPublished ? 'bg-emerald-600 text-white border border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-800'}`}
           >
             {mapData.isPublished ? <><Send className="w-3.5 h-3.5"/> LIVE</> : <><EyeOff className="w-3.5 h-3.5"/> HIDDEN</>}
           </button>
@@ -508,7 +508,7 @@ export default function DMBattleMap() {
       </div>
 
       {isEditingMap && (
-        <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-2xl p-5 shadow-inner animate-in fade-in slide-in-from-top-2 space-y-5">
+        <div className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-700/80 p-5 shadow-inner animate-in fade-in slide-in-from-top-2 space-y-5 relative z-10 shrink-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preset Local Map</label>
@@ -572,7 +572,7 @@ export default function DMBattleMap() {
       )}
 
       {hasUnstagedActors && (
-        <div className="bg-slate-900/50 backdrop-blur-sm p-3 md:p-4 rounded-2xl border border-slate-700/50 border-dashed flex items-center flex-wrap gap-2 shadow-inner">
+        <div className="bg-slate-900/50 backdrop-blur-sm p-3 md:p-4 border-b border-slate-700/50 border-dashed flex items-center flex-wrap gap-2 shadow-inner shrink-0 z-10">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 hidden xl:block">Stage Actors:</span>
           
           <button onClick={stageAllActive} className="text-[10px] md:text-xs font-bold uppercase tracking-wider bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors mr-2 flex items-center gap-1.5 shadow-sm">
@@ -590,33 +590,48 @@ export default function DMBattleMap() {
         </div>
       )}
 
-      <MapGrid 
-        mapData={mapData} 
-        tokens={tokens} 
-        activePlayers={activePlayers}
-        activeEnemies={activeEnemies}
-        onTileClick={handleTileClick} 
-        onTokenClick={(id) => setSelectedTokenId(selectedTokenId === id ? null : id)}
-        selectedTokenId={selectedTokenId}
-        isDM={true} 
-        onTokenDrop={handleTokenDrop}
-        showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null}
-        onToggleRuler={(id) => setShowRulerFor(showRulerFor === id ? null : id)}
-        isDrawingMode={isDrawingMode}
-        drawingColor={drawingColor}
-        drawingShape={drawingShape}
-        onDrawEnd={handleDrawEnd}
-        onUpdateHpLive={handleUpdateTokenHpLive}
-        onToggleSize={handleToggleTokenSize}
-        onToggleAura={handleToggleAura}
-        onToggleElevation={handleToggleElevation}
-        onToggleConcentration={handleToggleConcentration}
-        onToggleCondition={toggleCondition}
-        onUpdateImage={handleUpdateTokenImage}
-        onToggleHidden={handleToggleHidden}
-        onRemoveToken={removeToken}
-        onDeselect={() => setSelectedTokenId(null)}
-      />
+      {/* Map Area */}
+      <div className="flex-1 overflow-auto bg-slate-950 p-4 custom-scrollbar relative min-h-0">
+        {!mapData.imageUrl ? (
+          <div className="h-full flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/30">
+            <Map className="w-12 h-12 mb-4 opacity-50" />
+            <p className="font-bold">No map active.</p>
+            <button onClick={() => setShowConfig(true)} className="mt-4 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Configure Map</button>
+          </div>
+        ) : (
+          <div className="min-w-max min-h-max bg-slate-900 p-2 rounded-xl border border-slate-800 shadow-2xl mx-auto w-max relative group">
+            <div className="relative overflow-hidden rounded-lg shadow-inner border border-slate-700" style={{ width: `${mapData.cols * 50}px`, height: `${mapData.rows * 50}px` }}>
+              <MapGrid 
+                mapData={mapData} 
+                tokens={tokens} 
+                activePlayers={activePlayers}
+                activeEnemies={activeEnemies}
+                onTileClick={handleTileClick} 
+                onTokenClick={(id) => setSelectedTokenId(selectedTokenId === id ? null : id)}
+                selectedTokenId={selectedTokenId}
+                isDM={true} 
+                onTokenDrop={handleTokenDrop}
+                showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null}
+                onToggleRuler={(id) => setShowRulerFor(showRulerFor === id ? null : id)}
+                isDrawingMode={isDrawingMode}
+                drawingColor={drawingColor}
+                drawingShape={drawingShape}
+                onDrawEnd={handleDrawEnd}
+                onUpdateHpLive={handleUpdateTokenHpLive}
+                onToggleSize={handleToggleTokenSize}
+                onToggleAura={handleToggleAura}
+                onToggleElevation={handleToggleElevation}
+                onToggleConcentration={handleToggleConcentration}
+                onToggleCondition={toggleCondition}
+                onUpdateImage={handleUpdateTokenImage}
+                onToggleHidden={handleToggleHidden}
+                onRemoveToken={removeToken}
+                onDeselect={() => setSelectedTokenId(null)}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

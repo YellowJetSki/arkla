@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, Users, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud, Hammer, UserPlus, Wand2, Book, Package, Image as ImageIcon, Map as MapIcon, ShieldAlert, Trash2, PowerOff, UploadCloud } from 'lucide-react';
+import { Skull, Users, Flame, CheckSquare, Square, PenTool, X, Sparkles, DownloadCloud, Hammer, UserPlus, Wand2, Book, Package, Image as ImageIcon, Map as MapIcon, ShieldAlert, Trash2, PowerOff, UploadCloud, Star } from 'lucide-react';
 
 import DMPlayerCard from './DMPlayerCard';
 import DMEnemyCard from './DMEnemyCard';
@@ -9,6 +9,7 @@ import InitiativeTracker from './InitiativeTracker';
 import DMEncounterManager from './DMEncounterManager';
 import DMItemManager from './DMItemManager'; 
 import DMHandoutManager from './DMHandoutManager';
+import DMXPManager from './DMXPManager';
 import DMBattleMap from './battlemap/DMBattleMap'; 
 import DMReferenceModal from './DMReferenceModal';
 import DialogModal from './shared/DialogModal';
@@ -224,10 +225,7 @@ export default function DMDashboard({ onLogout }) {
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       {toast && (
-        <div 
-          onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onClick={() => setToast('')}
-          className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-[0_0_30px_rgba(99,102,241,0.3)] border border-indigo-500/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2 cursor-pointer"
-        >
+        <div className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-[0_0_30px_rgba(99,102,241,0.3)] border border-indigo-500/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2 cursor-pointer">
           <Sparkles className="w-4 h-4" /> {toast}
         </div>
       )}
@@ -235,10 +233,12 @@ export default function DMDashboard({ onLogout }) {
       {isForgingEnemy && <EnemyForge onClose={() => setIsForgingEnemy(false)} />}
       {isForgingSpell && <DMSpellForge onClose={() => setIsForgingSpell(false)} />}
       {isBuildingCharacter && <DMCharacterBuilder onClose={() => setIsBuildingCharacter(false)} />}
+      
       {activeManager === 'encounters' && <DMEncounterManager onClose={() => setActiveManager(null)} />}
       {activeManager === 'items' && <DMItemManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
       {activeManager === 'handouts' && <DMHandoutManager onClose={() => setActiveManager(null)} />}
       {activeManager === 'rules' && <DMReferenceModal onClose={() => setActiveManager(null)} />}
+      {activeManager === 'xp' && <DMXPManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
 
       {showScratchpad && (
         <div className="fixed bottom-6 right-6 w-80 h-80 bg-[#fdf6e3] rounded-xl shadow-2xl z-[9999] border border-amber-300/50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
@@ -258,10 +258,12 @@ export default function DMDashboard({ onLogout }) {
           <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2">
             <ShieldAlert className="w-5 h-5"/> Arkla DM
           </h1>
-          <div className="hidden md:flex items-center gap-2 border-l border-slate-700 pl-4">
+          <div className="hidden lg:flex items-center gap-2 border-l border-slate-700 pl-4">
             <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><Book className="w-4 h-4"/> Rules Ref</button>
             <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><Package className="w-4 h-4"/> Item Vault</button>
             <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><ImageIcon className="w-4 h-4"/> Handouts</button>
+            <div className="w-px h-4 bg-slate-700 mx-1"></div>
+            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-xs font-bold text-amber-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><Star className="w-4 h-4"/> XP</button>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -305,7 +307,7 @@ export default function DMDashboard({ onLogout }) {
               onExitBattle={() => setIsBattleMode(false)}
             />
           </div>
-          <div className="flex-1 relative overflow-hidden">
+          <div className="flex-1 relative overflow-hidden flex flex-col">
             {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>}
             <DMBattleMap />
           </div>
