@@ -5,6 +5,8 @@ import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, Monito
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
+import MapDrawings from './MapDrawings';
+import TokenContextMenu from './TokenContextMenu';
 
 const LOCAL_MAPS = [
   { label: 'Tutorial Forest', value: '/tutorial_forest_enc.png' },
@@ -45,6 +47,9 @@ export default function DMBattleMap() {
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
   
   const [imagePrompt, setImagePrompt] = useState({ isOpen: false, tokenId: null, url: '' });
+  const [contextMenu, setContextMenu] = useState(null);
+
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
@@ -369,8 +374,36 @@ export default function DMBattleMap() {
   const handleDrawEnd = async (lineData) => {
     const newLine = { ...lineData, id: Date.now(), shape: drawingShape };
     await updateDoc(doc(db, 'campaign', 'battlemap'), {
-      drawings: arrayUnion(newLine)
+      drawings: [...mapData.drawings, newLine]
     });
+  };
+
+  const handleUpdateToken = async (tokenId, updates) => {
+    const updatedTokens = { ...tokens, [tokenId]: { ...tokens[tokenId], ...updates } };
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    
+    const token = tokens[tokenId];
+    if (updates.hp !== undefined) {
+      if (token.type === 'player') {
+        await updateDoc(doc(db, 'characters', tokenId), { hp: updates.hp });
+      } else if (token.type === 'enemy') {
+        await updateDoc(doc(db, 'active_enemies', tokenId), { currentHp: updates.hp });
+      }
+    }
+    setContextMenu(null);
+  };
+
+  const handleDeleteToken = async (tokenId) => {
+    const updatedTokens = { ...tokens };
+    const token = updatedTokens[tokenId];
+    delete updatedTokens[tokenId];
+    
+    if (token.type === 'enemy') {
+       await deleteDoc(doc(db, 'active_enemies', tokenId));
+    }
+    
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
+    setContextMenu(null);
   };
 
   const handleClearDrawings = () => {
@@ -435,6 +468,17 @@ export default function DMBattleMap() {
         </div>
       )}
 
+      {contextMenu && (
+        <TokenContextMenu 
+          token={contextMenu.token} 
+          x={contextMenu.x} 
+          y={contextMenu.y} 
+          onUpdate={handleUpdateToken} 
+          onDelete={handleDeleteToken} 
+          onClose={() => setContextMenu(null)} 
+        />
+      )}
+
       <BattlemapPresetsModal 
         isOpen={isPresetsOpen} 
         onClose={() => setIsPresetsOpen(false)} 
@@ -443,6 +487,8 @@ export default function DMBattleMap() {
         activeEnemies={activeEnemies}
         onRestorePreset={handleRestorePreset}
       />
+
+      <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       {/* Control Bar */}
       <div className="bg-slate-900/80 backdrop-blur-md border-b border-indigo-500/50 p-3 shadow-[0_0_30px_rgba(99,102,241,0.15)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0 z-20">
@@ -600,7 +646,16 @@ export default function DMBattleMap() {
           </div>
         ) : (
           <div className="min-w-max min-h-max bg-slate-900 p-2 rounded-xl border border-slate-800 shadow-2xl mx-auto w-max relative group">
-            <div className="relative overflow-hidden rounded-lg shadow-inner border border-slate-700" style={{ width: `${mapData.cols * 50}px`, height: `${mapData.rows * 50}px` }}>
+            <div 
+              ref={containerRef}
+              className="relative overflow-hidden rounded-lg shadow-inner border border-slate-700" 
+              style={{ 
+                width: `${mapData.cols * 50}px`, 
+                height: `${mapData.rows * 50}px`,
+                backgroundImage: `url(${mapData.imageUrl})`,
+                backgroundSize: '100% 100%'
+              }}
+            >
               <MapGrid 
                 mapData={mapData} 
                 tokens={tokens} 
@@ -628,6 +683,73 @@ export default function DMBattleMap() {
                 onRemoveToken={removeToken}
                 onDeselect={() => setSelectedTokenId(null)}
               />
+
+              <MapDrawings 
+                drawings={mapData.drawings || []} 
+                activeTool={isDrawingMode ? 'draw' : 'move'} 
+                currentColor={drawingColor} 
+                containerRef={containerRef} 
+                onSaveDrawing={handleDrawEnd} 
+              />
+
+              {Object.values(tokens).map(token => {
+                const isSelected = mapData.activeTokenId === token.id || selectedTokenId === token.id;
+                return (
+                  <div
+                    key={token.id}
+                    className={`absolute cursor-grab active:cursor-grabbing transition-all duration-200 z-20 ${isSelected ? 'z-30 scale-110' : ''}`}
+                    style={{
+                      width: `${50 * token.size}px`,
+                      height: `${50 * token.size}px`,
+                      transform: `translate(${token.x * 50}px, ${token.y * 50}px)`
+                    }}
+                    onDragEnd={(e) => {
+                      if (isDrawingMode) return;
+                      const rect = e.target.parentElement.getBoundingClientRect();
+                      const x = Math.max(0, Math.min(mapData.cols - token.size, Math.floor((e.clientX - rect.left) / 50)));
+                      const y = Math.max(0, Math.min(mapData.rows - token.size, Math.floor((e.clientY - rect.top) / 50)));
+                      handleMoveToken(token.id, x, y);
+                    }}
+                    draggable={!isDrawingMode}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setContextMenu({ token, x: e.clientX, y: e.clientY });
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedTokenId(selectedTokenId === token.id ? null : token.id);
+                    }}
+                  >
+                    <div className="relative w-full h-full p-0.5 group/token">
+                       {isSelected && (
+                         <div className={`absolute inset-0 rounded-full animate-ping opacity-50 ${token.type === 'player' ? 'bg-indigo-500' : 'bg-red-500'}`}></div>
+                       )}
+                       <div className={`w-full h-full rounded-full border-2 shadow-[0_0_15px_rgba(0,0,0,0.8)] overflow-hidden bg-slate-900 relative ${isSelected ? (token.type === 'player' ? 'border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.6)]' : 'border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]') : (token.type === 'player' ? 'border-indigo-600' : 'border-red-600')}`}>
+                         <img src={token.img} alt={token.name} className={`w-full h-full object-cover ${token.isHidden ? 'opacity-50 grayscale' : ''}`} draggable={false} />
+                       </div>
+                       
+                       {/* HP Bar */}
+                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[80%] h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
+                         <div className={`h-full ${token.hp > (token.maxHp/2) ? 'bg-emerald-500' : token.hp > (token.maxHp/4) ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.max(0, Math.min(100, (token.hp / token.maxHp) * 100))}%` }}></div>
+                       </div>
+                       
+                       {/* Name Tag (Hover) */}
+                       <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/token:opacity-100 transition-opacity pointer-events-none border border-slate-700 z-50">
+                         {token.name} {token.isHidden && '(Hidden)'}
+                       </div>
+
+                       {/* Status Indicators */}
+                       {(token.conditions?.length > 0 || token.isConcentrating) && (
+                         <div className="absolute -right-1 -top-1 flex gap-0.5 flex-wrap w-6 z-40">
+                            {token.isConcentrating && <div className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-slate-900 shadow-sm animate-pulse" title="Concentrating"></div>}
+                            {token.conditions?.length > 0 && <div className="w-2.5 h-2.5 rounded-full bg-fuchsia-500 border border-slate-900 shadow-sm" title={token.conditions.join(', ')}></div>}
+                         </div>
+                       )}
+                    </div>
+                  </div>
+                );
+              })}
+
             </div>
           </div>
         )}
