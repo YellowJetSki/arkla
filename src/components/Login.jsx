@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Shield, User, Key, Sparkles, Flame, Loader2 } from 'lucide-react';
-import { PREMADE_CHARACTERS } from '../data/campaignData';
 
 export default function Login({ onLogin }) {
   const [name, setName] = useState('');
@@ -26,7 +25,6 @@ export default function Login({ onLogin }) {
     setError('');
     setIsAuthenticating(true);
 
-    // 1. Check for DM
     if (isDM) {
       if (passcode === 'Jello') {
         onLogin({ role: 'dm', name: 'Mike' });
@@ -37,7 +35,6 @@ export default function Login({ onLogin }) {
     }
 
     try {
-      // 2. Query Live Database for Custom/Forged Characters First
       const querySnapshot = await getDocs(collection(db, 'characters'));
       let foundCharId = null;
       let foundCharName = '';
@@ -52,21 +49,6 @@ export default function Login({ onLogin }) {
 
       if (foundCharId) {
         onLogin({ role: 'player', charId: foundCharId, name: foundCharName });
-        return;
-      }
-
-      // 3. Fallback to Premade Characters (Square 0 Initialization)
-      const charKey = Object.keys(PREMADE_CHARACTERS).find(
-        key => key.toLowerCase() === normalizedName || 
-               PREMADE_CHARACTERS[key].name.toLowerCase() === normalizedName
-      );
-
-      if (charKey) {
-        onLogin({ 
-          role: 'player', 
-          charId: charKey, 
-          name: PREMADE_CHARACTERS[charKey].name 
-        });
       } else {
         triggerError('Character not found. The chronomancers have no record of you.');
       }

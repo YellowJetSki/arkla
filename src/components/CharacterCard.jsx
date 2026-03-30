@@ -12,6 +12,7 @@ import FeatureCard from './shared/FeatureCard';
 import ImageModal from './shared/ImageModal'; 
 import GlobalLoader from './shared/GlobalLoader';
 import DialogModal from './shared/DialogModal';
+import CollapsibleSection from './shared/CollapsibleSection';
 
 import CharacterHeader from './character/CharacterHeader';
 import LevelUpModal from './LevelUpModal';
@@ -386,7 +387,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             {activeTab === 'features' && (
               <div className="space-y-6">
                 
-                <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-2 mb-4">
+                <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-2">
                   <h3 className="text-lg font-bold text-white flex items-center gap-2"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
                   {isDM && (
                     <button 
