@@ -3,6 +3,29 @@
 // Connects to D&D 5e API, applies Sanctuary Filters, maps mechanics, and handles multi-classing.
 // ==========================================
 
+export const ALL_SKILLS = [
+  'Acrobatics (DEX)', 'Animal Handling (WIS)', 'Arcana (INT)', 'Athletics (STR)',
+  'Deception (CHA)', 'History (INT)', 'Insight (WIS)', 'Intimidation (CHA)',
+  'Investigation (INT)', 'Medicine (WIS)', 'Nature (INT)', 'Perception (WIS)',
+  'Performance (CHA)', 'Persuasion (CHA)', 'Religion (INT)', 'Sleight of Hand (DEX)',
+  'Stealth (DEX)', 'Survival (WIS)'
+];
+
+export const CLASS_SKILLS_MAP = {
+  barbarian: ['Animal Handling (WIS)', 'Athletics (STR)', 'Intimidation (CHA)', 'Nature (INT)', 'Perception (WIS)', 'Survival (WIS)'],
+  bard: ALL_SKILLS,
+  cleric: ['History (INT)', 'Insight (WIS)', 'Medicine (WIS)', 'Persuasion (CHA)', 'Religion (INT)'],
+  druid: ['Arcana (INT)', 'Animal Handling (WIS)', 'Insight (WIS)', 'Medicine (WIS)', 'Nature (INT)', 'Perception (WIS)', 'Religion (INT)', 'Survival (WIS)'],
+  fighter: ['Acrobatics (DEX)', 'Animal Handling (WIS)', 'Athletics (STR)', 'History (INT)', 'Insight (WIS)', 'Intimidation (CHA)', 'Perception (WIS)', 'Survival (WIS)'],
+  monk: ['Acrobatics (DEX)', 'Athletics (STR)', 'History (INT)', 'Insight (WIS)', 'Religion (INT)', 'Stealth (DEX)'],
+  paladin: ['Athletics (STR)', 'Insight (WIS)', 'Intimidation (CHA)', 'Medicine (WIS)', 'Persuasion (CHA)', 'Religion (INT)'],
+  ranger: ['Animal Handling (WIS)', 'Athletics (STR)', 'Insight (WIS)', 'Investigation (INT)', 'Nature (INT)', 'Perception (WIS)', 'Stealth (DEX)', 'Survival (WIS)'],
+  rogue: ['Acrobatics (DEX)', 'Athletics (STR)', 'Deception (CHA)', 'Insight (WIS)', 'Intimidation (CHA)', 'Investigation (INT)', 'Perception (WIS)', 'Performance (CHA)', 'Persuasion (CHA)', 'Sleight of Hand (DEX)', 'Stealth (DEX)'],
+  sorcerer: ['Arcana (INT)', 'Deception (CHA)', 'Insight (WIS)', 'Intimidation (CHA)', 'Persuasion (CHA)', 'Religion (INT)'],
+  warlock: ['Arcana (INT)', 'Deception (CHA)', 'History (INT)', 'Intimidation (CHA)', 'Investigation (INT)', 'Nature (INT)', 'Religion (INT)'],
+  wizard: ['Arcana (INT)', 'History (INT)', 'Insight (WIS)', 'Investigation (INT)', 'Medicine (WIS)', 'Religion (INT)']
+};
+
 // --- CORE MATH & DERIVATIONS ---
 export const getProficiencyBonus = (totalLevel) => Math.floor((totalLevel - 1) / 4) + 2;
 export const getModifier = (score) => Math.floor((score - 10) / 2);
@@ -277,7 +300,7 @@ const RESOURCE_HOOKS = {
   'Hexblade\'s Curse': { maxType: 1, recharge: 'short', filterRename: 'Dealt\'s Curse' } 
 };
 
-const HOMEBREW_CLASSES = {
+export const HOMEBREW_CLASSES = {
   'pirate': {
     hitDie: 10,
     levels: {
@@ -304,7 +327,6 @@ const HOMEBREW_CLASSES = {
 // ==========================================
 // FALLBACK: SRD FEAT DATABASE
 // ==========================================
-// The 5e API only legally contains the "Grappler" feat. We inject the rest manually.
 const CUSTOM_FEATS = [
   { index: "actor", name: "Actor", desc: "Increase your CHA score by 1. You have advantage on Deception and Performance checks when trying to pass yourself off as a different person. You can mimic the speech of another person or the sounds made by other creatures.", prerequisites: [] },
   { index: "alert", name: "Alert", desc: "Always on the lookout for danger. You gain +5 to Initiative, can't be surprised while conscious, and unseen attackers don't gain advantage against you.", prerequisites: [] },
@@ -324,16 +346,28 @@ const CUSTOM_FEATS = [
   { index: "war-caster", name: "War Caster", desc: "You have advantage on CON saving throws that you make to maintain your concentration on a spell when you take damage. You can perform the somatic components of spells even when you have weapons or a shield in one or both hands. When a hostile creature's movement provokes an opportunity attack from you, you can use your reaction to cast a spell at the creature, rather than making an opportunity attack.", prerequisites: [] }
 ];
 
-let cachedSpellStubs = null;
+const cachedSpellStubs = {};
 let cachedFeatStubs = null;
 let cachedEquipmentStubs = null;
 
-export const getSpellStubs = async () => {
-  if (cachedSpellStubs) return cachedSpellStubs;
-  const res = await fetch('https://www.dnd5eapi.co/api/spells');
+export const getSpellStubs = async (className = '') => {
+  const stdClasses = ['bard', 'cleric', 'druid', 'paladin', 'ranger', 'sorcerer', 'warlock', 'wizard'];
+  const safeClass = className ? className.toLowerCase().split(' ')[0] : 'all';
+  const isStd = stdClasses.includes(safeClass);
+  const cacheKey = isStd ? safeClass : 'all';
+
+  if (cachedSpellStubs[cacheKey]) return cachedSpellStubs[cacheKey];
+
+  let url = 'https://www.dnd5eapi.co/api/spells';
+  if (isStd) {
+    url = `https://www.dnd5eapi.co/api/classes/${safeClass}/spells`;
+  }
+  
+  const res = await fetch(url);
+  if (!res.ok) return [];
   const data = await res.json();
-  cachedSpellStubs = data.results;
-  return cachedSpellStubs;
+  cachedSpellStubs[cacheKey] = data.results;
+  return cachedSpellStubs[cacheKey];
 };
 
 export const getFeatStubs = async () => {
@@ -341,15 +375,12 @@ export const getFeatStubs = async () => {
   try {
     const res = await fetch('https://www.dnd5eapi.co/api/feats');
     const data = await res.json();
-    
-    // Inject the custom feats alongside the solitary API Grappler feat
     const customStubs = CUSTOM_FEATS.map(f => ({ index: f.index, name: f.name, url: 'custom', isCustom: true, ...f }));
     cachedFeatStubs = [...data.results, ...customStubs];
   } catch(e) {
     cachedFeatStubs = CUSTOM_FEATS.map(f => ({ index: f.index, name: f.name, url: 'custom', isCustom: true, ...f }));
   }
   
-  // Sort alphabetically so it feels like a native API response
   cachedFeatStubs.sort((a,b) => a.name.localeCompare(b.name));
   return cachedFeatStubs;
 };
@@ -364,9 +395,7 @@ export const getEquipmentStubs = async () => {
 
 export const fetchDetailedStubs = async (stubs) => {
   const promises = stubs.map(async (stub) => {
-    // If it's a custom feat from our fallback array, return it directly!
     if (stub.isCustom) return stub; 
-
     try {
       const res = await fetch(`https://www.dnd5eapi.co${stub.url}`);
       const detail = await res.json();

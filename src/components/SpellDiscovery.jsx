@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Loader2, Plus, Flame, Lock, ChevronDown } from 'lucide-react';
 import { getSpellStubs, fetchDetailedStubs } from '../services/arklaEngine';
 
-export default function SpellDiscovery({ onAddSpell, allowAdd = true, maxSpellLevel = 9 }) {
+export default function SpellDiscovery({ className, onAddSpell, allowAdd = true, maxSpellLevel = 9 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   
@@ -16,7 +16,7 @@ export default function SpellDiscovery({ onAddSpell, allowAdd = true, maxSpellLe
   useEffect(() => {
     const initSpells = async () => {
       setIsSearching(true);
-      const stubs = await getSpellStubs();
+      const stubs = await getSpellStubs(className);
       setAllStubs(stubs);
       setFilteredStubs(stubs);
       
@@ -25,7 +25,7 @@ export default function SpellDiscovery({ onAddSpell, allowAdd = true, maxSpellLe
       setIsSearching(false);
     };
     initSpells();
-  }, []);
+  }, [className]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -57,7 +57,7 @@ export default function SpellDiscovery({ onAddSpell, allowAdd = true, maxSpellLe
       name: spell.name,
       level: spell.level || 0,
       castTime: spell.casting_time || '1 Action',
-      desc: spell.desc
+      desc: Array.isArray(spell.desc) ? spell.desc.join('\n') : spell.desc
     });
     setVisibleSpells(prev => prev.filter(s => s.index !== spell.index));
   };
@@ -67,12 +67,11 @@ export default function SpellDiscovery({ onAddSpell, allowAdd = true, maxSpellLe
   return (
     <div className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-fuchsia-500/30 shadow-[0_0_30px_rgba(217,70,239,0.1)] mb-6 animate-in fade-in slide-in-from-top-2 relative overflow-hidden">
       
-      {/* Subtle ambient glow inside the discovery box */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-600/5 blur-[80px] rounded-full pointer-events-none"></div>
 
       <div className="flex justify-between items-center mb-5 relative z-10">
         <h4 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-300 to-indigo-300 flex items-center gap-2 uppercase tracking-widest drop-shadow-sm">
-          <Flame className="w-5 h-5 text-fuchsia-400" /> Spell Archives
+          <Flame className="w-5 h-5 text-fuchsia-400" /> {className ? `${className} Spells` : 'Spell Archives'}
         </h4>
         {!allowAdd && (
           <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1.5 rounded-lg border border-slate-700 shadow-inner">
@@ -144,7 +143,7 @@ export default function SpellDiscovery({ onAddSpell, allowAdd = true, maxSpellLe
                 )}
               </div>
               <p className={`text-sm mt-3 leading-relaxed transition-all cursor-pointer relative z-10 ${isTooHigh ? 'text-slate-600 line-clamp-2' : 'text-slate-300 line-clamp-3 hover:line-clamp-none'}`}>
-                {spell.desc}
+                {Array.isArray(spell.desc) ? spell.desc.join('\n') : spell.desc}
               </p>
             </div>
           );

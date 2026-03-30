@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Loader2, Plus, BookOpen, Lock, ChevronDown } from 'lucide-react';
 import { getFeatStubs, fetchDetailedStubs } from '../services/arklaEngine';
 
-export default function FeatDiscovery({ onAddFeat, allowAdd = true, charLevel = 1 }) {
+export default function FeatDiscovery({ charSpecies = '', charStats = {}, onAddFeat, allowAdd = true, charLevel = 1 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   
@@ -55,10 +55,43 @@ export default function FeatDiscovery({ onAddFeat, allowAdd = true, charLevel = 
   const handleAdd = (feat) => {
     onAddFeat({
       name: feat.name,
-      desc: feat.desc,
+      desc: Array.isArray(feat.desc) ? feat.desc.join('\n') : feat.desc,
       prerequisites: feat.prerequisites || []
     });
     setVisibleFeats(prev => prev.filter(f => f.index !== feat.index));
+  };
+
+  const checkPrereqs = (feat) => {
+    if (!feat.prerequisites || feat.prerequisites.length === 0) return { locked: false, reason: '' };
+    
+    let isLocked = false;
+    let reasons = [];
+
+    const reqText = feat.prerequisites.map(p => p.ability_score ? `${p.ability_score.name} ${p.minimum_score}` : '').join(', ');
+    const descLower = (Array.isArray(feat.desc) ? feat.desc.join(' ') : feat.desc || '').toLowerCase();
+
+    feat.prerequisites.forEach(p => {
+      if (p.ability_score) {
+        const statName = p.ability_score.name;
+        const currentStat = charStats[statName] || 10;
+        if (currentStat < p.minimum_score) {
+          isLocked = true;
+          reasons.push(`${statName} ${p.minimum_score} Req`);
+        }
+      }
+    });
+
+    const speciesSafe = charSpecies.toLowerCase();
+    if (descLower.includes('prerequisite: elf') && !speciesSafe.includes('elf')) { isLocked = true; reasons.push('Elf Req'); }
+    if (descLower.includes('prerequisite: dwarf') && !speciesSafe.includes('dwarf')) { isLocked = true; reasons.push('Dwarf Req'); }
+    if (descLower.includes('prerequisite: halfling') && !speciesSafe.includes('halfling')) { isLocked = true; reasons.push('Halfling Req'); }
+
+    if (reqText.includes('Level') && !isLocked) {
+       isLocked = true;
+       reasons.push('Level Req');
+    }
+
+    return { locked: isLocked, reason: reasons.join(', ') };
   };
 
   const hasMore = visibleFeats.length < filteredStubs.length;
@@ -66,7 +99,6 @@ export default function FeatDiscovery({ onAddFeat, allowAdd = true, charLevel = 
   return (
     <div className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-amber-500/30 shadow-[0_0_30px_rgba(245,158,11,0.1)] mb-6 animate-in fade-in slide-in-from-top-2 relative overflow-hidden">
       
-      {/* Ambient background glow */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-amber-600/5 blur-[80px] rounded-full pointer-events-none"></div>
 
       <div className="flex justify-between items-center mb-5 relative z-10">
@@ -111,12 +143,8 @@ export default function FeatDiscovery({ onAddFeat, allowAdd = true, charLevel = 
       
       <div className="space-y-4 max-h-[450px] overflow-y-auto custom-scrollbar pr-2 relative z-10">
         {visibleFeats.map((feat) => {
-          let reqLevel = 1;
-          if (feat.prerequisites && feat.prerequisites.length > 0) {
-             const abilityReq = feat.prerequisites.find(p => p.ability_score);
-             if (abilityReq) reqLevel = 4; // Most basic assumption for ability reqs
-          }
-          const isTooHigh = reqLevel > charLevel;
+          const status = checkPrereqs(feat);
+          const isTooHigh = status.locked;
 
           return (
             <div key={feat.index} className={`p-4 rounded-xl text-left transition-all duration-300 relative overflow-hidden group ${isTooHigh ? 'bg-slate-900/40 border border-slate-800' : 'bg-slate-800/80 border border-slate-600 hover:border-amber-500/50 hover:shadow-[0_4px_20px_rgba(245,158,11,0.15)] hover:-translate-y-0.5'}`}>
@@ -129,7 +157,7 @@ export default function FeatDiscovery({ onAddFeat, allowAdd = true, charLevel = 
                 <div className="pr-4">
                   <span className={`font-black text-lg block mb-1 ${isTooHigh ? 'text-slate-500' : 'text-amber-300 drop-shadow-sm'}`}>{feat.name}</span>
                   {feat.prerequisites && feat.prerequisites.length > 0 && (
-                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border bg-slate-900/80 text-slate-400 border-slate-700 shadow-inner inline-block">
+                    <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border shadow-inner inline-block ${isTooHigh ? 'bg-red-950/30 text-red-400 border-red-900/50' : 'bg-slate-900/80 text-slate-400 border-slate-700'}`}>
                       Req: {feat.prerequisites.map(p => p.ability_score ? `${p.ability_score.name} ${p.minimum_score}` : 'Special').join(', ')}
                     </span>
                   )}
@@ -139,15 +167,15 @@ export default function FeatDiscovery({ onAddFeat, allowAdd = true, charLevel = 
                   <button 
                     onClick={() => handleAdd(feat)}
                     disabled={isTooHigh}
-                    className={`px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 shadow-sm ${isTooHigh ? 'bg-slate-900 text-slate-600 border border-slate-800 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]'}`}
+                    className={`px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 shadow-sm ${isTooHigh ? 'bg-slate-900 text-red-500 border border-slate-800 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]'}`}
                   >
                     {isTooHigh ? <Lock className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                    {isTooHigh ? 'Locked' : 'Master'}
+                    {isTooHigh ? status.reason : 'Master'}
                   </button>
                 )}
               </div>
               <p className={`text-sm mt-3 leading-relaxed transition-all cursor-pointer relative z-10 ${isTooHigh ? 'text-slate-600 line-clamp-2' : 'text-slate-300 line-clamp-3 hover:line-clamp-none'}`}>
-                {feat.desc}
+                {Array.isArray(feat.desc) ? feat.desc.join('\n') : feat.desc}
               </p>
             </div>
           );

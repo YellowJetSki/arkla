@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 import { PREMADE_CHARACTERS } from '../data/campaignData';
-import { fetchSpeciesTraits } from '../services/arklaEngine'; 
+import { fetchSpeciesTraits, fetchClassProgression } from '../services/arklaEngine'; 
 import StatGrid from './shared/StatGrid';
 import QuickTraits from './shared/QuickTraits'; 
 import CollapsibleSection from './shared/CollapsibleSection';
@@ -107,8 +107,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           if (!isDM && !isKicked) {
             const initialData = PREMADE_CHARACTERS[currentUser.charId];
             if (initialData) {
-              setDoc(charRef, { ...initialData, hasCompletedTutorial: false });
-              setChar({ ...initialData, hasCompletedTutorial: false }); 
+              setDoc(charRef, { ...initialData });
+              setChar({ ...initialData }); 
             } else setIsKicked(true);
           }
         }
@@ -133,11 +133,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     return () => { unsubscribeSession(); unsubscribeChar(); unsubscribeLoot(); };
   }, [currentUser.charId, isDM, isKicked]);
 
-  // --- NEW: SILENT AUTO-FETCHER FOR SPECIES TRAITS ---
   useEffect(() => {
     const autoFetchTraits = async () => {
       if (!char || isDM || !char.species || char.hasFetchedSpecies) return;
-
       try {
         const speciesData = await fetchSpeciesTraits(char.species);
         if (speciesData && !speciesData.error && speciesData.traits.length > 0) {
@@ -145,27 +143,58 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             name: `${char.species} Trait: ${t.name}`,
             desc: t.desc
           }));
-
           await updateDoc(doc(db, 'characters', currentUser.charId), {
             features: arrayUnion(...newTraits),
             hasFetchedSpecies: true,
             speed: speciesData.mechanics?.speed || char.speed || 30
           });
-          
           setSaveToast(`${char.species} Traits Auto-Scribed!`);
           setTimeout(() => setSaveToast(''), 3000);
         } else {
-          // If no traits exist for this species, mark as fetched so it doesn't loop infinitely
           await updateDoc(doc(db, 'characters', currentUser.charId), { hasFetchedSpecies: true });
         }
       } catch (err) {
         console.error("Failed to auto-fetch species traits", err);
       }
     };
-
     autoFetchTraits();
   }, [char?.species, char?.hasFetchedSpecies, isDM, currentUser.charId]);
-  // ---------------------------------------------------
+
+  useEffect(() => {
+    const autoFetchClass = async () => {
+      if (!char || isDM || !char.classes || char.hasFetchedClass) return;
+      try {
+        const classData = await fetchClassProgression(char.classes[0].name, 1);
+        let updates = { hasFetchedClass: true };
+        
+        if (classData.features?.length > 0) {
+          updates.features = arrayUnion(...classData.features);
+        }
+        
+        if (classData.resources?.length > 0) {
+           const currentResources = char.resources ? [...char.resources] : [];
+           classData.resources.forEach(res => {
+              let calculatedMax = 1;
+              if (res.maxType === 'PB') calculatedMax = 2; 
+              else if (res.maxType === 'LEVEL' || res.maxType === 'CLASS_LEVEL') calculatedMax = 1;
+              else if (['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'].includes(res.maxType)) {
+                calculatedMax = Math.max(1, Math.floor(((char.stats[res.maxType] || 10) - 10) / 2));
+              } else if (typeof res.maxType === 'number') calculatedMax = res.maxType;
+              
+              currentResources.push({ name: res.name, max: calculatedMax, current: calculatedMax, recharge: res.recharge, isPool: res.isPool });
+           });
+           updates.resources = currentResources;
+        }
+
+        await updateDoc(doc(db, 'characters', currentUser.charId), updates);
+        setSaveToast(`${char.classes[0].name} Features Scribed!`);
+        setTimeout(() => setSaveToast(''), 3000);
+      } catch (err) {
+        console.error("Failed to auto-fetch class traits", err);
+      }
+    };
+    autoFetchClass();
+  }, [char?.hasFetchedClass, isDM, currentUser.charId, char?.classes, char?.stats]);
 
   const updateField = async (field, value) => {
     if (!char) return;
@@ -249,11 +278,24 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     setNewLootPopup(null);
   };
 
-  const handleCompleteOnboarding = async (selectedTheme) => {
-    await updateDoc(doc(db, 'characters', currentUser.charId), {
-      theme: selectedTheme,
+  const handleCompleteOnboarding = async (wizardData) => {
+    let updates = {
+      theme: wizardData.theme,
       hasCompletedTutorial: true
-    });
+    };
+
+    if (wizardData.spells && wizardData.spells.length > 0) {
+      updates.spells = wizardData.spells;
+    }
+    
+    if (wizardData.skills && wizardData.skills.length > 0) {
+      updates.proficiencies = {
+         ...(char.proficiencies || {}),
+         skills: wizardData.skills.join(', ')
+      };
+    }
+
+    await updateDoc(doc(db, 'characters', currentUser.charId), updates);
   };
 
   const restoreCharacter = async (importedData) => {
@@ -322,7 +364,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
         {!isDM && char && !char.hasCompletedTutorial && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center pointer-events-auto">
-            <OnboardingWizard charName={char.name} onComplete={handleCompleteOnboarding} />
+            <OnboardingWizard char={char} onComplete={handleCompleteOnboarding} />
           </div>
         )}
 
@@ -481,7 +523,15 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                   </form>
                 )}
 
-                {showFeatSearch && !isDM && <FeatDiscovery onAddFeat={addFeature} allowAdd={isDM} charLevel={char.level} />}
+                {showFeatSearch && !isDM && (
+                  <FeatDiscovery 
+                    charSpecies={char.species}
+                    charStats={char.stats}
+                    onAddFeat={addFeature} 
+                    allowAdd={isDM} 
+                    charLevel={char.level} 
+                  />
+                )}
 
                 <div className="space-y-4">
                   {(char.features || []).map((feat, i) => (
