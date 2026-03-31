@@ -1,4 +1,6 @@
-import { Image as ImageIcon } from 'lucide-react';
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Image as ImageIcon, X } from 'lucide-react';
 
 const PUBLIC_IMAGES = [
   { 
@@ -11,34 +13,75 @@ const PUBLIC_IMAGES = [
   },
   { 
     category: 'Portraits & Art', 
-    urls: ['/kehrfuffle.png', '/strider.png', '/wendy.png', '/icon.png'] 
+    urls: ['/kehrfuffle.png', '/strider.png', '/wendy.png', '/icon.png', '/duku_belt.png'] 
   }
 ];
 
-export default function ImageSelector({ value, onChange, label = "Image Selection", inputClassName = "", iconColor = "text-slate-400" }) {
+export default function ImageSelector({ value, onChange, label = "Image URL", placeholder = "https://...", inputClassName = "", iconColor = "text-slate-400" }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // This is the modal content that we will teleport to the document body
+  const modalContent = isOpen ? (
+    <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
+       <div className="bg-slate-900 border border-slate-600 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+            <h3 className="font-black text-white uppercase tracking-widest flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-slate-400" /> Asset Gallery
+            </h3>
+            <button type="button" onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white p-1 rounded bg-slate-900 border border-slate-700"><X className="w-4 h-4"/></button>
+          </div>
+          
+          <div className="p-5 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+            {PUBLIC_IMAGES.map(group => (
+              <div key={group.category}>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 border-b border-slate-800 pb-1">{group.category}</h4>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                  {group.urls.map(url => (
+                    <button 
+                      key={url} 
+                      type="button" 
+                      onClick={() => { onChange(url); setIsOpen(false); }} 
+                      className="aspect-square bg-slate-950 rounded-xl border border-slate-700 overflow-hidden hover:border-indigo-500 hover:shadow-[0_0_15px_rgba(99,102,241,0.4)] transition-all group relative focus:outline-none"
+                    >
+                      <img src={url} alt={url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+                      <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity p-2">
+                        <span className="text-[10px] text-white font-bold text-center break-all leading-tight">{url.split('/').pop()}</span>
+                        <span className="text-[8px] text-indigo-400 uppercase tracking-widest mt-2 bg-indigo-900/50 px-2 py-0.5 rounded">Select</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+       </div>
+    </div>
+  ) : null;
+
   return (
     <div>
-      <label className="flex items-center text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 gap-1">
-        <ImageIcon className={`w-3 h-3 ${iconColor}`} /> {label}
+      <label className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+        <span className="flex items-center gap-1"><ImageIcon className={`w-3 h-3 ${iconColor}`} /> {label}</span>
+        <button 
+          type="button" 
+          onClick={() => setIsOpen(true)} 
+          className="text-white bg-slate-800 hover:bg-slate-700 border border-slate-600 px-2 py-0.5 rounded transition-colors shadow-sm"
+        >
+          Open Gallery
+        </button>
       </label>
       
-      <select 
-        value={PUBLIC_IMAGES.some(g => g.urls.includes(value)) ? value : ""} 
+      <input 
+        type="url" 
+        value={value} 
+        onFocus={(e) => e.target.select()} 
         onChange={(e) => onChange(e.target.value)} 
-        className={inputClassName || "w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner appearance-none cursor-pointer"}
-      >
-        <option value="" disabled>Select an image...</option>
-        
-        {PUBLIC_IMAGES.map(group => (
-          <optgroup key={group.category} label={`— ${group.category} —`} className="bg-slate-900 text-indigo-300 font-black italic mt-2">
-            {group.urls.map(url => (
-              <option key={url} value={url} className="text-white font-medium not-italic bg-slate-800">
-                {url.replace('/', '')}
-              </option>
-            ))}
-          </optgroup>
-        ))}
-      </select>
+        className={inputClassName || "w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner"} 
+        placeholder={placeholder} 
+      />
+      
+      {/* Teleport the modal to the body so it breaks out of the Character Builder popup! */}
+      {isOpen && createPortal(modalContent, document.body)}
     </div>
   );
 }
