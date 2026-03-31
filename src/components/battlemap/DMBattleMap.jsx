@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, writeBatch, deleteField, deleteDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, Heart, Maximize, Ruler, CircleDashed, ArrowUpCircle, BrainCircuit, PenTool, Eraser, Triangle, Circle } from 'lucide-react';
+import { Map, X, Image as ImageIcon, Loader2, Users } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
 import MapDrawings from './MapDrawings';
 import TokenContextMenu from './TokenContextMenu';
 import ImageSelector from '../shared/ImageSelector';
+import BattlemapControls from './BattlemapControls';
+import TokenLayer from './TokenLayer';
 
 const LOCAL_MAPS = [
   { label: 'Tutorial Forest', value: '/tutorial_forest_enc.png' },
@@ -232,7 +234,6 @@ export default function DMBattleMap() {
     if (isNaN(parsedHp)) return;
     
     try {
-      // BATCTH DOT-NOTATION UPDATE! 
       const batch = writeBatch(db);
       batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp });
       
@@ -394,35 +395,16 @@ export default function DMBattleMap() {
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       {/* Control Bar */}
-      <div className="bg-slate-900/80 backdrop-blur-md border-b border-indigo-500/50 p-3 shadow-[0_0_30px_rgba(99,102,241,0.15)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0 z-20">
-        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-sm"><Map className="w-5 h-5" /> Battlefield</h2>
-        
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar">
-          <div className="flex items-center bg-slate-950/80 p-1.5 rounded-xl border border-slate-700/80 shadow-inner mr-2 shrink-0">
-            <button onClick={() => setIsDrawingMode(!isDrawingMode)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${isDrawingMode ? 'bg-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-red-400 hover:bg-slate-800'}`}><PenTool className="w-3.5 h-3.5" /> Pen</button>
-            {isDrawingMode && (
-              <div className="flex items-center gap-1.5 px-2 border-l border-slate-700/50 ml-1 pl-2">
-                <button onClick={() => setDrawingShape('freehand')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'freehand' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}><PenTool className="w-3 h-3" /></button>
-                <button onClick={() => setDrawingShape('line')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'line' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}><div className="w-3 h-0.5 bg-current rotate-45" /></button>
-                <button onClick={() => setDrawingShape('circle')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'circle' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}><Circle className="w-3 h-3" /></button>
-                <button onClick={() => setDrawingShape('cone')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'cone' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}><Triangle className="w-3 h-3" /></button>
-                <div className="w-px h-4 bg-slate-700/50 mx-1"></div>
-                {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
-                  <button key={c} onClick={() => setDrawingColor(c)} className={`w-5 h-5 rounded-full border-2 transition-all ${drawingColor === c ? 'scale-110 border-white shadow-md' : 'border-transparent opacity-60 hover:opacity-100'}`} style={{ backgroundColor: c }} />
-                ))}
-              </div>
-            )}
-            <button onClick={handleClearDrawings} className="text-slate-500 hover:text-red-400 p-2 ml-1 border-l border-slate-700/50 transition-colors"><Eraser className="w-4 h-4" /></button>
-          </div>
-
-          <button onClick={launchDisplayTab} className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"><MonitorPlay className="w-3.5 h-3.5" /> Cast</button>
-          <button onClick={() => setIsPresetsOpen(true)} className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"><Save className="w-3.5 h-3.5" /> Presets</button>
-          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"><Settings className="w-3.5 h-3.5" /> Config</button>
-          <button onClick={togglePublish} className={`px-4 py-1.5 rounded-lg font-black text-[10px] md:text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 uppercase tracking-widest ${mapData.isPublished ? 'bg-emerald-600 text-white border border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-800'}`}>
-            {mapData.isPublished ? <><Send className="w-3.5 h-3.5"/> LIVE</> : <><EyeOff className="w-3.5 h-3.5"/> HIDDEN</>}
-          </button>
-        </div>
-      </div>
+      <BattlemapControls 
+        isDrawingMode={isDrawingMode} setIsDrawingMode={setIsDrawingMode}
+        drawingShape={drawingShape} setDrawingShape={setDrawingShape}
+        drawingColor={drawingColor} setDrawingColor={setDrawingColor}
+        handleClearDrawings={handleClearDrawings}
+        launchDisplayTab={launchDisplayTab}
+        setIsPresetsOpen={setIsPresetsOpen}
+        isEditingMap={isEditingMap} setIsEditingMap={setIsEditingMap}
+        mapData={mapData} togglePublish={togglePublish}
+      />
 
       {isEditingMap && (
         <div className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-700/80 p-5 shadow-inner animate-in fade-in slide-in-from-top-2 space-y-5 relative z-10 shrink-0">
@@ -483,7 +465,7 @@ export default function DMBattleMap() {
           <div className="h-full flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/30">
             <Map className="w-12 h-12 mb-4 opacity-50" />
             <p className="font-bold">No map active.</p>
-            <button onClick={() => setShowConfig(true)} className="mt-4 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Configure Map</button>
+            <button onClick={() => setIsEditingMap(true)} className="mt-4 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Configure Map</button>
           </div>
         ) : (
           <div className="min-w-max min-h-max bg-slate-900 p-2 rounded-xl border border-slate-800 shadow-2xl mx-auto w-max relative group">
@@ -502,63 +484,16 @@ export default function DMBattleMap() {
 
               <MapDrawings drawings={mapData.drawings || []} activeTool={isDrawingMode ? 'draw' : 'move'} currentColor={drawingColor} containerRef={containerRef} onSaveDrawing={handleDrawEnd} />
 
-              {Object.values(tokens).map(token => {
-                const isSelected = mapData.activeTokenId === token.id || selectedTokenId === token.id;
-                return (
-                  <div
-                    key={token.id}
-                    className={`absolute cursor-grab active:cursor-grabbing transition-all duration-200 z-20 ${isSelected ? 'z-30 scale-110' : ''}`}
-                    style={{ width: `${50 * token.size}px`, height: `${50 * token.size}px`, transform: `translate(${token.x * 50}px, ${token.y * 50}px)` }}
-                    onDragEnd={(e) => {
-                      if (isDrawingMode) return;
-                      const rect = e.target.parentElement.getBoundingClientRect();
-                      const x = Math.max(0, Math.min(mapData.cols - token.size, Math.floor((e.clientX - rect.left) / 50)));
-                      const y = Math.max(0, Math.min(mapData.rows - token.size, Math.floor((e.clientY - rect.top) / 50)));
-                      handleMoveToken(token.id, x, y);
-                    }}
-                    draggable={!isDrawingMode}
-                    onContextMenu={(e) => { e.preventDefault(); setContextMenu({ token, x: e.clientX, y: e.clientY }); }}
-                    onClick={(e) => { e.stopPropagation(); setSelectedTokenId(selectedTokenId === token.id ? null : token.id); }}
-                  >
-                    <div className="relative w-full h-full p-0.5 group/token">
-                       
-                       {/* Quick HP HUD (DM Only, when selected) */}
-                       {isSelected && (
-                         <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-slate-900/95 p-1 rounded-lg border border-slate-700 shadow-2xl z-50 pointer-events-auto">
-                           <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp - 10); }} className="px-1.5 py-0.5 bg-red-900/80 hover:bg-red-600 text-white text-[10px] font-bold rounded cursor-pointer">-10</button>
-                           <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp - 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">-1</button>
-                           <span className="text-[10px] font-black px-1.5 text-white min-w-[24px] text-center">{token.hp}</span>
-                           <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp + 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">+1</button>
-                         </div>
-                       )}
-
-                       {isSelected && <div className={`absolute inset-0 rounded-full animate-ping opacity-50 ${token.type === 'player' ? 'bg-indigo-500' : 'bg-red-500'}`}></div>}
-                       
-                       <div className={`w-full h-full rounded-full border-2 shadow-[0_0_15px_rgba(0,0,0,0.8)] overflow-hidden bg-slate-900 relative ${isSelected ? (token.type === 'player' ? 'border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.6)]' : 'border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]') : (token.type === 'player' ? 'border-indigo-600' : 'border-red-600')}`}>
-                         <img src={token.img} alt={token.name} className={`w-full h-full object-cover ${token.isHidden ? 'opacity-50 grayscale' : ''}`} draggable={false} />
-                       </div>
-                       
-                       {/* HP Bar */}
-                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[80%] h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
-                         <div className={`h-full ${token.hp > (token.maxHp/2) ? 'bg-emerald-500' : token.hp > (token.maxHp/4) ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.max(0, Math.min(100, (token.hp / token.maxHp) * 100))}%` }}></div>
-                       </div>
-                       
-                       {/* Name Tag (Hover) */}
-                       <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/token:opacity-100 transition-opacity pointer-events-none border border-slate-700 z-50">
-                         {token.name} {token.isHidden && '(Hidden)'}
-                       </div>
-
-                       {/* Status Indicators */}
-                       {(token.conditions?.length > 0 || token.isConcentrating) && (
-                         <div className="absolute -right-1 -top-1 flex gap-0.5 flex-wrap w-6 z-40">
-                            {token.isConcentrating && <div className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-slate-900 shadow-sm animate-pulse" title="Concentrating"></div>}
-                            {token.conditions?.length > 0 && <div className="w-2.5 h-2.5 rounded-full bg-fuchsia-500 border border-slate-900 shadow-sm" title={token.conditions.join(', ')}></div>}
-                         </div>
-                       )}
-                    </div>
-                  </div>
-                );
-              })}
+              <TokenLayer 
+                tokens={tokens}
+                mapData={mapData}
+                selectedTokenId={selectedTokenId}
+                setSelectedTokenId={setSelectedTokenId}
+                isDrawingMode={isDrawingMode}
+                handleTokenDrop={handleTokenDrop}
+                handleUpdateTokenHpLive={handleUpdateTokenHpLive}
+                setContextMenu={setContextMenu}
+              />
 
             </div>
           </div>
