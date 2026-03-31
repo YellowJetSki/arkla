@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { UserPlus, ChevronRight, ChevronLeft, Dices, X, Wand2, Backpack, BookOpen, Image as ImageIcon, Circle, PawPrint } from 'lucide-react';
+import { UserPlus, ChevronRight, ChevronLeft, Dices, X, Wand2, Backpack, BookOpen, Fingerprint, Plus, Trash2, Image as ImageIcon, Circle, PawPrint, Sword, Shield } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
+import ImageSelector from './shared/ImageSelector';
 
 export default function DMCharacterBuilder({ onClose }) {
   const [stepIndex, setStepIndex] = useState(0);
@@ -14,39 +15,40 @@ export default function DMCharacterBuilder({ onClose }) {
     name: '',
     species: '',
     class: '',
-    level: 1,
-    maxHp: 10,
-    ac: 10,
-    speed: 30,
     theme: 'indigo',
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
     alignment: 'Neutral',
     backstory: '',
-    inventory: '',
+    speed: 30,
     imageUrl: '',
     tokenImg: ''
   });
 
+  // Homebrew Species State
+  const [isCustomSpecies, setIsCustomSpecies] = useState(false);
+  const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '' });
+  const [speciesTraits, setSpeciesTraits] = useState([]);
+
+  // Companion State
   const [hasCompanion, setHasCompanion] = useState(false);
   const [companionData, setCompanionData] = useState({
-    name: '',
-    species: '',
-    isDormant: false,
-    awakeLevel: 1,
-    hp: 10,
-    ac: 10,
-    speed: 30,
-    stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
-    attacks: '',
-    desc: ''
+    name: '', species: '', isDormant: false, awakeLevel: 1, hp: 10, ac: 10, speed: 30,
+    stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }, attacks: '', desc: ''
   });
 
-  const steps = ['identity', 'attributes', 'lore', 'companion'];
+  // Structured Inventory State
+  const [inventory, setInventory] = useState([]);
+  const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '' });
+
+  const steps = ['identity', 'attributes'];
+  if (isCustomSpecies) steps.push('speciesForge');
+  steps.push('companion', 'inventory', 'lore');
+  
   const currentStep = steps[stepIndex];
 
   const updateField = (field, val) => setFormData(prev => ({ ...prev, [field]: val }));
   const updateStat = (stat, val) => setFormData(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(val) } }));
-
+  const updateProf = (field, val) => setCustomProfs(prev => ({ ...prev, [field]: val }));
   const updateCompField = (field, val) => setCompanionData(prev => ({ ...prev, [field]: val }));
   const updateCompStat = (stat, val) => setCompanionData(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(val) } }));
 
@@ -65,45 +67,72 @@ export default function DMCharacterBuilder({ onClose }) {
     }));
   };
 
+  const addTrait = () => setSpeciesTraits(prev => [...prev, { name: '', desc: '' }]);
+  const updateTrait = (index, field, value) => {
+    const newTraits = [...speciesTraits];
+    newTraits[index][field] = value;
+    setSpeciesTraits(newTraits);
+  };
+  const removeTrait = (index) => setSpeciesTraits(prev => prev.filter((_, i) => i !== index));
+
+  const handleAddItem = (e) => {
+    e.preventDefault();
+    if (!newItem.name) return;
+    
+    const formattedItem = {
+      id: `item_${Date.now()}`,
+      name: newItem.name,
+      category: newItem.category,
+      quantity: Number(newItem.quantity) || 1,
+      desc: newItem.desc,
+      imageUrl: '',
+      damageDice: newItem.category === 'Weapon' ? newItem.damageDice : null,
+      damageType: newItem.category === 'Weapon' ? newItem.damageType : null,
+      properties: newItem.category === 'Weapon' ? newItem.properties : null,
+      ac: newItem.category === 'Armor' ? Number(newItem.ac) : null
+    };
+
+    setInventory(prev => [...prev, formattedItem]);
+    setNewItem({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '' });
+  };
+
+  const removeInventoryItem = (index) => setInventory(prev => prev.filter((_, i) => i !== index));
+
   const handleFinish = async () => {
-    if (!formData.name || !formData.class || !formData.species) {
-      setDialog({ isOpen: true, title: 'Missing Info', message: 'Name, Species, and Class are required.', type: 'alert', onConfirm: closeDialog });
+    if (!formData.name) {
+      setDialog({ isOpen: true, title: 'Missing Name', message: 'The character must have a name.', type: 'alert', onConfirm: closeDialog });
       return;
     }
     
-    if (hasCompanion && (!companionData.name || !companionData.species)) {
-      setDialog({ isOpen: true, title: 'Missing Companion Info', message: 'Companion Name and Species/Type are required.', type: 'alert', onConfirm: closeDialog });
-      return;
-    }
-
     setIsSaving(true);
     try {
       const charId = `char_${Date.now()}`;
+      const conMod = Math.floor((formData.stats.CON - 10) / 2);
+      const dexMod = Math.floor((formData.stats.DEX - 10) / 2);
 
-      // Convert raw text inventory into structured objects
-      const startingItems = formData.inventory.split('\n').filter(line => line.trim()).map((line, idx) => ({
-        id: `item_${Date.now()}_${idx}`,
-        name: line.replace(/^[•\-*]\s*/, '').trim(),
-        category: 'Adventuring Gear',
-        quantity: 1,
-        desc: '',
-        imageUrl: ''
-      }));
+      let finalSpeed = formData.speed;
+      let finalProfs = isCustomSpecies ? customProfs : { skills: '', tools: '', weapons: '', armor: '', languages: 'Common' };
+      let finalFeatures = isCustomSpecies 
+        ? speciesTraits.filter(t => t.name && t.desc).map(t => ({ name: `${formData.species || 'Custom'} Trait: ${t.name}`, desc: t.desc }))
+        : [];
+      
+      const startingHp = 10 + conMod; // Default hit die is d10 for manual builds unless edited later
 
       const newChar = {
         name: formData.name,
-        species: formData.species,
-        class: formData.class,
-        level: Number(formData.level),
+        species: formData.species || 'Human',
+        class: formData.class || 'Fighter',
+        classes: [{ name: formData.class || 'Fighter', level: 1 }],
+        level: 1,
         theme: formData.theme,
         exp: 0,
         alignment: formData.alignment,
-        hp: Number(formData.maxHp),
-        maxHp: Number(formData.maxHp),
+        hp: startingHp,
+        maxHp: startingHp,
         tempHp: 0,
-        hitDice: { current: Number(formData.level), max: Number(formData.level), type: 'd8' },
-        ac: Number(formData.ac),
-        speed: Number(formData.speed),
+        hitDice: { current: 1, max: 1, type: 'd10' },
+        ac: 10 + dexMod,
+        speed: finalSpeed,
         initiative: '--',
         spellSave: '--',
         spellAttack: '--',
@@ -122,27 +151,23 @@ export default function DMCharacterBuilder({ onClose }) {
         spellSlots: {},
         spells: [],
         dmNotes: '',
-        attacks: [],
-        proficiencies: { skills: '', tools: '', weapons: '', armor: '', languages: 'Common' },
-        features: [],
-        inventory: startingItems,
+        attacks: [], // Weapons equipped from inventory will populate this
+        proficiencies: finalProfs,
+        features: finalFeatures,
+        inventory: inventory,
         traits: { personality: '', ideal: '', bond: '', flaws: '' },
         backstory: formData.backstory,
         notes: '',
         levelUpPending: false,
         companion: hasCompanion ? {
           ...companionData,
-          hp: Number(companionData.hp),
-          ac: Number(companionData.ac),
-          speed: Number(companionData.speed),
-          awakeLevel: Number(companionData.awakeLevel)
+          hp: Number(companionData.hp), ac: Number(companionData.ac),
+          speed: Number(companionData.speed), awakeLevel: Number(companionData.awakeLevel)
         } : null
       };
 
       const batch = writeBatch(db);
-      
-      const charRef = doc(db, 'characters', charId);
-      batch.set(charRef, newChar);
+      batch.set(doc(db, 'characters', charId), newChar);
 
       const sessionRef = doc(db, 'campaign', 'main_session');
       batch.update(sessionRef, { unlockedCharacters: [...(window.unlockedCharactersCache || []), charId] });
@@ -179,7 +204,7 @@ export default function DMCharacterBuilder({ onClose }) {
             {currentStep === 'identity' && (
               <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
                 <div className="flex items-center gap-3 text-indigo-400 border-b border-slate-800 pb-2 mb-4">
-                  <Wand2 className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Identity & Class</h3>
+                  <Wand2 className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Identity & Path</h3>
                 </div>
                 
                 <div>
@@ -190,12 +215,17 @@ export default function DMCharacterBuilder({ onClose }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-slate-950 border border-slate-700 rounded-xl p-3 shadow-inner">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Species</label>
-                    <input type="text" onFocus={(e) => e.target.select()} value={formData.species} onChange={e => updateField('species', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 mb-3" placeholder="e.g. Wood Elf, Tiefling..." />
+                    <input type="text" onFocus={(e) => e.target.select()} value={formData.species} onChange={e => updateField('species', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 mb-3" placeholder="e.g. Elf, Tiefling, custom..." />
+                    
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input type="checkbox" checked={isCustomSpecies} onChange={(e) => setIsCustomSpecies(e.target.checked)} className="w-4 h-4 rounded border-slate-600 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 bg-slate-800" />
+                      <span className="text-xs text-slate-300 group-hover:text-white transition-colors">This is a Custom/Homebrew Species</span>
+                    </label>
                   </div>
                   
                   <div className="bg-slate-950 border border-slate-700 rounded-xl p-3 shadow-inner">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Class & Level(s)</label>
-                    <input type="text" onFocus={(e) => e.target.select()} value={formData.class} onChange={e => updateField('class', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500" placeholder="e.g. Fighter 3 / Rogue 1" />
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Arkla Class</label>
+                    <input type="text" value={formData.class} onChange={e => updateField('class', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500" placeholder="Type or select a class..." />
                   </div>
                 </div>
 
@@ -216,27 +246,15 @@ export default function DMCharacterBuilder({ onClose }) {
               <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
                 <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-4">
                   <div className="flex items-center gap-3 text-indigo-400">
-                    <Dices className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Vitals & Stats</h3>
+                    <Dices className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Attributes</h3>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-700 shadow-inner mb-6">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Total Level</label>
-                    <input type="number" onFocus={(e) => e.target.select()} value={formData.level} onChange={e => updateField('level', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Max HP</label>
-                    <input type="number" onFocus={(e) => e.target.select()} value={formData.maxHp} onChange={e => updateField('maxHp', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Armor Class</label>
-                    <input type="number" onFocus={(e) => e.target.select()} value={formData.ac} onChange={e => updateField('ac', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Speed (ft)</label>
-                    <input type="number" onFocus={(e) => e.target.select()} value={formData.speed} onChange={e => updateField('speed', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
-                  </div>
+                <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 text-center mb-6 shadow-inner">
+                  <p className="text-sm text-slate-300 mb-4">Input the results of your physical dice rolls below, or allow the engine to digitally roll 4d6 (drop lowest) for you.</p>
+                  <button onClick={handleRollAll} className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white px-5 py-2.5 rounded-xl text-xs uppercase font-black tracking-widest transition-colors border border-indigo-500/50 shadow-sm mx-auto flex items-center gap-2">
+                    <Dices className="w-4 h-4" /> Digital Roll (4d6)
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
@@ -253,42 +271,40 @@ export default function DMCharacterBuilder({ onClose }) {
                     </div>
                   ))}
                 </div>
-                <button onClick={handleRollAll} className="mt-4 bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white px-5 py-2.5 rounded-xl text-xs uppercase font-black tracking-widest transition-colors border border-indigo-500/50 shadow-sm mx-auto flex items-center gap-2">
-                  <Dices className="w-4 h-4" /> Randomize Stats
-                </button>
               </div>
             )}
 
-            {currentStep === 'lore' && (
-              <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
-                <div className="flex items-center gap-3 text-indigo-400 border-b border-slate-800 pb-2 mb-4">
-                  <BookOpen className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Lore & Aesthetics</h3>
+            {currentStep === 'speciesForge' && (
+              <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center gap-3 text-emerald-400 border-b border-emerald-900/50 pb-2 mb-4">
+                  <Fingerprint className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Homebrew Species Forge</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><ImageIcon className="w-3 h-3"/> Sheet Portrait URL</label>
-                    <input type="url" onFocus={(e) => e.target.select()} value={formData.imageUrl} onChange={e => updateField('imageUrl', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="https://..." />
+                  <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Base Speed (ft)</label>
+                    <input type="number" onFocus={(e) => e.target.select()} value={formData.speed} onChange={e => updateField('speed', Number(e.target.value))} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Circle className="w-3 h-3"/> Battle Token URL</label>
-                    <input type="url" onFocus={(e) => e.target.select()} value={formData.tokenImg} onChange={e => updateField('tokenImg', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="https://..." />
+                  
+                  <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Languages</label>
+                    <input type="text" onFocus={(e) => e.target.select()} value={customProfs.languages} onChange={e => updateProf('languages', e.target.value)} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500" placeholder="e.g. Common, Elvish" />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Alignment</label>
-                  <input type="text" onFocus={(e) => e.target.select()} value={formData.alignment} onChange={e => updateField('alignment', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. Chaotic Neutral" />
-                </div>
+                <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner">
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Unique Traits & Features</label>
+                    <button onClick={addTrait} className="bg-emerald-900/40 hover:bg-emerald-600 text-emerald-400 hover:text-white px-2 py-1 rounded text-[10px] uppercase font-bold tracking-widest transition-colors flex items-center gap-1 border border-emerald-500/30 shadow-sm"><Plus className="w-3 h-3"/> Add Trait</button>
+                  </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Backpack className="w-3 h-3"/> Starting Inventory (One per line)</label>
-                  <textarea value={formData.inventory} onChange={e => updateField('inventory', e.target.value)} className="w-full h-24 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 shadow-inner resize-y custom-scrollbar" placeholder="Longsword&#10;50ft Hempen Rope&#10;Bedroll" />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><BookOpen className="w-3 h-3"/> Backstory</label>
-                  <textarea value={formData.backstory} onChange={e => updateField('backstory', e.target.value)} className="w-full h-24 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 shadow-inner resize-y custom-scrollbar" placeholder="Born in the town of..." />
+                  {speciesTraits.map((trait, index) => (
+                    <div key={index} className="bg-slate-950 border border-slate-700 rounded-lg p-3 relative group mb-3">
+                      <button onClick={() => removeTrait(index)} className="absolute top-2 right-2 text-slate-600 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4"/></button>
+                      <input type="text" value={trait.name} onChange={e => updateTrait(index, 'name', e.target.value)} placeholder="Trait Name" className="w-11/12 bg-transparent text-emerald-300 font-bold text-sm focus:outline-none mb-2 border-b border-slate-800 focus:border-emerald-500 pb-1" />
+                      <textarea value={trait.desc} onChange={e => updateTrait(index, 'desc', e.target.value)} placeholder="Describe mechanics..." className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-xs text-slate-300 focus:outline-none min-h-[60px]" />
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -337,18 +353,9 @@ export default function DMCharacterBuilder({ onClose }) {
                     </div>
 
                     <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">HP</label>
-                        <input type="number" value={companionData.hp} onChange={e => updateCompField('hp', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-center font-bold focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">AC</label>
-                        <input type="number" value={companionData.ac} onChange={e => updateCompField('ac', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-center font-bold focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Speed</label>
-                        <input type="number" value={companionData.speed} onChange={e => updateCompField('speed', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-center font-bold focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
-                      </div>
+                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">HP</label><input type="number" value={companionData.hp} onChange={e => updateCompField('hp', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-center font-bold focus:outline-none" /></div>
+                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">AC</label><input type="number" value={companionData.ac} onChange={e => updateCompField('ac', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-center font-bold focus:outline-none" /></div>
+                      <div><label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Speed</label><input type="number" value={companionData.speed} onChange={e => updateCompField('speed', e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-center font-bold focus:outline-none" /></div>
                     </div>
 
                     <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 shadow-inner">
@@ -357,28 +364,128 @@ export default function DMCharacterBuilder({ onClose }) {
                         {Object.keys(companionData.stats).map(stat => (
                           <div key={stat} className="flex flex-col items-center">
                             <span className="text-[9px] text-slate-500 font-bold mb-1">{stat}</span>
-                            <input 
-                              type="number" 
-                              value={companionData.stats[stat]} 
-                              onChange={(e) => updateCompStat(stat, e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 rounded text-white font-bold text-center py-1 focus:outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
-                            />
+                            <input type="number" value={companionData.stats[stat]} onChange={(e) => updateCompStat(stat, e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded text-white font-bold text-center py-1 focus:outline-none" />
                           </div>
                         ))}
                       </div>
                     </div>
-
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Actions & Attacks</label>
-                      <textarea value={companionData.attacks} onChange={e => updateCompField('attacks', e.target.value)} className="w-full h-16 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-300 text-sm focus:outline-none focus:border-emerald-500 shadow-inner resize-y custom-scrollbar" placeholder="e.g. Bite: +4 to hit, 1d6 piercing." />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Description & Traits</label>
-                      <textarea value={companionData.desc} onChange={e => updateCompField('desc', e.target.value)} className="w-full h-16 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-300 text-sm focus:outline-none focus:border-emerald-500 shadow-inner resize-y custom-scrollbar" placeholder="Traits and roleplaying notes..." />
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Actions & Description</label>
+                      <textarea value={companionData.desc} onChange={e => updateCompField('desc', e.target.value)} className="w-full h-16 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-300 text-sm focus:outline-none resize-y" placeholder="Traits, attacks, and roleplaying notes..." />
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {currentStep === 'inventory' && (
+              <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center gap-3 text-indigo-400 border-b border-slate-800 pb-2 mb-4">
+                  <Backpack className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Starting Inventory</h3>
+                </div>
+                
+                <form onSubmit={handleAddItem} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 shadow-inner space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Item Name</label>
+                      <input type="text" required value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none" placeholder="e.g. Longsword" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Category</label>
+                      <select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none">
+                        <option value="Weapon">Weapon</option>
+                        <option value="Armor">Armor</option>
+                        <option value="Adventuring Gear">Adventuring Gear</option>
+                        <option value="Potion">Potion</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {newItem.category === 'Weapon' && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-900 p-3 rounded-lg border border-slate-700">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Sword className="w-3 h-3 inline"/> Damage</label>
+                        <input type="text" value={newItem.damageDice} onChange={e => setNewItem({...newItem, damageDice: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="1d8" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Type</label>
+                        <input type="text" value={newItem.damageType} onChange={e => setNewItem({...newItem, damageType: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="Slashing" />
+                      </div>
+                      <div className="col-span-2 sm:col-span-1">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Properties</label>
+                        <input type="text" value={newItem.properties} onChange={e => setNewItem({...newItem, properties: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="Finesse, Light" />
+                      </div>
+                    </div>
+                  )}
+
+                  {newItem.category === 'Armor' && (
+                    <div className="bg-slate-900 p-3 rounded-lg border border-slate-700">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Shield className="w-3 h-3 inline"/> Armor Class (AC)</label>
+                      <input type="number" value={newItem.ac} onChange={e => setNewItem({...newItem, ac: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-md px-3 py-2 text-white text-sm focus:outline-none" />
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <div className="w-20">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Qty</label>
+                      <input type="number" value={newItem.quantity} onChange={e => setNewItem({...newItem, quantity: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-2 py-2 text-center text-white text-sm focus:outline-none" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description</label>
+                      <input type="text" value={newItem.desc} onChange={e => setNewItem({...newItem, desc: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none" placeholder="Short description..." />
+                    </div>
+                  </div>
+                  <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs py-2.5 rounded-lg flex justify-center items-center gap-2"><Plus className="w-4 h-4"/> Add to Bags</button>
+                </form>
+
+                <div className="space-y-2 mt-4">
+                  {inventory.length === 0 ? (
+                    <p className="text-center text-slate-500 italic text-xs">No starting items added.</p>
+                  ) : (
+                    inventory.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-slate-950 p-2 rounded-lg border border-slate-700">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-white">{item.quantity}x {item.name}</span>
+                          <span className="text-[9px] text-slate-400 uppercase tracking-widest">{item.category} {item.damageDice ? `(${item.damageDice})` : ''}</span>
+                        </div>
+                        <button onClick={() => removeInventoryItem(idx)} className="text-slate-500 hover:text-red-400 p-2"><Trash2 className="w-4 h-4"/></button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {currentStep === 'lore' && (
+              <div className="space-y-5 animate-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center gap-3 text-indigo-400 border-b border-slate-800 pb-2 mb-4">
+                  <BookOpen className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Lore & Aesthetics</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ImageSelector 
+                    label="Sheet Portrait"
+                    value={formData.imageUrl}
+                    onChange={(val) => updateField('imageUrl', val)}
+                    inputClassName="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner"
+                  />
+                  <ImageSelector 
+                    label="Battle Token"
+                    value={formData.tokenImg}
+                    onChange={(val) => updateField('tokenImg', val)}
+                    inputClassName="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Alignment</label>
+                  <input type="text" onFocus={(e) => e.target.select()} value={formData.alignment} onChange={e => updateField('alignment', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. Chaotic Neutral" />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1"><BookOpen className="w-3 h-3"/> Backstory</label>
+                  <textarea value={formData.backstory} onChange={e => updateField('backstory', e.target.value)} className="w-full h-24 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 shadow-inner resize-y custom-scrollbar" placeholder="Born in the town of..." />
+                </div>
               </div>
             )}
 
@@ -390,7 +497,7 @@ export default function DMCharacterBuilder({ onClose }) {
             {stepIndex < steps.length - 1 ? (
                <button onClick={() => setStepIndex(s => s + 1)} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg">Next Step <ChevronRight className="w-5 h-5" /></button>
             ) : (
-               <button onClick={handleFinish} disabled={isSaving || !formData.name || !formData.class} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+               <button onClick={handleFinish} disabled={isSaving || !formData.name} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)]">
                  {isSaving ? 'Scribing Data...' : 'Construct Character'}
                </button>
             )}

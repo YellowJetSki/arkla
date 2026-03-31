@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Hammer, X, Save, Sword, Shield, Image as ImageIcon } from 'lucide-react';
+import { Hammer, X, Save, Sword, Shield } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
+import ImageSelector from './shared/ImageSelector';
 
 export default function DMItemForge({ onClose }) {
   const [isSaving, setIsSaving] = useState(false);
@@ -18,10 +19,8 @@ export default function DMItemForge({ onClose }) {
     weight: 0,
     imageUrl: '',
     properties: [],
-    // Weapon specifics
     damage: { damage_dice: '', damage_type: { name: 'Slashing' } },
     range: { normal: 5, long: null },
-    // Armor specifics
     armor_category: 'Light',
     armor_class: { base: 11, dex_bonus: true, max_bonus: null },
     str_minimum: 0,
@@ -118,8 +117,13 @@ export default function DMItemForge({ onClose }) {
               </div>
 
               <div className="sm:col-span-2">
-                <label className="flex items-center gap-1 block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5"><ImageIcon className="w-3 h-3" /> Artifact Image URL (Optional)</label>
-                <input type="url" value={item.imageUrl} onChange={e => setItem({...item, imageUrl: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="https://..." />
+                <ImageSelector 
+                  label="Artifact Image"
+                  value={item.imageUrl}
+                  onChange={(val) => setItem({...item, imageUrl: val})}
+                  iconColor="text-emerald-400"
+                  inputClassName="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 shadow-inner"
+                />
               </div>
             </div>
 

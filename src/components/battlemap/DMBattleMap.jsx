@@ -7,13 +7,13 @@ import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
 import MapDrawings from './MapDrawings';
 import TokenContextMenu from './TokenContextMenu';
+import ImageSelector from '../shared/ImageSelector';
 
 const LOCAL_MAPS = [
   { label: 'Tutorial Forest', value: '/tutorial_forest_enc.png' },
   { label: 'Screwbeard Cave', value: '/screwbeard_cave_enc.png' }
 ];
 
-// Helper to extract the quoted name (e.g. Edward "Strider" Tudul -> Strider)
 const getShortName = (fullName) => {
   if (!fullName) return 'Unknown';
   const match = fullName.match(/["']([^"']+)["']/);
@@ -56,10 +56,8 @@ export default function DMBattleMap() {
     const unsub = onSnapshot(mapRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const rawCols = Number(data.cols);
-        const rawRows = Number(data.rows);
-        const safeCols = Math.min(100, Math.max(1, isNaN(rawCols) ? 20 : rawCols));
-        const safeRows = Math.min(100, Math.max(1, isNaN(rawRows) ? 15 : rawRows));
+        const safeCols = Math.min(100, Math.max(1, isNaN(Number(data.cols)) ? 20 : Number(data.cols)));
+        const safeRows = Math.min(100, Math.max(1, isNaN(Number(data.rows)) ? 15 : Number(data.rows)));
 
         setMapData({
           imageUrl: data.imageUrl || '',
@@ -92,12 +90,10 @@ export default function DMBattleMap() {
                setActivePlayers(players);
             });
             return () => unsubPlayers();
-          } else {
-            setActivePlayers([]);
-          }
+          } else setActivePlayers([]);
         }
       } catch (error) {
-        console.error("Safely aborted fetch due to database error:", error);
+        console.error("Aborted fetch due to DB error:", error);
       }
     };
     
@@ -112,46 +108,27 @@ export default function DMBattleMap() {
 
   const handleUpdateMapSettings = () => {
     setIsSavingMap(true);
-
     if (!tempImageUrl) {
       setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: '', cols: 20, rows: 15, gridColor: tempGridColor }, { merge: true }).then(() => {
-        setIsSavingMap(false);
-        setIsEditingMap(false);
+        setIsSavingMap(false); setIsEditingMap(false);
       });
       return;
     }
-
     const img = new Image();
     img.crossOrigin = "Anonymous"; 
-    
     img.onload = () => {
       const calcCols = Math.min(100, Math.max(1, Math.round(img.naturalWidth / tempGridScale)));
       const calcRows = Math.min(100, Math.max(1, Math.round(img.naturalHeight / tempGridScale)));
-
-      setDoc(doc(db, 'campaign', 'battlemap'), { 
-        imageUrl: tempImageUrl,
-        cols: calcCols,
-        rows: calcRows,
-        gridColor: tempGridColor
-      }, { merge: true }).then(() => {
-        setIsSavingMap(false);
-        setIsEditingMap(false);
+      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: tempImageUrl, cols: calcCols, rows: calcRows, gridColor: tempGridColor }, { merge: true }).then(() => {
+        setIsSavingMap(false); setIsEditingMap(false);
       });
     };
-
     img.onerror = () => {
-      setDoc(doc(db, 'campaign', 'battlemap'), { 
-        imageUrl: tempImageUrl,
-        cols: 20,
-        rows: 15,
-        gridColor: tempGridColor
-      }, { merge: true }).then(() => {
-        setIsSavingMap(false);
-        setIsEditingMap(false);
-        setDialog({ isOpen: true, title: 'Map Dimension Error', message: 'Could not read exact image dimensions. Defaulted to a 20x15 grid.', type: 'alert', onConfirm: closeDialog });
+      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: tempImageUrl, cols: 20, rows: 15, gridColor: tempGridColor }, { merge: true }).then(() => {
+        setIsSavingMap(false); setIsEditingMap(false);
+        setDialog({ isOpen: true, title: 'Dimension Error', message: 'Could not read image dimensions. Defaulted to 20x15.', type: 'alert', onConfirm: closeDialog });
       });
     };
-
     img.src = tempImageUrl;
   };
 
@@ -162,39 +139,24 @@ export default function DMBattleMap() {
   const handleRestorePreset = async (presetData) => {
     try {
       const batch = writeBatch(db);
-      
       const enemyDocs = await getDocs(collection(db, 'active_enemies'));
       enemyDocs.forEach((docSnap) => batch.delete(docSnap.ref));
 
       const mapRef = doc(db, 'campaign', 'battlemap');
-      batch.set(mapRef, {
-        ...presetData.mapData,
-        tokens: presetData.tokens,
-        isPublished: false 
-      });
+      batch.set(mapRef, { ...presetData.mapData, tokens: presetData.tokens, isPublished: false });
 
       const presetEnemies = Object.values(presetData.tokens || {}).filter(t => t.type === 'enemy');
       for (const enemy of presetEnemies) {
-         const enemyRef = doc(db, 'active_enemies', enemy.id);
-         batch.set(enemyRef, {
+         batch.set(doc(db, 'active_enemies', enemy.id), {
             ...(enemy.entityData || {}), 
-            name: enemy.name,
-            hp: enemy.hp || 10,
-            maxHp: enemy.maxHp || enemy.hp || 10,
-            currentHp: enemy.hp || 10,
-            speed: enemy.speed || 30,
-            img: enemy.img || '',
-            conditions: enemy.conditions || [],
-            size: enemy.size || 1,
-            isConcentrating: enemy.isConcentrating || false
+            name: enemy.name, hp: enemy.hp || 10, maxHp: enemy.maxHp || enemy.hp || 10,
+            currentHp: enemy.hp || 10, speed: enemy.speed || 30, img: enemy.img || '',
+            conditions: enemy.conditions || [], size: enemy.size || 1, isConcentrating: enemy.isConcentrating || false
          });
       }
-
       await batch.commit();
       setSelectedTokenId(null);
-    } catch (error) {
-      console.error("Error restoring preset:", error);
-    }
+    } catch (error) { console.error("Restore error:", error); }
   };
 
   const getCreatureSize = (name) => {
@@ -207,41 +169,25 @@ export default function DMBattleMap() {
   const stageToken = async (actor, type) => {
     if (tokens[actor.id]) return; 
     const newToken = { 
-      id: actor.id, 
-      name: getShortName(actor.name), 
-      type: type, 
-      img: actor.img || '', 
-      speed: actor.speed || 30, 
-      conditions: actor.conditions || [], 
-      x: 0, 
-      y: 0, 
-      size: getCreatureSize(actor.name), 
-      isHidden: false, 
-      hp: actor.currentHp ?? actor.hp ?? 0,
-      maxHp: actor.maxHp ?? actor.hp ?? 1,
-      tempHp: actor.tempHp || 0,
-      aura: 0,
-      elevation: 0, 
-      isConcentrating: actor.isConcentrating || false
+      id: actor.id, name: getShortName(actor.name), type: type, img: actor.img || '', 
+      speed: actor.speed || 30, conditions: actor.conditions || [], x: 0, y: 0, 
+      size: getCreatureSize(actor.name), isHidden: false, 
+      hp: actor.currentHp ?? actor.hp ?? 0, maxHp: actor.maxHp ?? actor.hp ?? 1,
+      tempHp: actor.tempHp || 0, aura: 0, elevation: 0, isConcentrating: actor.isConcentrating || false
     };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${actor.id}`]: newToken });
   };
 
   const stageAllActive = async () => {
     const updates = {};
-    let pX = 0;
-    let eX = 0;
-    
-    unstagedPlayers.forEach(p => {
+    let pX = 0, eX = 0;
+    activePlayers.filter(p => !tokens[p.id]).forEach(p => {
       updates[`tokens.${p.id}`] = { id: p.id, name: getShortName(p.name), type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
     });
-    unstagedEnemies.forEach(e => {
+    activeEnemies.filter(e => !tokens[e.id]).forEach(e => {
       updates[`tokens.${e.id}`] = { id: e.id, name: getShortName(e.name), type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
     });
-    
-    if (Object.keys(updates).length > 0) {
-      await updateDoc(doc(db, 'campaign', 'battlemap'), updates);
-    }
+    if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'campaign', 'battlemap'), updates);
   };
 
   const removeToken = async (tokenId) => {
@@ -252,8 +198,7 @@ export default function DMBattleMap() {
   const handleToggleHidden = async (tokenId) => {
     const targetId = tokenId || selectedTokenId;
     if (!targetId || !tokens[targetId]) return;
-    const isCurrentlyHidden = tokens[targetId].isHidden || false;
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.isHidden`]: !isCurrentlyHidden });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.isHidden`]: !(tokens[targetId].isHidden || false) });
   };
 
   const handleUpdateTokenImage = (tokenId) => {
@@ -264,39 +209,40 @@ export default function DMBattleMap() {
 
   const confirmUpdateTokenImage = async (e) => {
     e.preventDefault();
-    const targetId = imagePrompt.tokenId;
-    const url = imagePrompt.url;
-    
-    if (!targetId || !tokens[targetId] || !url) {
+    const { tokenId, url } = imagePrompt;
+    if (!tokenId || !tokens[tokenId] || !url) {
        setImagePrompt({ isOpen: false, tokenId: null, url: '' });
        return;
     }
-
     try {
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.img`]: url });
-      const type = tokens[targetId].type;
-      const collectionName = type === 'player' ? 'characters' : 'active_enemies';
-      await updateDoc(doc(db, collectionName, targetId), { img: url });
-    } catch (error) {
-      console.error("Failed to update token image", error);
-    }
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.img`]: url });
+      const collectionName = tokens[tokenId].type === 'player' ? 'characters' : 'active_enemies';
+      batch.update(doc(db, collectionName, tokenId), { img: url });
+      await batch.commit();
+    } catch (error) { console.error("Token image update failed", error); }
     setImagePrompt({ isOpen: false, tokenId: null, url: '' });
   };
 
   const handleUpdateTokenHpLive = async (tokenId, newHpVal) => {
-    const parsedHp = parseInt(newHpVal, 10);
-    if (isNaN(parsedHp) || !tokenId || !tokens[tokenId]) return;
+    const targetToken = tokens[tokenId];
+    if (!targetToken) return;
     
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp });
+    const parsedHp = Math.max(0, Math.min(targetToken.maxHp || 1000, parseInt(newHpVal, 10)));
+    if (isNaN(parsedHp)) return;
     
-    const type = tokens[tokenId].type;
-    const collectionName = type === 'player' ? 'characters' : 'active_enemies';
     try {
-      if (type === 'enemy') {
-        await updateDoc(doc(db, collectionName, tokenId), { currentHp: parsedHp, hp: parsedHp });
+      // BATCTH DOT-NOTATION UPDATE! 
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp });
+      
+      const collectionName = targetToken.type === 'player' ? 'characters' : 'active_enemies';
+      if (targetToken.type === 'enemy') {
+        batch.update(doc(db, collectionName, tokenId), { currentHp: parsedHp });
       } else {
-        await updateDoc(doc(db, collectionName, tokenId), { hp: parsedHp });
+        batch.update(doc(db, collectionName, tokenId), { hp: parsedHp });
       }
+      await batch.commit();
     } catch (e) {
       console.error("Failed to sync HP to entity", e);
     }
@@ -306,37 +252,34 @@ export default function DMBattleMap() {
     const targetId = tokenId || selectedTokenId;
     if (!targetId || !tokens[targetId]) return;
     const currentSize = tokens[targetId].size || 1;
-    const newSize = currentSize >= 4 ? 1 : currentSize + 1; 
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.size`]: newSize });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.size`]: currentSize >= 4 ? 1 : currentSize + 1 });
   };
 
   const handleToggleAura = async (tokenId) => {
     const targetId = tokenId || selectedTokenId;
     if (!targetId || !tokens[targetId]) return;
     const currentAura = tokens[targetId].aura || 0;
-    const newAura = currentAura === 0 ? 10 : currentAura === 10 ? 15 : currentAura === 15 ? 30 : 0; 
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.aura`]: newAura });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.aura`]: currentAura === 0 ? 10 : currentAura === 10 ? 15 : currentAura === 15 ? 30 : 0 });
   };
 
   const handleToggleElevation = async (tokenId) => {
     const targetId = tokenId || selectedTokenId;
     if (!targetId || !tokens[targetId]) return;
     const current = tokens[targetId].elevation || 0;
-    const newElev = current === 0 ? 10 : current === 10 ? 20 : current === 20 ? 30 : current === 30 ? 60 : 0;
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.elevation`]: newElev });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.elevation`]: current === 0 ? 10 : current === 10 ? 20 : current === 20 ? 30 : current === 30 ? 60 : 0 });
   };
 
   const handleToggleConcentration = async (tokenId) => {
     const targetId = tokenId || selectedTokenId;
     if (!targetId || !tokens[targetId]) return;
-    
     const t = tokens[targetId];
     const newConcState = !t.isConcentrating;
-    
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.isConcentrating`]: newConcState });
-    
     const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
-    await updateDoc(doc(db, collectionName, targetId), { isConcentrating: newConcState });
+
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.isConcentrating`]: newConcState });
+    batch.update(doc(db, collectionName, targetId), { isConcentrating: newConcState });
+    await batch.commit();
   };
 
   const toggleCondition = async (tokenId, cond) => {
@@ -344,14 +287,13 @@ export default function DMBattleMap() {
     if (!targetId || !tokens[targetId]) return;
     const t = tokens[targetId];
     const currentConds = t.conditions || [];
-    const newConds = currentConds.includes(cond) 
-      ? currentConds.filter(c => c !== cond) 
-      : [...currentConds, cond];
+    const newConds = currentConds.includes(cond) ? currentConds.filter(c => c !== cond) : [...currentConds, cond];
       
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.conditions`]: newConds });
-    
     const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
-    await updateDoc(doc(db, collectionName, targetId), { conditions: newConds });
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.conditions`]: newConds });
+    batch.update(doc(db, collectionName, targetId), { conditions: newConds });
+    await batch.commit();
   };
 
   const handleTileClick = async (x, y) => {
@@ -373,9 +315,7 @@ export default function DMBattleMap() {
 
   const handleDrawEnd = async (lineData) => {
     const newLine = { ...lineData, id: Date.now(), shape: drawingShape };
-    await updateDoc(doc(db, 'campaign', 'battlemap'), {
-      drawings: [...mapData.drawings, newLine]
-    });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [...mapData.drawings, newLine] });
   };
 
   const handleUpdateToken = async (tokenId, updates) => {
@@ -384,11 +324,8 @@ export default function DMBattleMap() {
     
     const token = tokens[tokenId];
     if (updates.hp !== undefined) {
-      if (token.type === 'player') {
-        await updateDoc(doc(db, 'characters', tokenId), { hp: updates.hp });
-      } else if (token.type === 'enemy') {
-        await updateDoc(doc(db, 'active_enemies', tokenId), { currentHp: updates.hp });
-      }
+      if (token.type === 'player') await updateDoc(doc(db, 'characters', tokenId), { hp: updates.hp });
+      else if (token.type === 'enemy') await updateDoc(doc(db, 'active_enemies', tokenId), { currentHp: updates.hp });
     }
     setContextMenu(null);
   };
@@ -398,30 +335,14 @@ export default function DMBattleMap() {
     const token = updatedTokens[tokenId];
     delete updatedTokens[tokenId];
     
-    if (token.type === 'enemy') {
-       await deleteDoc(doc(db, 'active_enemies', tokenId));
-    }
-    
+    if (token.type === 'enemy') await deleteDoc(doc(db, 'active_enemies', tokenId));
     await updateDoc(doc(db, 'campaign', 'battlemap'), { tokens: updatedTokens });
     setContextMenu(null);
   };
 
   const handleClearDrawings = () => {
-    setDialog({
-      isOpen: true,
-      title: 'Clear Drawings',
-      message: 'Clear all drawings and templates from the map?',
-      type: 'confirm',
-      onConfirm: async () => {
-        await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [] });
-        closeDialog();
-      }
-    });
+    setDialog({ isOpen: true, title: 'Clear Drawings', message: 'Clear all drawings and templates from the map?', type: 'confirm', onConfirm: async () => { await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [] }); closeDialog(); }});
   };
-
-  const unstagedPlayers = activePlayers.filter(p => !tokens[p.id]);
-  const unstagedEnemies = activeEnemies.filter(e => !tokens[e.id]);
-  const hasUnstagedActors = unstagedPlayers.length > 0 || unstagedEnemies.length > 0;
 
   useEffect(() => {
     if (isEditingMap) {
@@ -431,15 +352,15 @@ export default function DMBattleMap() {
     }
   }, [isEditingMap, mapData.imageUrl, mapData.gridColor]);
 
-  const launchDisplayTab = () => {
-    const displayUrl = window.location.pathname + '?display=true';
-    window.open(displayUrl, '_blank');
-  };
+  const launchDisplayTab = () => { window.open(window.location.pathname + '?display=true', '_blank'); };
+
+  const unstagedPlayers = activePlayers.filter(p => !tokens[p.id]);
+  const unstagedEnemies = activeEnemies.filter(e => !tokens[e.id]);
+  const hasUnstagedActors = unstagedPlayers.length > 0 || unstagedEnemies.length > 0;
 
   return (
     <div className="flex-1 flex flex-col bg-slate-950 min-h-0 relative">
       
-      {/* Custom Input Modal for Token Images */}
       {imagePrompt.isOpen && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
           <form onSubmit={confirmUpdateTokenImage} className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
@@ -448,106 +369,56 @@ export default function DMBattleMap() {
                <button type="button" onClick={() => setImagePrompt({ isOpen: false, tokenId: null, url: '' })} className="text-slate-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
              </div>
              <div className="p-6">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Image URL</label>
-                <input 
-                  type="url" 
-                  value={imagePrompt.url} 
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => setImagePrompt({...imagePrompt, url: e.target.value})} 
-                  placeholder="https://example.com/avatar.png"
-                  className="w-full bg-slate-950 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
-                  autoFocus 
-                  required
+                <ImageSelector 
+                  label="New Token Image"
+                  value={imagePrompt.url}
+                  onChange={(val) => setImagePrompt({...imagePrompt, url: val})}
+                  iconColor="text-indigo-400"
+                  inputClassName="w-full bg-slate-950 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
                 />
              </div>
-             <div className="p-4 bg-slate-800 flex gap-3 justify-end border-t border-slate-700">
-                <button type="button" onClick={() => setImagePrompt({ isOpen: false, tokenId: null, url: '' })} className="px-4 py-2 rounded-lg font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">Cancel</button>
-                <button type="submit" className="px-6 py-2 rounded-lg font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors shadow-md">Update</button>
+             <div className="p-4 bg-slate-800 flex justify-end gap-3 border-t border-slate-700">
+                <button type="button" onClick={() => setImagePrompt({ isOpen: false, tokenId: null, url: '' })} className="px-4 py-2 rounded-lg font-medium text-slate-300 hover:bg-slate-700 hover:text-white">Cancel</button>
+                <button type="submit" className="px-6 py-2 rounded-lg font-bold text-white bg-indigo-600 hover:bg-indigo-500">Update</button>
              </div>
           </form>
         </div>
       )}
 
       {contextMenu && (
-        <TokenContextMenu 
-          token={contextMenu.token} 
-          x={contextMenu.x} 
-          y={contextMenu.y} 
-          onUpdate={handleUpdateToken} 
-          onDelete={handleDeleteToken} 
-          onClose={() => setContextMenu(null)} 
-        />
+        <TokenContextMenu token={contextMenu.token} x={contextMenu.x} y={contextMenu.y} onUpdate={handleUpdateToken} onDelete={handleDeleteToken} onClose={() => setContextMenu(null)} />
       )}
 
-      <BattlemapPresetsModal 
-        isOpen={isPresetsOpen} 
-        onClose={() => setIsPresetsOpen(false)} 
-        currentMapData={mapData}
-        currentTokens={tokens}
-        activeEnemies={activeEnemies}
-        onRestorePreset={handleRestorePreset}
-      />
+      <BattlemapPresetsModal isOpen={isPresetsOpen} onClose={() => setIsPresetsOpen(false)} currentMapData={mapData} currentTokens={tokens} activeEnemies={activeEnemies} onRestorePreset={handleRestorePreset} />
 
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       {/* Control Bar */}
       <div className="bg-slate-900/80 backdrop-blur-md border-b border-indigo-500/50 p-3 shadow-[0_0_30px_rgba(99,102,241,0.15)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0 z-20">
-        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-sm">
-          <Map className="w-5 h-5" /> Battlefield
-        </h2>
+        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-sm"><Map className="w-5 h-5" /> Battlefield</h2>
         
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar">
-          
           <div className="flex items-center bg-slate-950/80 p-1.5 rounded-xl border border-slate-700/80 shadow-inner mr-2 shrink-0">
-            <button 
-              onClick={() => setIsDrawingMode(!isDrawingMode)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${isDrawingMode ? 'bg-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-red-400 hover:bg-slate-800'}`}
-            >
-              <PenTool className="w-3.5 h-3.5" /> Pen
-            </button>
-            
+            <button onClick={() => setIsDrawingMode(!isDrawingMode)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${isDrawingMode ? 'bg-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.4)]' : 'text-slate-400 hover:text-red-400 hover:bg-slate-800'}`}><PenTool className="w-3.5 h-3.5" /> Pen</button>
             {isDrawingMode && (
               <div className="flex items-center gap-1.5 px-2 border-l border-slate-700/50 ml-1 pl-2">
-                <button onClick={() => setDrawingShape('freehand')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'freehand' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`} title="Freehand"><PenTool className="w-3 h-3" /></button>
-                <button onClick={() => setDrawingShape('line')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'line' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`} title="Line/Wall"><div className="w-3 h-0.5 bg-current rotate-45" /></button>
-                <button onClick={() => setDrawingShape('circle')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'circle' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`} title="Sphere/Radius"><Circle className="w-3 h-3" /></button>
-                <button onClick={() => setDrawingShape('cone')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'cone' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`} title="Cone"><Triangle className="w-3 h-3" /></button>
-                
+                <button onClick={() => setDrawingShape('freehand')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'freehand' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}><PenTool className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('line')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'line' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}><div className="w-3 h-0.5 bg-current rotate-45" /></button>
+                <button onClick={() => setDrawingShape('circle')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'circle' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}><Circle className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('cone')} className={`p-1.5 rounded-lg transition-colors ${drawingShape === 'cone' ? 'bg-slate-700 text-white shadow-inner' : 'text-slate-500 hover:text-slate-300'}`}><Triangle className="w-3 h-3" /></button>
                 <div className="w-px h-4 bg-slate-700/50 mx-1"></div>
-                
                 {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
                   <button key={c} onClick={() => setDrawingColor(c)} className={`w-5 h-5 rounded-full border-2 transition-all ${drawingColor === c ? 'scale-110 border-white shadow-md' : 'border-transparent opacity-60 hover:opacity-100'}`} style={{ backgroundColor: c }} />
                 ))}
               </div>
             )}
-            <button onClick={handleClearDrawings} className="text-slate-500 hover:text-red-400 p-2 ml-1 border-l border-slate-700/50 transition-colors" title="Clear Map Drawings">
-              <Eraser className="w-4 h-4" />
-            </button>
+            <button onClick={handleClearDrawings} className="text-slate-500 hover:text-red-400 p-2 ml-1 border-l border-slate-700/50 transition-colors"><Eraser className="w-4 h-4" /></button>
           </div>
 
-          <button 
-            onClick={launchDisplayTab}
-            className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"
-            title="Cast to a second monitor"
-          >
-            <MonitorPlay className="w-3.5 h-3.5" /> Cast
-          </button>
-
-          <button 
-            onClick={() => setIsPresetsOpen(true)}
-            className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"
-          >
-            <Save className="w-3.5 h-3.5" /> Presets
-          </button>
-
-          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider">
-            <Settings className="w-3.5 h-3.5" /> Config
-          </button>
-          
-          <button 
-            onClick={togglePublish} 
-            className={`px-4 py-1.5 rounded-lg font-black text-[10px] md:text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 uppercase tracking-widest ${mapData.isPublished ? 'bg-emerald-600 text-white border border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-800'}`}
-          >
+          <button onClick={launchDisplayTab} className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"><MonitorPlay className="w-3.5 h-3.5" /> Cast</button>
+          <button onClick={() => setIsPresetsOpen(true)} className="bg-amber-900/30 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/40 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"><Save className="w-3.5 h-3.5" /> Presets</button>
+          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 transition-colors shadow-sm shrink-0 uppercase tracking-wider"><Settings className="w-3.5 h-3.5" /> Config</button>
+          <button onClick={togglePublish} className={`px-4 py-1.5 rounded-lg font-black text-[10px] md:text-xs flex items-center gap-1.5 transition-all shadow-md shrink-0 uppercase tracking-widest ${mapData.isPublished ? 'bg-emerald-600 text-white border border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-slate-900 text-slate-400 border border-slate-700 hover:text-white hover:bg-slate-800'}`}>
             {mapData.isPublished ? <><Send className="w-3.5 h-3.5"/> LIVE</> : <><EyeOff className="w-3.5 h-3.5"/> HIDDEN</>}
           </button>
         </div>
@@ -558,45 +429,27 @@ export default function DMBattleMap() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Preset Local Map</label>
-              <select 
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner"
-                onChange={(e) => setTempImageUrl(e.target.value)}
-                value={LOCAL_MAPS.some(m => m.value === tempImageUrl) ? tempImageUrl : ''}
-              >
+              <select className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" onChange={(e) => setTempImageUrl(e.target.value)} value={LOCAL_MAPS.some(m => m.value === tempImageUrl) ? tempImageUrl : ''}>
                 <option value="" disabled>Select a map...</option>
-                {LOCAL_MAPS.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
+                {LOCAL_MAPS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
             <div>
-               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Or Custom Web URL</label>
-               <input 
-                 type="url" 
+               <ImageSelector 
+                 label="Custom Map Image"
                  value={tempImageUrl}
-                 onFocus={(e) => e.target.select()}
-                 onChange={(e) => setTempImageUrl(e.target.value)}
-                 className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner"
-                 placeholder="https://example.com/map.jpg"
+                 onChange={(val) => setTempImageUrl(val)}
+                 iconColor="text-indigo-400"
+                 inputClassName="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner"
                />
             </div>
             <div>
                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Grid Cell Size (Pixels)</label>
-               <input 
-                 type="number" 
-                 value={tempGridScale}
-                 onFocus={(e) => e.target.select()}
-                 onChange={(e) => setTempGridScale(Number(e.target.value))}
-                 className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm font-black focus:outline-none focus:border-indigo-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-               />
+               <input type="number" value={tempGridScale} onFocus={(e) => e.target.select()} onChange={(e) => setTempGridScale(Number(e.target.value))} className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm font-black focus:outline-none focus:border-indigo-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Grid Color</label>
-              <select 
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner"
-                onChange={(e) => setTempGridColor(e.target.value)}
-                value={tempGridColor}
-              >
+              <select className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" onChange={(e) => setTempGridColor(e.target.value)} value={tempGridColor}>
                 <option value="rgba(255,255,255,0.35)">White (Default)</option>
                 <option value="rgba(0,0,0,0.6)">Black (Snow Maps)</option>
                 <option value="rgba(220,38,38,0.6)">Red (High Contrast)</option>
@@ -604,14 +457,9 @@ export default function DMBattleMap() {
               </select>
             </div>
           </div>
-
           <div className="flex justify-end border-t border-slate-700/80 pt-5 mt-2">
-            <button 
-              onClick={handleUpdateMapSettings} 
-              disabled={isSavingMap}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-black uppercase tracking-widest px-8 py-3 rounded-xl transition-all flex items-center gap-2 shadow-md hover:shadow-lg"
-            >
-              {isSavingMap ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating Grid...</> : 'Save Configuration'}
+            <button onClick={handleUpdateMapSettings} disabled={isSavingMap} className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-black uppercase tracking-widest px-8 py-3 rounded-xl transition-all flex items-center gap-2 shadow-md">
+              {isSavingMap ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating...</> : 'Save Configuration'}
             </button>
           </div>
         </div>
@@ -620,19 +468,12 @@ export default function DMBattleMap() {
       {hasUnstagedActors && (
         <div className="bg-slate-900/50 backdrop-blur-sm p-3 md:p-4 border-b border-slate-700/50 border-dashed flex items-center flex-wrap gap-2 shadow-inner shrink-0 z-10">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 hidden xl:block">Stage Actors:</span>
-          
           <button onClick={stageAllActive} className="text-[10px] md:text-xs font-bold uppercase tracking-wider bg-emerald-900/40 border border-emerald-500/50 text-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors mr-2 flex items-center gap-1.5 shadow-sm">
             <Users className="w-3.5 h-3.5"/> Deploy All
           </button>
-
           <div className="w-px h-5 bg-slate-700/50 mx-1"></div>
-
-          {unstagedPlayers.map(p => (
-            <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs font-bold bg-indigo-900/30 border border-indigo-500/30 text-indigo-300 px-2.5 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">+ {getShortName(p.name)}</button>
-          ))}
-          {unstagedEnemies.map(e => (
-            <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs font-bold bg-red-900/30 border border-red-500/30 text-red-300 px-2.5 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-sm">+ {getShortName(e.name)}</button>
-          ))}
+          {unstagedPlayers.map(p => <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs font-bold bg-indigo-900/30 border border-indigo-500/30 text-indigo-300 px-2.5 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors shadow-sm">+ {getShortName(p.name)}</button>)}
+          {unstagedEnemies.map(e => <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs font-bold bg-red-900/30 border border-red-500/30 text-red-300 px-2.5 py-1.5 rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-sm">+ {getShortName(e.name)}</button>)}
         </div>
       )}
 
@@ -646,51 +487,20 @@ export default function DMBattleMap() {
           </div>
         ) : (
           <div className="min-w-max min-h-max bg-slate-900 p-2 rounded-xl border border-slate-800 shadow-2xl mx-auto w-max relative group">
-            <div 
-              ref={containerRef}
-              className="relative overflow-hidden rounded-lg shadow-inner border border-slate-700" 
-              style={{ 
-                width: `${mapData.cols * 50}px`, 
-                height: `${mapData.rows * 50}px`,
-                backgroundImage: `url(${mapData.imageUrl})`,
-                backgroundSize: '100% 100%'
-              }}
-            >
+            <div ref={containerRef} className="relative overflow-hidden rounded-lg shadow-inner border border-slate-700" style={{ width: `${mapData.cols * 50}px`, height: `${mapData.rows * 50}px`, backgroundImage: `url(${mapData.imageUrl})`, backgroundSize: '100% 100%' }}>
               <MapGrid 
-                mapData={mapData} 
-                tokens={tokens} 
-                activePlayers={activePlayers}
-                activeEnemies={activeEnemies}
-                onTileClick={handleTileClick} 
-                onTokenClick={(id) => setSelectedTokenId(selectedTokenId === id ? null : id)}
-                selectedTokenId={selectedTokenId}
-                isDM={true} 
-                onTokenDrop={handleTokenDrop}
-                showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null}
-                onToggleRuler={(id) => setShowRulerFor(showRulerFor === id ? null : id)}
-                isDrawingMode={isDrawingMode}
-                drawingColor={drawingColor}
-                drawingShape={drawingShape}
-                onDrawEnd={handleDrawEnd}
-                onUpdateHpLive={handleUpdateTokenHpLive}
-                onToggleSize={handleToggleTokenSize}
-                onToggleAura={handleToggleAura}
-                onToggleElevation={handleToggleElevation}
-                onToggleConcentration={handleToggleConcentration}
-                onToggleCondition={toggleCondition}
-                onUpdateImage={handleUpdateTokenImage}
-                onToggleHidden={handleToggleHidden}
-                onRemoveToken={removeToken}
-                onDeselect={() => setSelectedTokenId(null)}
+                mapData={mapData} tokens={tokens} activePlayers={activePlayers} activeEnemies={activeEnemies}
+                onTileClick={handleTileClick} onTokenClick={(id) => setSelectedTokenId(selectedTokenId === id ? null : id)}
+                selectedTokenId={selectedTokenId} isDM={true} onTokenDrop={handleTokenDrop}
+                showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null} onToggleRuler={(id) => setShowRulerFor(showRulerFor === id ? null : id)}
+                isDrawingMode={isDrawingMode} drawingColor={drawingColor} drawingShape={drawingShape}
+                onDrawEnd={handleDrawEnd} onUpdateHpLive={handleUpdateTokenHpLive} onToggleSize={handleToggleTokenSize}
+                onToggleAura={handleToggleAura} onToggleElevation={handleToggleElevation} onToggleConcentration={handleToggleConcentration}
+                onToggleCondition={toggleCondition} onUpdateImage={handleUpdateTokenImage} onToggleHidden={handleToggleHidden}
+                onRemoveToken={removeToken} onDeselect={() => setSelectedTokenId(null)}
               />
 
-              <MapDrawings 
-                drawings={mapData.drawings || []} 
-                activeTool={isDrawingMode ? 'draw' : 'move'} 
-                currentColor={drawingColor} 
-                containerRef={containerRef} 
-                onSaveDrawing={handleDrawEnd} 
-              />
+              <MapDrawings drawings={mapData.drawings || []} activeTool={isDrawingMode ? 'draw' : 'move'} currentColor={drawingColor} containerRef={containerRef} onSaveDrawing={handleDrawEnd} />
 
               {Object.values(tokens).map(token => {
                 const isSelected = mapData.activeTokenId === token.id || selectedTokenId === token.id;
@@ -698,11 +508,7 @@ export default function DMBattleMap() {
                   <div
                     key={token.id}
                     className={`absolute cursor-grab active:cursor-grabbing transition-all duration-200 z-20 ${isSelected ? 'z-30 scale-110' : ''}`}
-                    style={{
-                      width: `${50 * token.size}px`,
-                      height: `${50 * token.size}px`,
-                      transform: `translate(${token.x * 50}px, ${token.y * 50}px)`
-                    }}
+                    style={{ width: `${50 * token.size}px`, height: `${50 * token.size}px`, transform: `translate(${token.x * 50}px, ${token.y * 50}px)` }}
                     onDragEnd={(e) => {
                       if (isDrawingMode) return;
                       const rect = e.target.parentElement.getBoundingClientRect();
@@ -711,19 +517,23 @@ export default function DMBattleMap() {
                       handleMoveToken(token.id, x, y);
                     }}
                     draggable={!isDrawingMode}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setContextMenu({ token, x: e.clientX, y: e.clientY });
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedTokenId(selectedTokenId === token.id ? null : token.id);
-                    }}
+                    onContextMenu={(e) => { e.preventDefault(); setContextMenu({ token, x: e.clientX, y: e.clientY }); }}
+                    onClick={(e) => { e.stopPropagation(); setSelectedTokenId(selectedTokenId === token.id ? null : token.id); }}
                   >
                     <div className="relative w-full h-full p-0.5 group/token">
+                       
+                       {/* Quick HP HUD (DM Only, when selected) */}
                        {isSelected && (
-                         <div className={`absolute inset-0 rounded-full animate-ping opacity-50 ${token.type === 'player' ? 'bg-indigo-500' : 'bg-red-500'}`}></div>
+                         <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-slate-900/95 p-1 rounded-lg border border-slate-700 shadow-2xl z-50 pointer-events-auto">
+                           <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp - 10); }} className="px-1.5 py-0.5 bg-red-900/80 hover:bg-red-600 text-white text-[10px] font-bold rounded cursor-pointer">-10</button>
+                           <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp - 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">-1</button>
+                           <span className="text-[10px] font-black px-1.5 text-white min-w-[24px] text-center">{token.hp}</span>
+                           <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp + 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">+1</button>
+                         </div>
                        )}
+
+                       {isSelected && <div className={`absolute inset-0 rounded-full animate-ping opacity-50 ${token.type === 'player' ? 'bg-indigo-500' : 'bg-red-500'}`}></div>}
+                       
                        <div className={`w-full h-full rounded-full border-2 shadow-[0_0_15px_rgba(0,0,0,0.8)] overflow-hidden bg-slate-900 relative ${isSelected ? (token.type === 'player' ? 'border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.6)]' : 'border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]') : (token.type === 'player' ? 'border-indigo-600' : 'border-red-600')}`}>
                          <img src={token.img} alt={token.name} className={`w-full h-full object-cover ${token.isHidden ? 'opacity-50 grayscale' : ''}`} draggable={false} />
                        </div>

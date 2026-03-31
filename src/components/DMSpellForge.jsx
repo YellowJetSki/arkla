@@ -3,21 +3,20 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Wand2, X, Save, Flame, Target, Search, Loader2, Plus, BookOpen } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
+import ImageSelector from './shared/ImageSelector';
 
 export default function DMSpellForge({ onClose }) {
-  const [activeTab, setActiveTab] = useState('custom'); // 'custom' or 'api'
+  const [activeTab, setActiveTab] = useState('custom'); 
   const [isSaving, setIsSaving] = useState(false);
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
-  // Custom Spell State
   const [spell, setSpell] = useState({
     name: '', level: 1, school: { name: 'Evocation' }, casting_time: '1 Action',
     range: '60 feet', duration: 'Instantaneous', components: ['V', 'S'], material: '',
-    desc: [''], damageDice: '', damageType: '', saveRequired: '', isHomebrew: true
+    desc: [''], damageDice: '', damageType: '', saveRequired: '', imageUrl: '', isHomebrew: true
   });
 
-  // API Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [srdSpells, setSrdSpells] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -87,6 +86,7 @@ export default function DMSpellForge({ onClose }) {
         damageDice: data.damage?.damage_at_slot_level?.[data.level] || data.damage?.damage_at_character_level?.[1] || '',
         damageType: data.damage?.damage_type?.name || '',
         saveRequired: data.dc?.dc_type?.name ? `${data.dc.dc_type.name} Save` : '',
+        imageUrl: '',
         isHomebrew: false,
         index: data.index
       };
@@ -132,6 +132,15 @@ export default function DMSpellForge({ onClose }) {
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Spell Level (0 = Cantrip)</label>
                     <input type="number" min="0" max="9" value={spell.level} onChange={e => setSpell({...spell, level: Number(e.target.value)})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-center focus:outline-none focus:border-fuchsia-500" />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <ImageSelector 
+                      label="Spell Image"
+                      value={spell.imageUrl}
+                      onChange={(val) => setSpell({...spell, imageUrl: val})}
+                      iconColor="text-fuchsia-400"
+                      inputClassName="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner"
+                    />
                   </div>
                 </div>
 

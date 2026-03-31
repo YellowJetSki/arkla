@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { collection, addDoc, setDoc, doc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, X, Save, Shield, Heart, Wind, Swords, Image as ImageIcon, Search, Loader2, Plus, Target } from 'lucide-react';
+import { Skull, X, Save, Shield, Heart, Wind, Swords, Search, Loader2, Plus, Target, Brain, Eye } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
+import ImageSelector from './shared/ImageSelector';
 import { applySanctuaryFilter } from '../services/arklaEngine';
 
 export default function EnemyForge({ onClose }) {
-  const [activeTab, setActiveTab] = useState('custom'); // 'custom' or 'api'
+  const [activeTab, setActiveTab] = useState('custom'); 
   const [isSaving, setIsSaving] = useState(false);
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
-  // Custom Enemy State (Robust Version)
   const [enemy, setEnemy] = useState({
     name: '', size: 'Medium', type: 'Humanoid', alignment: 'Unaligned', challenge_rating: 1,
     ac: 10, hp: 10, speed: '30 ft.',
@@ -22,7 +22,6 @@ export default function EnemyForge({ onClose }) {
     imageUrl: '', tokenUrl: ''
   });
 
-  // API Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [srdEnemies, setSrdEnemies] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -224,23 +223,29 @@ export default function EnemyForge({ onClose }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Swords className="w-3 h-3 text-red-400" /> Actions & Attacks</label>
-                    <textarea value={enemy.actions} onChange={e => setEnemy({...enemy, actions: e.target.value})} className="w-full h-32 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-red-500 shadow-inner resize-y custom-scrollbar" placeholder="Multiattack..." />
+                    <textarea value={enemy.actions} onChange={e => setEnemy({...enemy, actions: e.target.value})} className="w-full h-32 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-red-500 shadow-inner resize-y custom-scrollbar" placeholder="Multiattack. The Brevar makes two attacks..." />
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Traits & Passive Abilities</label>
-                    <textarea value={enemy.traits} onChange={e => setEnemy({...enemy, traits: e.target.value})} className="w-full h-32 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-red-500 shadow-inner resize-y custom-scrollbar" placeholder="Pack Tactics..." />
+                    <textarea value={enemy.traits} onChange={e => setEnemy({...enemy, traits: e.target.value})} className="w-full h-32 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-red-500 shadow-inner resize-y custom-scrollbar" placeholder="Pack Tactics. The creature has advantage..." />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 shadow-inner">
-                  <div>
-                    <label className="flex items-center gap-1 block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5"><ImageIcon className="w-3 h-3" /> Monster Artwork URL</label>
-                    <input type="url" value={enemy.imageUrl} onChange={e => setEnemy({...enemy, imageUrl: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500" placeholder="https://..." />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-1 block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5"><Target className="w-3 h-3" /> Token URL (For Battlemap)</label>
-                    <input type="url" value={enemy.tokenUrl} onChange={e => setEnemy({...enemy, tokenUrl: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500" placeholder="https://..." />
-                  </div>
+                  <ImageSelector 
+                    label="Monster Artwork"
+                    value={enemy.imageUrl}
+                    onChange={(val) => setEnemy({...enemy, imageUrl: val})}
+                    iconColor="text-red-400"
+                    inputClassName="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner"
+                  />
+                  <ImageSelector 
+                    label="Battle Token"
+                    value={enemy.tokenUrl}
+                    onChange={(val) => setEnemy({...enemy, tokenUrl: val})}
+                    iconColor="text-red-400"
+                    inputClassName="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500 shadow-inner"
+                  />
                 </div>
                 
                 <button type="submit" disabled={isSaving} className="w-full bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-widest py-3.5 rounded-xl transition-all shadow-[0_0_20px_rgba(220,38,38,0.3)]">
