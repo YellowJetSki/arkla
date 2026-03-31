@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Hammer, X, Save, Sword, Shield } from 'lucide-react';
+import { Hammer, X, Save, Sword, Shield, Search } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import ImageSelector from './shared/ImageSelector';
+import { fetchAllEquipment, fetchEquipmentDetails } from '../services/srdApi';
 
 export default function DMItemForge({ onClose }) {
   const [isSaving, setIsSaving] = useState(false);
@@ -29,6 +30,46 @@ export default function DMItemForge({ onClose }) {
   });
 
   const [propertyInput, setPropertyInput] = useState('');
+  
+  // SRD Autocomplete State
+  const [srdEquipmentList, setSrdEquipmentList] = useState([]);
+  const [filteredEquip, setFilteredEquip] = useState([]);
+  const [showEquipDropdown, setShowEquipDropdown] = useState(false);
+
+  useEffect(() => {
+    fetchAllEquipment().then(setSrdEquipmentList);
+  }, []);
+
+  const handleNameChange = (e) => {
+    const val = e.target.value;
+    setItem(prev => ({ ...prev, name: val }));
+    
+    if (val.length > 1) {
+      setFilteredEquip(srdEquipmentList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
+      setShowEquipDropdown(true);
+    } else {
+      setShowEquipDropdown(false);
+    }
+  };
+
+  const handleSelectSrdItem = async (indexStr) => {
+    setShowEquipDropdown(false);
+    const details = await fetchEquipmentDetails(indexStr);
+    if (details) {
+      setItem(prev => ({
+        ...prev,
+        name: details.name,
+        equipment_category: { name: details.category === 'Adventuring Gear' || details.category === 'Potion' ? details.category : details.category },
+        desc: details.desc.split('\n'),
+        damage: { 
+          damage_dice: details.damageDice || '', 
+          damage_type: { name: details.damageType || 'Slashing' } 
+        },
+        properties: details.properties ? details.properties.split(', ').map(p => ({ name: p })) : [],
+        armor_class: { base: details.ac || 11, dex_bonus: true, max_bonus: null }
+      }));
+    }
+  };
 
   const handleAddProperty = (e) => {
     e.preventDefault();
@@ -97,9 +138,32 @@ export default function DMItemForge({ onClose }) {
           <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6 relative z-10">
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Artifact Name</label>
-                <input type="text" value={item.name} onChange={e => setItem({...item, name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-lg font-bold focus:outline-none focus:border-emerald-500 shadow-inner" placeholder="e.g. The Sun Blade" />
+              <div className="sm:col-span-2 relative">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                  <Search className="w-3 h-3" /> Artifact Name (SRD Search)
+                </label>
+                <input 
+                  type="text" 
+                  value={item.name} 
+                  onChange={handleNameChange} 
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white text-lg font-bold focus:outline-none focus:border-emerald-500 shadow-inner" 
+                  placeholder="e.g. The Sun Blade or Longsword" 
+                />
+                
+                {/* SRD Autocomplete Dropdown */}
+                {showEquipDropdown && filteredEquip.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50">
+                    {filteredEquip.map(eq => (
+                      <div 
+                        key={eq.index} 
+                        onClick={() => handleSelectSrdItem(eq.index)} 
+                        className="px-4 py-3 text-sm text-slate-300 hover:bg-emerald-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors"
+                      >
+                        {eq.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

@@ -95,7 +95,7 @@ export default function DMEncounterManager({ onClose }) {
     setDialog({
       isOpen: true,
       title: 'Deploy to Board',
-      message: `Are you ready to deploy "${encounter.name}"? This will instantly place all enemies onto the active threat board.`,
+      message: `Are you ready to deploy "${encounter.name}"? This will instantly place all enemies onto the active threat board and roll their initiative.`,
       type: 'confirm',
       onConfirm: async () => {
         for (const draftEnemy of encounter.enemies) {
@@ -103,12 +103,18 @@ export default function DMEncounterManager({ onClose }) {
             const uniqueId = `${draftEnemy.id}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
             const enemyRef = doc(db, 'active_enemies', uniqueId);
             
+            // Auto-Roll Initiative calculation based on DEX
+            const enemyDex = draftEnemy.fullData.stats?.DEX || 10;
+            const dexMod = Math.floor((enemyDex - 10) / 2);
+            const rolledInitiative = Math.floor(Math.random() * 20) + 1 + dexMod;
+
             await setDoc(enemyRef, {
               ...draftEnemy.fullData,
               id: uniqueId, 
               currentHp: draftEnemy.fullData.hp || draftEnemy.fullData.maxHp || 10,
               conditions: [],
-              encounterName: encounter.name 
+              encounterName: encounter.name,
+              initiative: rolledInitiative // Instantly rolled and assigned
             });
           }
         }

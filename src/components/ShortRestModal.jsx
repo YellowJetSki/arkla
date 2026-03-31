@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Tent, X, Heart, ShieldPlus, CheckCircle2, Dices, Info, Sparkles, Flame } from 'lucide-react';
 
@@ -27,6 +27,7 @@ export default function ShortRestModal({ char, charId, onClose }) {
     const boundedSpent = Math.max(0, Math.min(safeSpent, currentDice));
     
     try {
+      const batch = writeBatch(db);
       const charRef = doc(db, 'characters', charId);
       const mapRef = doc(db, 'campaign', 'battlemap');
 
@@ -50,14 +51,18 @@ export default function ShortRestModal({ char, charId, onClose }) {
         updates.resources = updatedResources;
       }
 
-      updateDoc(charRef, updates).catch(console.error);
+      // Stage character updates
+      batch.update(charRef, updates);
 
-      getDoc(mapRef).then(mapDoc => {
-        if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-          updateDoc(mapRef, { [`tokens.${charId}.hp`]: previewHp }).catch(console.error);
-        }
-      });
+      // Safely sync to map token
+      const mapDoc = await getDoc(mapRef);
+      if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
+        batch.update(mapRef, { [`tokens.${charId}.hp`]: previewHp });
+      }
       
+      // Commit all changes simultaneously
+      await batch.commit();
+
       setTimeout(() => {
         onClose();
       }, 2000); 

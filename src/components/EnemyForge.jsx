@@ -83,49 +83,57 @@ export default function EnemyForge({ onClose }) {
     setIsSearching(false);
   };
 
-  const importApiEnemy = async (url) => {
+  // NEW: Load the API data directly into the Custom Board for editing
+  const loadApiEnemyIntoForge = async (url) => {
     setIsSaving(true);
     try {
       const res = await fetch(`https://www.dnd5eapi.co${url}`);
       const data = await res.json();
 
-      let tokenSize = 1;
-      if (data.size === 'Large') tokenSize = 2;
-      if (data.size === 'Huge') tokenSize = 3;
-      if (data.size === 'Gargantuan') tokenSize = 4;
+      const profs = data.proficiencies || [];
+      const savesList = profs.filter(p => p.proficiency.index.startsWith('saving-throw-')).map(p => `${p.proficiency.name.split(' ').pop()} +${p.value}`).join(', ');
+      const skillsList = profs.filter(p => p.proficiency.index.startsWith('skill-')).map(p => `${p.proficiency.name.replace('Skill: ', '')} +${p.value}`).join(', ');
 
-      const calcMod = (score) => {
-         const mod = Math.floor((score - 10) / 2);
-         return mod >= 0 ? `+${mod}` : `${mod}`;
-      };
+      const formattedTraits = (data.special_abilities || []).map(f => `${f.name}. ${f.desc}`).join('\n\n');
+      const formattedActions = (data.actions || []).map(a => `${a.name}. ${a.desc}`).join('\n\n');
+      const formattedReactions = (data.reactions || []).map(r => `${r.name}. ${r.desc}`).join('\n\n');
 
-      const newEnemy = {
+      setEnemy({
         name: applySanctuaryFilter(data.name),
-        flavor: applySanctuaryFilter(`${data.size} ${data.type}, ${data.alignment}`),
+        size: data.size || 'Medium',
+        type: data.type || 'Humanoid',
+        alignment: data.alignment || 'Unaligned',
+        challenge_rating: data.challenge_rating || 1,
         ac: data.armor_class?.[0]?.value || 10,
         hp: data.hit_points || 10,
-        currentHp: data.hit_points || 10,
-        maxHp: data.hit_points || 10,
         speed: data.speed?.walk || '30 ft.',
         stats: {
-          STR: calcMod(data.strength), DEX: calcMod(data.dexterity), CON: calcMod(data.constitution),
-          INT: calcMod(data.intelligence), WIS: calcMod(data.wisdom), CHA: calcMod(data.charisma)
+          STR: data.strength || 10,
+          DEX: data.dexterity || 10,
+          CON: data.constitution || 10,
+          INT: data.intelligence || 10,
+          WIS: data.wisdom || 10,
+          CHA: data.charisma || 10
         },
-        passivePerception: data.senses?.passive_perception || 10,
-        features: (data.special_abilities || []).map(f => ({ name: applySanctuaryFilter(f.name), desc: applySanctuaryFilter(f.desc) })),
-        actions: (data.actions || []).map(a => ({ name: applySanctuaryFilter(a.name), desc: applySanctuaryFilter(a.desc) })),
-        size: tokenSize,
-        conditions: [],
-        img: data.image ? `https://www.dnd5eapi.co${data.image}` : '',
-        isHomebrew: false
-      };
+        saves: savesList,
+        skills: skillsList,
+        vulnerabilities: (data.damage_vulnerabilities || []).join(', '),
+        resistances: (data.damage_resistances || []).join(', '),
+        immunities: (data.damage_immunities || []).join(', '),
+        conditionImmunities: (data.condition_immunities || []).map(c => c.name).join(', '),
+        senses: `passive Perception ${data.senses?.passive_perception || 10}`,
+        languages: data.languages || '--',
+        traits: applySanctuaryFilter(formattedTraits),
+        actions: applySanctuaryFilter(formattedActions),
+        reactions: applySanctuaryFilter(formattedReactions),
+        imageUrl: data.image ? `https://www.dnd5eapi.co${data.image}` : '',
+        tokenUrl: data.image ? `https://www.dnd5eapi.co${data.image}` : ''
+      });
 
-      const enemyId = `enemy_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      await setDoc(doc(db, 'active_enemies', enemyId), newEnemy);
-      setDialog({ isOpen: true, title: 'Summoned', message: `${data.name} added to the board!`, type: 'alert', onConfirm: onClose });
+      setActiveTab('custom'); // Kick them over to the Custom tab to review/edit
     } catch (err) {
       console.error(err);
-      setDialog({ isOpen: true, title: 'Import Error', message: 'Failed to import monster.', type: 'alert' });
+      setDialog({ isOpen: true, title: 'Import Error', message: 'Failed to load monster data into the forge.', type: 'alert' });
     }
     setIsSaving(false);
   };
@@ -267,8 +275,8 @@ export default function EnemyForge({ onClose }) {
                     {srdEnemies.map(s => (
                       <div key={s.index} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center group">
                         <span className="font-bold text-white flex items-center gap-2"><Skull className="w-4 h-4 text-slate-500"/> {s.name}</span>
-                        <button onClick={() => importApiEnemy(s.url)} disabled={isSaving} className="bg-red-900/40 hover:bg-red-600 text-red-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider border border-red-500/50 transition-colors flex items-center gap-1">
-                          <Plus className="w-3 h-3"/> Summon
+                        <button onClick={() => loadApiEnemyIntoForge(s.url)} disabled={isSaving} className="bg-red-900/40 hover:bg-red-600 text-red-400 hover:text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border border-red-500/50 transition-colors flex items-center gap-1">
+                          <Plus className="w-3 h-3"/> Load as Template
                         </button>
                       </div>
                     ))}

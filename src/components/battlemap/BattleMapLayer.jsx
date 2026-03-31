@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc, collection, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, collection, runTransaction } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map as MapIcon, X, AlertTriangle, Zap } from 'lucide-react';
 import MapGrid from './MapGrid';
+import MapDrawings from './MapDrawings';
 import { getConditionMechanics } from '../../services/arklaEngine';
 
 export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
-  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [] });
+  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [], fogOfWar: false });
   const [tokens, setTokens] = useState({});
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert' });
   
@@ -29,7 +30,8 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
           isPublished: data.isPublished || false,
           activeTokenId: data.activeTokenId || null,
           gridColor: data.gridColor || 'rgba(255,255,255,0.35)',
-          drawings: data.drawings || []
+          drawings: data.drawings || [],
+          fogOfWar: data.fogOfWar || false
         });
         setTokens(data.tokens || {});
       }
@@ -206,24 +208,38 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-hidden p-2 md:p-8 flex items-center justify-center bg-slate-950">
+      <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-950 custom-scrollbar">
         {!mapData.isPublished ? (
           <div className="text-center">
             <MapIcon className="w-16 h-16 text-slate-800 mx-auto mb-4" />
             <p className="text-slate-500 font-bold uppercase tracking-widest">Waiting for DM to reveal map...</p>
           </div>
         ) : (
-          <MapGrid 
-            mapData={mapData} 
-            tokens={tokens} 
-            activePlayers={activePlayers}
-            activeEnemies={activeEnemies}
-            onTileClick={handleTileClick} 
-            onTokenClick={handleTokenClick}
-            selectedTokenId={charId}
-            isDM={false} 
-            showMovementRangeFor={showRange ? { ...tokens[charId], speed: dynamicSpeed } : null}
-          />
+          <div className="relative shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-700 mx-auto" style={{ width: `${mapData.cols * 50}px`, height: `${mapData.rows * 50}px`, backgroundImage: mapData.imageUrl ? `url(${mapData.imageUrl})` : 'none', backgroundSize: '100% 100%' }}>
+            
+            {/* 1. Render the base Map Grid and Tokens */}
+            <MapGrid 
+              mapData={mapData} 
+              tokens={tokens} 
+              activePlayers={activePlayers}
+              activeEnemies={activeEnemies}
+              onTileClick={handleTileClick} 
+              onTokenClick={handleTokenClick}
+              selectedTokenId={charId}
+              isDM={false} 
+              showMovementRangeFor={showRange ? { ...tokens[charId], speed: dynamicSpeed } : null}
+            />
+
+            {/* 2. Render the Fog of War Mask over the Grid/Tokens */}
+            <MapDrawings 
+              drawings={mapData.drawings || []} 
+              fogOfWar={mapData.fogOfWar} 
+              currentCellSize={50} 
+              cols={mapData.cols} 
+              rows={mapData.rows} 
+              isDrawingMode={false} 
+            />
+          </div>
         )}
       </div>
 

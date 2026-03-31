@@ -92,6 +92,7 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, className = '') =
     activeStat = 'DEX';
   }
 
+  // Allow custom override via properties box (e.g. "use: cha" for Hexblades)
   const overrideMatch = properties.match(/use:\s*([a-z]{3})/i);
   if (overrideMatch) {
     const forcedStat = overrideMatch[1].toUpperCase();
@@ -104,14 +105,15 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, className = '') =
   const toHit = pb + useStatMod;
   const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
 
+  // BUG FIX: Safely inject the modifier without erasing secondary damage dice
   const baseDiceMatch = (attack.damage || '').match(/(\d+d\d+)/);
   const baseDice = baseDiceMatch ? baseDiceMatch[0] : '';
   
   let formattedDamage = attack.damage; 
   if (baseDice) {
-     formattedDamage = useStatMod === 0 ? baseDice : 
-                       useStatMod > 0 ? `${baseDice} + ${useStatMod}` : 
-                       `${baseDice} - ${Math.abs(useStatMod)}`;
+     const modString = useStatMod === 0 ? '' : useStatMod > 0 ? ` + ${useStatMod}` : ` - ${Math.abs(useStatMod)}`;
+     // Replaces ONLY the first instance of the base dice, appending the modifier directly after it
+     formattedDamage = attack.damage.replace(baseDice, `${baseDice}${modString}`);
   }
 
   return { ...attack, hit: formattedHit, damage: formattedDamage };

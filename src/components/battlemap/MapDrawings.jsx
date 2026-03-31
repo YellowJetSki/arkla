@@ -5,10 +5,11 @@ export default function MapDrawings({
   isDrawingMode = false, 
   drawingShape = 'freehand',
   onDrawEnd, 
-  currentCellSize, 
-  cols, 
-  rows,
-  drawingColor = '#ef4444'
+  currentCellSize = 50, 
+  cols = 20, 
+  rows = 15,
+  drawingColor = '#ef4444',
+  fogOfWar = false
 }) {
   const [currentLine, setCurrentLine] = useState(null);
   const svgRef = useRef(null);
@@ -35,10 +36,9 @@ export default function MapDrawings({
     const coords = getCoords(e.nativeEvent || e);
     
     setCurrentLine(prev => {
-      if (prev.type === 'freehand') {
+      if (prev.type === 'freehand' || prev.type === 'reveal') {
         return { ...prev, points: [...prev.points, coords] };
       } else {
-        // For shapes, we just need the start and the current endpoint
         return { ...prev, points: [prev.points[0], coords] };
       }
     });
@@ -52,14 +52,19 @@ export default function MapDrawings({
     setCurrentLine(null);
   };
 
-  const renderShape = (line, index) => {
+  const renderShape = (line, index, isMask = false) => {
     if (!line || !line.points || line.points.length === 0) return null;
     const p1 = line.points[0];
     const p2 = line.points[line.points.length - 1];
 
-    if (line.type === 'freehand') {
+    const strokeColor = isMask ? "black" : (line.color || '#ef4444');
+    const fillColor = isMask ? "black" : (line.color || '#ef4444');
+    const shapeType = line.type || line.shape; 
+
+    if (shapeType === 'freehand' || shapeType === 'reveal') {
+      const strokeWidth = shapeType === 'reveal' ? 60 : 4;
       const d = line.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * currentCellSize} ${p.y * currentCellSize}`).join(' ');
-      return <path key={index} d={d} stroke={line.color || '#ef4444'} strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />;
+      return <path key={index} d={d} stroke={strokeColor} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={isMask ? 1 : 0.85} />;
     }
 
     if (!p2) return null;
@@ -69,21 +74,20 @@ export default function MapDrawings({
     const x2 = p2.x * currentCellSize;
     const y2 = p2.y * currentCellSize;
 
-    if (line.type === 'line') {
-      return <line key={index} x1={x1} y1={y1} x2={x2} y2={y2} stroke={line.color} strokeWidth={8} strokeLinecap="round" opacity={0.6} />;
+    if (shapeType === 'line') {
+      return <line key={index} x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeColor} strokeWidth={8} strokeLinecap="round" opacity={isMask ? 1 : 0.6} />;
     }
 
-    if (line.type === 'circle') {
+    if (shapeType === 'circle') {
       const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
       return (
-        <circle key={index} cx={x1} cy={y1} r={radius} stroke={line.color} strokeWidth={4} fill={line.color} fillOpacity={0.2} opacity={0.85} />
+        <circle key={index} cx={x1} cy={y1} r={radius} stroke={strokeColor} strokeWidth={4} fill={fillColor} fillOpacity={isMask ? 1 : 0.2} opacity={isMask ? 1 : 0.85} />
       );
     }
 
-    if (line.type === 'cone') {
+    if (shapeType === 'cone') {
       const angle = Math.atan2(y2 - y1, x2 - x1);
       const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-      // Standard D&D 53 degree cone
       const halfAngle = (53 / 2) * (Math.PI / 180); 
       
       const p2x = x1 + distance * Math.cos(angle - halfAngle);
@@ -93,12 +97,18 @@ export default function MapDrawings({
       const p3y = y1 + distance * Math.sin(angle + halfAngle);
 
       return (
-        <polygon key={index} points={`${x1},${y1} ${p2x},${p2y} ${p3x},${p3y}`} stroke={line.color} strokeWidth={4} fill={line.color} fillOpacity={0.2} strokeLinejoin="round" opacity={0.85} />
+        <polygon key={index} points={`${x1},${y1} ${p2x},${p2y} ${p3x},${p3y}`} stroke={strokeColor} strokeWidth={4} fill={fillColor} fillOpacity={isMask ? 1 : 0.2} strokeLinejoin="round" opacity={isMask ? 1 : 0.85} />
       );
     }
 
     return null;
   };
+
+  const paints = drawings.filter(d => (d.type || d.shape) !== 'reveal');
+  const reveals = drawings.filter(d => (d.type || d.shape) === 'reveal');
+  
+  const currentPaints = currentLine && currentLine.type !== 'reveal' ? currentLine : null;
+  const currentReveals = currentLine && currentLine.type === 'reveal' ? currentLine : null;
 
   return (
     <svg
@@ -113,8 +123,26 @@ export default function MapDrawings({
       onTouchMove={handlePointerMove}
       onTouchEnd={handlePointerUp}
     >
-      {drawings.map((line, i) => renderShape(line, line.id || i))}
-      {currentLine && renderShape(currentLine, 'current')}
+      {/* THE FOG OF WAR MASK LAYER */}
+      {fogOfWar && (
+        <defs>
+          <mask id="fogMask">
+            {/* White makes the fog opaque */}
+            <rect width="100%" height="100%" fill="white" />
+            {/* Black cuts holes in the fog */}
+            {reveals.map((line, i) => renderShape(line, `rev-${i}`, true))}
+            {currentReveals && renderShape(currentReveals, 'curr-rev', true)}
+          </mask>
+        </defs>
+      )}
+
+      {fogOfWar && (
+        <rect width="100%" height="100%" fill="#020617" mask="url(#fogMask)" opacity="0.97" />
+      )}
+
+      {/* THE STANDARD DRAWING LAYER */}
+      {paints.map((line, i) => renderShape(line, `paint-${line.id || i}`))}
+      {currentPaints && renderShape(currentPaints, 'curr-paint')}
     </svg>
   );
 }

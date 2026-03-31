@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { doc, getDoc, setDoc, runTransaction, arrayUnion } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Image as ImageIcon } from 'lucide-react';
+import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
 
 export default function InventoryTab({ char, charId, isDM, updateField, activeTheme, showDialog }) {
   const [isForgingItem, setIsForgingItem] = useState(false);
@@ -22,7 +23,61 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   const [isEditingCopper, setIsEditingCopper] = useState(false);
   const [displayCopper, setDisplayCopper] = useState("");
 
+  // SRD Autocomplete State
+  const [srdEquipmentList, setSrdEquipmentList] = useState([]);
+  const [filteredEquip, setFilteredEquip] = useState([]);
+  const [showEquipDropdown, setShowEquipDropdown] = useState(false);
+
+  useEffect(() => {
+    fetchAllEquipment().then(setSrdEquipmentList);
+  }, []);
+
   const inventoryArray = Array.isArray(char.inventory) ? char.inventory : [];
+
+  // Atomic Transaction Wrapper for Inventory Mutations
+  const runInventoryTransaction = async (mutationFn) => {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const charRef = doc(db, 'characters', charId);
+        const sfDoc = await transaction.get(charRef);
+        if (!sfDoc.exists()) return;
+        const currentInv = sfDoc.data().inventory || [];
+        const updatedInv = mutationFn([...currentInv]);
+        transaction.update(charRef, { inventory: updatedInv });
+      });
+    } catch(e) {
+      console.error("Inventory transaction failed", e);
+    }
+  };
+
+  const handleNameChange = (e) => {
+    const val = e.target.value;
+    setCustomItem(prev => ({ ...prev, name: val }));
+    
+    if (val.length > 1) {
+      setFilteredEquip(srdEquipmentList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
+      setShowEquipDropdown(true);
+    } else {
+      setShowEquipDropdown(false);
+    }
+  };
+
+  const handleSelectSrdItem = async (indexStr) => {
+    setShowEquipDropdown(false);
+    const details = await fetchEquipmentDetails(indexStr);
+    if (details) {
+      setCustomItem(prev => ({
+        ...prev,
+        name: details.name,
+        category: details.category === 'Adventuring Gear' || details.category === 'Potion' ? details.category : details.category,
+        desc: details.desc,
+        damageDice: details.damageDice || '',
+        damageType: details.damageType || 'Slashing',
+        properties: details.properties || '',
+        ac: details.ac || 14
+      }));
+    }
+  };
 
   const handleForgeCustomItem = async (e) => {
     e.preventDefault();
@@ -41,20 +96,23 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
        ac: customItem.category === 'Armor' ? Number(customItem.ac) : null
     };
     
-    const newInventory = [...inventoryArray, newItem];
-    await updateField('inventory', newInventory);
+    await runInventoryTransaction((inv) => {
+      return [...inv, newItem];
+    });
     
     setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, desc: '', imageUrl: '' });
     setIsForgingItem(false);
   };
 
   const updateQuantity = async (idx, delta) => {
-    const newInv = [...inventoryArray];
-    newInv[idx].quantity += delta;
-    if (newInv[idx].quantity <= 0) {
-      newInv.splice(idx, 1);
-    }
-    await updateField('inventory', newInv);
+    await runInventoryTransaction((inv) => {
+      if (!inv[idx]) return inv;
+      inv[idx].quantity += delta;
+      if (inv[idx].quantity <= 0) {
+        inv.splice(idx, 1);
+      }
+      return inv;
+    });
   };
 
   const equipWeapon = async (item) => {
@@ -66,7 +124,10 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
        notes: item.properties || ''
     };
     try {
-      await updateDoc(doc(db, 'characters', charId), { attacks: arrayUnion(newAttack) });
+      await runTransaction(db, async (transaction) => {
+        const charRef = doc(db, 'characters', charId);
+        transaction.update(charRef, { attacks: arrayUnion(newAttack) });
+      });
       showDialog({ title: 'Weapon Equipped', message: `${item.name} added to Combat Tab!`, type: 'alert', onConfirm: () => showDialog({ isOpen: false }) });
     } catch (err) {
       console.error(err);
@@ -74,9 +135,11 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   };
 
   const deleteItem = async (idx) => {
-    const newInv = [...inventoryArray];
-    newInv.splice(idx, 1);
-    await updateField('inventory', newInv);
+    await runInventoryTransaction((inv) => {
+      if (!inv[idx]) return inv;
+      inv.splice(idx, 1);
+      return inv;
+    });
   };
 
   const handleShareToParty = async (item, index) => {
@@ -85,9 +148,12 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
       message: `Send ${item.name} to the Shared Party Loot? It will be removed from your personal inventory.`,
       type: 'confirm',
       onConfirm: async () => {
-        const newInv = [...inventoryArray];
-        newInv.splice(index, 1);
-        await updateField('inventory', newInv);
+        // Safe remove from inventory
+        await runInventoryTransaction((inv) => {
+          if (!inv[index]) return inv;
+          inv.splice(index, 1);
+          return inv;
+        });
 
         let descText = `${item.category}\n`;
         if (item.category === 'Weapon') descText += `Damage: ${item.damageDice} ${item.damageType}\n`;
@@ -198,9 +264,33 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
             <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b border-indigo-900/50 pb-2"><Hammer className="w-4 h-4" /> Inject Item</h4>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Item Name</label>
-                <input type="text" required value={customItem.name} onChange={e => setCustomItem({...customItem, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. Ring of Fire" />
+              <div className="relative">
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Search className="w-3 h-3" /> Item Name (SRD Search)
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={customItem.name} 
+                  onChange={handleNameChange} 
+                  className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" 
+                  placeholder="e.g. Ring of Fire or Longsword" 
+                />
+                
+                {/* SRD Autocomplete Dropdown */}
+                {showEquipDropdown && filteredEquip.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-600 rounded-lg shadow-2xl z-50">
+                    {filteredEquip.map(item => (
+                      <div 
+                        key={item.index} 
+                        onClick={() => handleSelectSrdItem(item.index)} 
+                        className="px-3 py-2.5 text-sm text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors"
+                      >
+                        {item.name}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Category</label>
@@ -244,7 +334,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
 
               <div className="sm:col-span-2">
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Lore</label>
-                <textarea required value={customItem.desc} onChange={e => setCustomItem({...customItem, desc: e.target.value})} className="w-full min-h-[80px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 resize-y shadow-inner" placeholder="Notes..." />
+                <textarea required value={customItem.desc} onChange={e => setCustomItem({...customItem, desc: e.target.value})} className="w-full min-h-[80px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 resize-y shadow-inner leading-relaxed" placeholder="Notes..." />
               </div>
             </div>
             
@@ -259,7 +349,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
              <p className="text-slate-500 italic p-6 text-center bg-slate-900/50 rounded-xl border border-slate-800 border-dashed">Your bags are empty.</p>
           ) : (
             inventoryArray.map((item, i) => (
-              <div key={item.id || i} className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl overflow-hidden transition-colors shadow-sm ${openItems[i] ? `border-${activeTheme.ring} shadow-[0_0_15px_rgba(255,255,255,0.05)]` : 'border-slate-700/80 hover:border-slate-500'}`}>
+              <div key={item.id || i} className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl overflow-hidden transition-colors shadow-sm ${openItems[i] ? `${activeTheme.activeBorder} shadow-[0_0_15px_rgba(255,255,255,0.05)]` : 'border-slate-700/80 hover:border-slate-500'}`}>
                 <div className="flex justify-between items-center p-3 sm:p-4 cursor-pointer" onClick={() => toggleItemOpen(i)}>
                   
                   <div className="flex items-center gap-3">

@@ -1,4 +1,4 @@
-import { Shield, Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, Info, X, Droplets, Droplet } from 'lucide-react';
+import { Shield, Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, Info, X, Droplets, Droplet, Backpack } from 'lucide-react';
 import { getModifier, parseAndScaleAttack, getConditionMechanics } from '../../services/arklaEngine';
 import VitalStats from '../shared/VitalStats';
 import { CONDITIONS_LIST, CONDITION_EFFECTS } from '../../data/campaignData';
@@ -154,7 +154,7 @@ export default function CombatTab({
             attacks.map((atk, idx) => {
               const scaledAtk = parseAndScaleAttack(atk, char.stats, char.level, char.class);
               return (
-                <div key={idx} className={`bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-${activeTheme.ring}/50 transition-colors shadow-sm`}>
+                <div key={idx} className={`bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group ${activeTheme.hoverBorder} transition-colors shadow-sm`}>
                   <div className="flex-1">
                     <h4 className="font-black text-white text-base md:text-lg mb-1 drop-shadow-sm">{scaledAtk.name}</h4>
                     {scaledAtk.notes && <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold bg-slate-950 inline-block px-2 py-1 rounded shadow-inner">{scaledAtk.notes}</p>}

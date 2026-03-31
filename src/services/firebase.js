@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -14,15 +14,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
 
-// QoL: Enable offline persistence. The app will continue to function during brief Wi-Fi drops.
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('Firebase: Multiple tabs open, persistence enabled in first tab only.');
-  } else if (err.code === 'unimplemented') {
-    console.warn('Firebase: Browser does not support offline persistence.');
-  }
+// BUG FIX: Replaced the deprecated 'enableIndexedDbPersistence' with modern caching.
+// This prevents console warnings and safely allows multiple Arkla tabs to be open at once!
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
 });
 
 export { app, auth, db };

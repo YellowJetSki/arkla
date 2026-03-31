@@ -67,13 +67,14 @@ export default function DMSpellForge({ onClose }) {
     setIsSearching(false);
   };
 
-  const importApiSpell = async (url) => {
+  // NEW: Instead of instantly saving, this loads the API data into the Custom Tab editor!
+  const loadApiSpellIntoForge = async (url) => {
     setIsSaving(true);
     try {
       const res = await fetch(`https://www.dnd5eapi.co${url}`);
       const data = await res.json();
       
-      const importedSpell = {
+      setSpell({
         name: data.name,
         level: data.level,
         school: { name: data.school?.name || 'Unknown' },
@@ -87,15 +88,14 @@ export default function DMSpellForge({ onClose }) {
         damageType: data.damage?.damage_type?.name || '',
         saveRequired: data.dc?.dc_type?.name ? `${data.dc.dc_type.name} Save` : '',
         imageUrl: '',
-        isHomebrew: false,
+        isHomebrew: true, // Mark it as homebrew now since we are copying it locally
         index: data.index
-      };
+      });
 
-      await addDoc(collection(db, 'homebrew_spells'), importedSpell);
-      setDialog({ isOpen: true, title: 'Imported', message: `${data.name} added to your global Grimoire!`, type: 'alert', onConfirm: onClose });
+      setActiveTab('custom'); // Kick the DM over to the custom tab so they can review and edit
     } catch (err) {
       console.error(err);
-      setDialog({ isOpen: true, title: 'Import Error', message: 'Failed to import spell.', type: 'alert' });
+      setDialog({ isOpen: true, title: 'Import Error', message: 'Failed to load spell data into the forge.', type: 'alert' });
     }
     setIsSaving(false);
   };
@@ -210,8 +210,8 @@ export default function DMSpellForge({ onClose }) {
                     {srdSpells.map(s => (
                       <div key={s.index} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex justify-between items-center group">
                         <span className="font-bold text-white flex items-center gap-2"><BookOpen className="w-4 h-4 text-slate-500"/> {s.name}</span>
-                        <button onClick={() => importApiSpell(s.url)} disabled={isSaving} className="bg-fuchsia-900/40 hover:bg-fuchsia-600 text-fuchsia-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider border border-fuchsia-500/50 transition-colors flex items-center gap-1">
-                          <Plus className="w-3 h-3"/> Import
+                        <button onClick={() => loadApiSpellIntoForge(s.url)} disabled={isSaving} className="bg-fuchsia-900/40 hover:bg-fuchsia-600 text-fuchsia-400 hover:text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border border-fuchsia-500/50 transition-colors flex items-center gap-1">
+                          <Plus className="w-3 h-3"/> Load as Template
                         </button>
                       </div>
                     ))}

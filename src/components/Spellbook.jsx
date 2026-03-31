@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { doc, setDoc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Shield, Settings, BrainCircuit, Hammer, X, Filter, Trash2 } from 'lucide-react';
+import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Shield, Settings, BrainCircuit, Hammer, X, Filter, Trash2, Loader2 } from 'lucide-react';
 import CollapsibleSection from './shared/CollapsibleSection';
 
 const SPELL_FILTERS = ['All', 'Cantrips', 'Leveled', 'Concentration', 'Action', 'Bonus', 'Reaction'];
@@ -9,17 +9,17 @@ const SPELL_FILTERS = ['All', 'Cantrips', 'Leveled', 'Concentration', 'Action', 
 export default function Spellbook({ char, charId, isDM, showDialog }) {
   const [isEditingSlots, setIsEditingSlots] = useState(false); 
   const [isForgingSpell, setIsForgingSpell] = useState(false);
+  const [activeForgeTab, setActiveForgeTab] = useState('custom');
   
   const [customSpell, setCustomSpell] = useState({ 
-    name: '', 
-    level: 0, 
-    castTime: '1 Action', 
-    range: '60 feet', 
-    components: 'V, S', 
-    duration: 'Instantaneous', 
-    desc: '' 
+    name: '', level: 0, castTime: '1 Action', range: '60 feet', components: 'V, S', duration: 'Instantaneous', desc: '' 
   });
   
+  // SRD Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [srdSpells, setSrdSpells] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
   const [activeFilter, setActiveFilter] = useState('All');
   const [spellToCast, setSpellToCast] = useState(null);
 
@@ -128,6 +128,42 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     } catch (err) {
       console.error("Failed to forge custom spell:", err);
       showDialog({ isOpen: true, title: 'Error', message: 'Failed to forge spell.', type: 'alert' });
+    }
+  };
+
+  const searchApi = async (e) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    try {
+      const res = await fetch(`https://www.dnd5eapi.co/api/spells/?name=${encodeURIComponent(searchQuery.trim())}`);
+      const data = await res.json();
+      setSrdSpells(data.results || []);
+    } catch (err) {
+      showDialog({ isOpen: true, title: 'API Error', message: 'Failed to search archives.', type: 'alert' });
+    }
+    setIsSearching(false);
+  };
+
+  const loadApiSpellIntoForge = async (url) => {
+    try {
+      const res = await fetch(`https://www.dnd5eapi.co${url}`);
+      const data = await res.json();
+      
+      setCustomSpell({
+        name: data.name,
+        level: data.level,
+        castTime: data.casting_time || '1 Action',
+        range: data.range || 'Self',
+        components: (data.components || []).join(', '),
+        duration: data.duration || 'Instantaneous',
+        desc: (data.desc || []).join('\n')
+      });
+
+      setActiveForgeTab('custom');
+    } catch (err) {
+      console.error(err);
+      showDialog({ isOpen: true, title: 'Import Error', message: 'Failed to load spell data into the forge.', type: 'alert' });
     }
   };
 
@@ -312,51 +348,90 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
         )}
 
         {isDM && isForgingSpell && (
-          <form onSubmit={handleForgeCustomSpell} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-fuchsia-500/30 shadow-inner mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
-            <h4 className="text-sm font-black text-fuchsia-400 flex items-center gap-2 uppercase tracking-widest border-b border-fuchsia-900/50 pb-2"><Hammer className="w-4 h-4" /> Spell Forge</h4>
+          <div className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-fuchsia-500/30 shadow-inner mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
             
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Spell Name</label>
-                <input type="text" onFocus={(e) => e.target.select()} required value={customSpell.name} onChange={e => setCustomSpell({...customSpell, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Arcane Eruption" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Spell Level</label>
-                <select value={customSpell.level} onChange={e => setCustomSpell({...customSpell, level: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner">
-                  <option value="0">Cantrip (0)</option>
-                  {[1,2,3,4,5,6,7,8,9].map(l => <option key={l} value={l}>Level {l}</option>)}
-                </select>
+            {/* TABS FOR CUSTOM vs API */}
+            <div className="flex justify-between items-center border-b border-fuchsia-900/50 pb-2">
+              <h4 className="text-sm font-black text-fuchsia-400 flex items-center gap-2 uppercase tracking-widest"><Hammer className="w-4 h-4" /> Spell Forge</h4>
+              <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
+                <button onClick={() => setActiveForgeTab('custom')} className={`px-3 py-1 text-xs font-bold uppercase rounded-md transition-colors ${activeForgeTab === 'custom' ? 'bg-fuchsia-600 text-white' : 'text-slate-500 hover:text-white'}`}>Custom</button>
+                <button onClick={() => setActiveForgeTab('api')} className={`px-3 py-1 text-xs font-bold uppercase rounded-md transition-colors ${activeForgeTab === 'api' ? 'bg-fuchsia-600 text-white' : 'text-slate-500 hover:text-white'}`}>SRD API</button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Casting Time</label>
-                <input type="text" onFocus={(e) => e.target.select()} required value={customSpell.castTime} onChange={e => setCustomSpell({...customSpell, castTime: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 1 Action" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Range</label>
-                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.range} onChange={e => setCustomSpell({...customSpell, range: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 60 feet" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Components</label>
-                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.components} onChange={e => setCustomSpell({...customSpell, components: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. V, S, M" />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Duration</label>
-                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.duration} onChange={e => setCustomSpell({...customSpell, duration: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Concentration" />
-              </div>
-            </div>
+            {activeForgeTab === 'custom' ? (
+              <form onSubmit={handleForgeCustomSpell}>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Spell Name</label>
+                    <input type="text" onFocus={(e) => e.target.select()} required value={customSpell.name} onChange={e => setCustomSpell({...customSpell, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Arcane Eruption" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Spell Level</label>
+                    <select value={customSpell.level} onChange={e => setCustomSpell({...customSpell, level: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner">
+                      <option value="0">Cantrip (0)</option>
+                      {[1,2,3,4,5,6,7,8,9].map(l => <option key={l} value={l}>Level {l}</option>)}
+                    </select>
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
-              <textarea required value={customSpell.desc} onChange={e => setCustomSpell({...customSpell, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-fuchsia-500 resize-y shadow-inner leading-relaxed" placeholder="Describe the damage, saving throws, and effects..." />
-            </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Casting Time</label>
+                    <input type="text" onFocus={(e) => e.target.select()} required value={customSpell.castTime} onChange={e => setCustomSpell({...customSpell, castTime: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 1 Action" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Range</label>
+                    <input type="text" onFocus={(e) => e.target.select()} value={customSpell.range} onChange={e => setCustomSpell({...customSpell, range: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 60 feet" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Components</label>
+                    <input type="text" onFocus={(e) => e.target.select()} value={customSpell.components} onChange={e => setCustomSpell({...customSpell, components: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. V, S, M" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Duration</label>
+                    <input type="text" onFocus={(e) => e.target.select()} value={customSpell.duration} onChange={e => setCustomSpell({...customSpell, duration: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Concentration" />
+                  </div>
+                </div>
 
-            <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl shadow-[0_0_15px_rgba(217,70,239,0.3)] hover:shadow-[0_0_25px_rgba(217,70,239,0.5)] transition-all flex items-center justify-center gap-2 mt-2">
-              <Plus className="w-4 h-4" /> Inject into Grimoire
-            </button>
-          </form>
+                <div className="mb-4">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
+                  <textarea required value={customSpell.desc} onChange={e => setCustomSpell({...customSpell, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-fuchsia-500 resize-y shadow-inner leading-relaxed" placeholder="Describe the damage, saving throws, and effects..." />
+                </div>
+
+                <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl shadow-[0_0_15px_rgba(217,70,239,0.3)] hover:shadow-[0_0_25px_rgba(217,70,239,0.5)] transition-all flex items-center justify-center gap-2">
+                  <Plus className="w-4 h-4" /> Inject into Grimoire
+                </button>
+              </form>
+            ) : (
+              <div className="space-y-4 animate-in fade-in">
+                <form onSubmit={searchApi} className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search SRD for Spells (e.g. Fireball)..." className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-4 text-white font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner" />
+                  <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-fuchsia-600 hover:bg-fuchsia-500 transition-colors px-4 py-2 rounded-lg text-white font-bold text-sm uppercase tracking-wider">Search</button>
+                </form>
+                
+                {isSearching ? (
+                  <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 text-fuchsia-500 animate-spin" /></div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                    {srdSpells.map(s => (
+                      <div key={s.index} className="bg-slate-950 p-3 rounded-lg border border-slate-700 flex justify-between items-center group">
+                        <span className="font-bold text-slate-300 flex items-center gap-2"><BookOpen className="w-4 h-4 text-slate-500"/> {s.name}</span>
+                        <button 
+                          onClick={() => loadApiSpellIntoForge(s.url)} 
+                          className="bg-fuchsia-900/40 hover:bg-fuchsia-600 text-fuchsia-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider border border-fuchsia-500/50 transition-colors flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3"/> Load Template
+                        </button>
+                      </div>
+                    ))}
+                    {searchQuery && srdSpells.length === 0 && <p className="text-center text-slate-500 italic p-4">No spells found.</p>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {Object.keys(groupedSpells).length === 0 ? (

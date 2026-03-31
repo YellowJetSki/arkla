@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/generate-images.js",
     "dev": "vite",
+    "prebuild": "node scripts/generate-images.js",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

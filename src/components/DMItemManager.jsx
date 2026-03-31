@@ -4,6 +4,7 @@ import { db } from '../services/firebase';
 import { X, Backpack, Send, PackagePlus, Hammer, Search, Loader2, Plus } from 'lucide-react';
 import DMItemForge from './DMItemForge';
 import DialogModal from './shared/DialogModal';
+import { fetchAllEquipment, fetchEquipmentDetails } from '../services/srdApi';
 
 export default function DMItemManager({ onClose, activePlayers }) {
   const [stashedItems, setStashedItems] = useState([]);
@@ -29,16 +30,8 @@ export default function DMItemManager({ onClose, activePlayers }) {
       }
     };
     
-    const fetchSrd = async () => {
-      try {
-        const res = await fetch('https://www.dnd5eapi.co/api/equipment');
-        const data = await res.json();
-        setSrdItems(data.results || []);
-      } catch (err) { console.error("Failed to load SRD index", err); }
-    };
-
     fetchStash();
-    fetchSrd();
+    fetchAllEquipment().then(setSrdItems);
   }, []);
 
   const saveStashToDb = async (newItems) => {
@@ -46,27 +39,28 @@ export default function DMItemManager({ onClose, activePlayers }) {
     await updateDoc(doc(db, 'campaign', 'dm_stash'), { items: newItems });
   };
 
-  const fetchAndStashApiItem = async (url) => {
+  const fetchAndStashApiItem = async (indexStr) => {
     setIsSearching(true);
     try {
-      const res = await fetch(`https://www.dnd5eapi.co${url}`);
-      const detail = await res.json();
+      const details = await fetchEquipmentDetails(indexStr);
       
-      const structuredItem = {
-        id: `item_${Date.now()}`,
-        name: detail.name,
-        category: detail.equipment_category?.name || 'Adventuring Gear',
-        desc: Array.isArray(detail.desc) ? detail.desc.join('\n') : (detail.desc || 'A standard piece of equipment.'),
-        quantity: 1,
-        imageUrl: '',
-        damageDice: detail.damage?.damage_dice || null,
-        damageType: detail.damage?.damage_type?.name || null,
-        properties: detail.properties ? detail.properties.map(p => p.name).join(', ') : null,
-        ac: detail.armor_class?.base || null
-      };
+      if (details) {
+        const structuredItem = {
+          id: `item_${Date.now()}`,
+          name: details.name,
+          category: details.category || 'Adventuring Gear',
+          desc: details.desc || 'A standard piece of equipment.',
+          quantity: 1,
+          imageUrl: '',
+          damageDice: details.damageDice || null,
+          damageType: details.damageType || null,
+          properties: details.properties || null,
+          ac: details.ac || null
+        };
 
-      saveStashToDb([structuredItem, ...stashedItems]);
-      setSearchQuery('');
+        saveStashToDb([structuredItem, ...stashedItems]);
+        setSearchQuery('');
+      }
     } catch (err) {
       console.error(err);
       setDialog({ isOpen: true, title: 'Error', message: 'Failed to extract item from archives.', type: 'alert' });
@@ -87,11 +81,9 @@ export default function DMItemManager({ onClose, activePlayers }) {
     if (playerSnap.exists()) {
       const currentInv = playerSnap.data().inventory || [];
       const invArray = Array.isArray(currentInv) ? currentInv : []; 
-      
       const newInv = [...invArray, item];
       
       await updateDoc(playerRef, { inventory: newInv });
-      
       saveStashToDb(stashedItems.filter(i => i.id !== item.id));
       setDialog({ isOpen: true, title: 'Item Sent', message: `${item.name} has been mysteriously placed in their backpack.`, type: 'alert' });
     }
@@ -157,7 +149,7 @@ export default function DMItemManager({ onClose, activePlayers }) {
                       <div key={item.index} className="bg-slate-900 border border-slate-700 rounded-lg p-3 flex justify-between items-center group shadow-sm">
                         <span className="font-bold text-slate-300 text-sm">{item.name}</span>
                         <button 
-                          onClick={() => fetchAndStashApiItem(item.url)}
+                          onClick={() => fetchAndStashApiItem(item.index)}
                           className="bg-indigo-900/40 hover:bg-indigo-600 text-indigo-400 hover:text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors border border-indigo-500/30 flex items-center gap-1"
                         >
                           <Plus className="w-3 h-3" /> Stash
