@@ -3,7 +3,6 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { LogOut, X } from 'lucide-react';
 import MapGrid from './MapGrid';
-import MapDrawings from './MapDrawings';
 
 export default function BattleMapDisplay({ onLogout }) {
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, fogOfWar: false, drawings: [] });
@@ -104,28 +103,16 @@ export default function BattleMapDisplay({ onLogout }) {
         </div>
       )}
 
-      {/* Battlemap Container - Exactly matching the DM View constraints */}
-      <div className="relative shadow-[0_0_80px_rgba(0,0,0,0.8)]" style={{ width: `${mapData.cols * 50}px`, height: `${mapData.rows * 50}px`, backgroundImage: `url(${mapData.imageUrl})`, backgroundSize: '100% 100%' }}>
-        <MapGrid 
-          mapData={mapData} 
-          tokens={tokens} 
-          onTileClick={() => {}} 
-          onTokenClick={() => {}}
-          selectedTokenId={null}
-          isDM={false} 
-          isDisplayMode={true}
-        />
-        
-        {/* Draw Fog and Reveals over the map grid */}
-        <MapDrawings 
-          drawings={mapData.drawings} 
-          fogOfWar={mapData.fogOfWar} 
-          currentCellSize={50} 
-          cols={mapData.cols} 
-          rows={mapData.rows} 
-          isDrawingMode={false} 
-        />
-      </div>
+      {/* Battlemap Container - Let MapGrid handle the background and drawing layers entirely */}
+      <MapGrid 
+        mapData={mapData} 
+        tokens={tokens} 
+        onTileClick={() => {}} 
+        onTokenClick={() => {}}
+        selectedTokenId={null}
+        isDM={false} 
+        isDisplayMode={true}
+      />
       
       <button 
         onClick={onLogout}

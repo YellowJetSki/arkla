@@ -22,7 +22,26 @@ export default function CombatTab({
   const isEncumbered = (char.inventory || '').length > 500 && char.stats?.STR < 15;
   if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
 
-  const attacks = char.attacks || [];
+  // Dynamic Attack Sourcing: Merging char.attacks (Custom Actions) + inventory (Weapons)
+  const inventoryWeapons = (char.inventory || []).filter(item => item.category === 'Weapon').map(w => {
+    // Safely extract properties if they are a string or an array from DMForge
+    let propsStr = '';
+    if (Array.isArray(w.properties)) {
+      propsStr = w.properties.map(p => p.name).join(', ');
+    } else if (typeof w.properties === 'string') {
+      propsStr = w.properties;
+    }
+
+    return {
+      name: w.name,
+      hit: '--',
+      damage: w.damageDice || w.damage?.damage_dice || '1d4',
+      type: w.damageType || w.damage?.damage_type?.name || 'Slashing',
+      notes: propsStr || (typeof w.desc === 'string' ? w.desc : '')
+    };
+  });
+
+  const allAttacks = [...(char.attacks || []), ...inventoryWeapons];
   const resources = char.resources || [];
 
   return (
@@ -146,18 +165,18 @@ export default function CombatTab({
         </h3>
         
         <div className="space-y-3 relative z-10">
-          {attacks.length === 0 ? (
+          {allAttacks.length === 0 ? (
             <div className="text-center p-6 bg-slate-900/50 rounded-xl border border-slate-700/50 border-dashed">
-              <p className="text-sm text-slate-400 italic">No weapons equipped. Equip them from your Inventory Tab.</p>
+              <p className="text-sm text-slate-400 italic">No weapons in bags or actions assigned.</p>
             </div>
           ) : (
-            attacks.map((atk, idx) => {
+            allAttacks.map((atk, idx) => {
               const scaledAtk = parseAndScaleAttack(atk, char.stats, char.level, char.class);
               return (
-                <div key={idx} className={`bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group ${activeTheme.hoverBorder} transition-colors shadow-sm`}>
+                <div key={idx} className={`bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group ${activeTheme.hoverBorder || ''} transition-colors shadow-sm`}>
                   <div className="flex-1">
                     <h4 className="font-black text-white text-base md:text-lg mb-1 drop-shadow-sm">{scaledAtk.name}</h4>
-                    {scaledAtk.notes && <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold bg-slate-950 inline-block px-2 py-1 rounded shadow-inner">{scaledAtk.notes}</p>}
+                    {scaledAtk.notes && <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold bg-slate-950 inline-block px-2 py-1 rounded shadow-inner truncate max-w-full">{scaledAtk.notes}</p>}
                   </div>
                   
                   <div className="flex gap-2 shrink-0">

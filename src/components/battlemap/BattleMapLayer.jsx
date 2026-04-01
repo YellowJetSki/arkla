@@ -3,7 +3,6 @@ import { doc, onSnapshot, collection, runTransaction } from 'firebase/firestore'
 import { db } from '../../services/firebase';
 import { Map as MapIcon, X, AlertTriangle, Zap } from 'lucide-react';
 import MapGrid from './MapGrid';
-import MapDrawings from './MapDrawings';
 import { getConditionMechanics } from '../../services/arklaEngine';
 
 export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
@@ -215,31 +214,17 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
             <p className="text-slate-500 font-bold uppercase tracking-widest">Waiting for DM to reveal map...</p>
           </div>
         ) : (
-          <div className="relative shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-700 mx-auto" style={{ width: `${mapData.cols * 50}px`, height: `${mapData.rows * 50}px`, backgroundImage: mapData.imageUrl ? `url(${mapData.imageUrl})` : 'none', backgroundSize: '100% 100%' }}>
-            
-            {/* 1. Render the base Map Grid and Tokens */}
-            <MapGrid 
-              mapData={mapData} 
-              tokens={tokens} 
-              activePlayers={activePlayers}
-              activeEnemies={activeEnemies}
-              onTileClick={handleTileClick} 
-              onTokenClick={handleTokenClick}
-              selectedTokenId={charId}
-              isDM={false} 
-              showMovementRangeFor={showRange ? { ...tokens[charId], speed: dynamicSpeed } : null}
-            />
-
-            {/* 2. Render the Fog of War Mask over the Grid/Tokens */}
-            <MapDrawings 
-              drawings={mapData.drawings || []} 
-              fogOfWar={mapData.fogOfWar} 
-              currentCellSize={50} 
-              cols={mapData.cols} 
-              rows={mapData.rows} 
-              isDrawingMode={false} 
-            />
-          </div>
+          <MapGrid 
+            mapData={mapData} 
+            tokens={tokens} 
+            activePlayers={activePlayers}
+            activeEnemies={activeEnemies}
+            onTileClick={handleTileClick} 
+            onTokenClick={handleTokenClick}
+            selectedTokenId={charId}
+            isDM={false} 
+            showMovementRangeFor={showRange ? { ...tokens[charId], speed: dynamicSpeed } : null}
+          />
         )}
       </div>
 

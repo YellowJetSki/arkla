@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, runTransaction, arrayUnion } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Image as ImageIcon } from 'lucide-react';
+import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Image as ImageIcon } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
 
 export default function InventoryTab({ char, charId, isDM, updateField, activeTheme, showDialog }) {
@@ -9,7 +9,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   const [openItems, setOpenItems] = useState({}); 
   
   const [customItem, setCustomItem] = useState({ 
-    name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, desc: '', imageUrl: '' 
+    name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' 
   });
   
   const [transactionAmount, setTransactionAmount] = useState('');
@@ -93,14 +93,15 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
        damageDice: customItem.category === 'Weapon' ? customItem.damageDice : null,
        damageType: customItem.category === 'Weapon' ? customItem.damageType : null,
        properties: customItem.category === 'Weapon' ? customItem.properties : null,
-       ac: customItem.category === 'Armor' ? Number(customItem.ac) : null
+       ac: customItem.category === 'Armor' ? Number(customItem.ac) : null,
+       hpRecovery: customItem.category === 'Consumable' || customItem.category === 'Potion' ? customItem.hpRecovery : null
     };
     
     await runInventoryTransaction((inv) => {
       return [...inv, newItem];
     });
     
-    setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, desc: '', imageUrl: '' });
+    setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' });
     setIsForgingItem(false);
   };
 
@@ -115,30 +116,54 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
     });
   };
 
-  const equipWeapon = async (item) => {
-    const newAttack = {
-       name: item.name, 
-       hit: '--', 
-       damage: item.damageDice || '1d4', 
-       type: item.damageType || 'Slashing', 
-       notes: item.properties || ''
-    };
-    try {
-      await runTransaction(db, async (transaction) => {
-        const charRef = doc(db, 'characters', charId);
-        transaction.update(charRef, { attacks: arrayUnion(newAttack) });
-      });
-      showDialog({ title: 'Weapon Equipped', message: `${item.name} added to Combat Tab!`, type: 'alert', onConfirm: () => showDialog({ isOpen: false }) });
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
   const deleteItem = async (idx) => {
     await runInventoryTransaction((inv) => {
       if (!inv[idx]) return inv;
       inv.splice(idx, 1);
       return inv;
+    });
+  };
+
+  const handleConsume = (item, index) => {
+    const isDice = (item.hpRecovery || '').includes('d');
+    const promptMsg = isDice 
+      ? `Roll your ${item.hpRecovery} and enter the total HP regained below. This will consume 1x ${item.name}.`
+      : `You will regain ${item.hpRecovery || '0'} HP. This will consume 1x ${item.name}. Proceed?`;
+
+    showDialog({
+      title: `Consume ${item.name}?`,
+      message: promptMsg,
+      type: isDice ? 'prompt' : 'confirm',
+      inputPlaceholder: "Total HP...",
+      onConfirm: async (val) => {
+        const healAmount = isDice ? parseInt(val, 10) : parseInt(item.hpRecovery, 10) || 0;
+        if (isNaN(healAmount) || healAmount <= 0) {
+          showDialog({ isOpen: false }); 
+          return; 
+        }
+
+        // 1. Consume the item safely
+        await runInventoryTransaction((inv) => {
+          if (!inv[index]) return inv;
+          inv[index].quantity -= 1;
+          if (inv[index].quantity <= 0) {
+             inv.splice(index, 1);
+          }
+          return inv;
+        });
+
+        // 2. Update HP safely
+        await runTransaction(db, async (t) => {
+          const charRef = doc(db, 'characters', charId);
+          const snap = await t.get(charRef);
+          if (!snap.exists()) return;
+          const currentHp = snap.data().hp || 0;
+          const maxHp = snap.data().maxHp || 10;
+          t.update(charRef, { hp: Math.min(maxHp, currentHp + healAmount) });
+        });
+        showDialog({ isOpen: false });
+      },
+      onCancel: () => showDialog({ isOpen: false })
     });
   };
 
@@ -298,8 +323,9 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                   <option value="Wondrous Item">Wondrous Item</option>
                   <option value="Weapon">Weapon</option>
                   <option value="Armor">Armor</option>
-                  <option value="Adventuring Gear">Adventuring Gear</option>
+                  <option value="Consumable">Consumable</option>
                   <option value="Potion">Potion</option>
+                  <option value="Adventuring Gear">Adventuring Gear</option>
                 </select>
               </div>
 
@@ -318,6 +344,13 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                     <input type="text" value={customItem.properties} onChange={e => setCustomItem({...customItem, properties: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. Finesse, Light" />
                   </div>
                 </>
+              )}
+
+              {(customItem.category === 'Consumable' || customItem.category === 'Potion') && (
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">HP Recovery (Dice or Flat Value)</label>
+                  <input type="text" value={customItem.hpRecovery} onChange={e => setCustomItem({...customItem, hpRecovery: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 2d4+2 or 10" />
+                </div>
               )}
 
               {customItem.category === 'Armor' && (
@@ -394,22 +427,34 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                       <div className="flex-1">
                         {item.category === 'Weapon' && (
                           <div className="flex flex-wrap gap-2 mb-3">
-                            <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Damage: <span className="text-white">{item.damageDice} {item.damageType}</span></span>
-                            {item.properties && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties}</span></span>}
+                            <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Damage: <span className="text-white">{item.damageDice || (item.damage?.damage_dice)} {item.damageType || (item.damage?.damage_type?.name)}</span></span>
+                            {/* Properties safely handled if array or string */}
+                            {(item.properties && Array.isArray(item.properties) && item.properties.length > 0) && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties.map(p => p.name).join(', ')}</span></span>}
+                            {(item.properties && typeof item.properties === 'string') && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties}</span></span>}
                           </div>
                         )}
                         {item.category === 'Armor' && (
                           <div className="flex flex-wrap gap-2 mb-3">
-                            <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">AC: <span className="text-white">{item.ac}</span></span>
+                            <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">AC: <span className="text-white">{item.ac || item.armor_class?.base}</span></span>
                           </div>
                         )}
-                        <p className="whitespace-pre-wrap leading-relaxed">{item.desc}</p>
+                        <p className="whitespace-pre-wrap leading-relaxed">{typeof item.desc === 'string' ? item.desc : (item.desc || []).join('\n')}</p>
                         
-                        {!isDM && item.category === 'Weapon' && (
-                          <button onClick={() => equipWeapon(item)} className="mt-4 bg-indigo-900/40 border border-indigo-500/50 hover:bg-indigo-600 text-indigo-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm">
-                            <Sword className="w-3 h-3" /> Equip to Combat Tab
+                        {/* THE NEW CONSUME BUTTON */}
+                        {!isDM && (item.hpRecovery || item.category === 'Consumable' || item.category === 'Potion') && (
+                          <button onClick={() => handleConsume(item, i)} className="mt-4 bg-emerald-900/40 border border-emerald-500/50 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm">
+                            <Utensils className="w-3 h-3" /> Consume
                           </button>
                         )}
+                        
+                        {/* WEAPON AUTO-EQUIP INDICATOR */}
+                        {item.category === 'Weapon' && (
+                          <div className="flex items-center gap-1.5 mt-4">
+                             <Sword className="w-3 h-3 text-slate-500" />
+                             <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Automatically available in Combat Tab</span>
+                          </div>
+                        )}
+
                       </div>
                     </div>
                   </div>

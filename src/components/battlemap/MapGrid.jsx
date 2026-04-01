@@ -282,7 +282,18 @@ export default function MapGrid({
             <div className="absolute inset-0 pointer-events-none z-0 transition-all duration-500" style={{ backgroundImage: `linear-gradient(to right, ${gridColor} 1px, transparent 1px), linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)`, backgroundSize: `${currentCellSize}px ${currentCellSize}px` }}></div>
           )}
 
-          <MapDrawings drawings={mapData?.drawings || []} isDrawingMode={isDrawingMode && !isDisplayMode} drawingShape={drawingShape} onDrawEnd={onDrawEnd} currentCellSize={currentCellSize} cols={cols} rows={rows} drawingColor={drawingColor} />
+          <MapDrawings 
+            drawings={mapData?.drawings || []} 
+            fogOfWar={mapData?.fogOfWar}
+            isDM={isDM}
+            isDrawingMode={isDrawingMode && !isDisplayMode} 
+            drawingShape={drawingShape} 
+            onDrawEnd={onDrawEnd} 
+            currentCellSize={currentCellSize} 
+            cols={cols} 
+            rows={rows} 
+            drawingColor={drawingColor} 
+          />
 
           <div className={`absolute inset-0 grid z-20 ${isDrawingMode ? 'pointer-events-none' : ''}`} style={{ gridTemplateColumns: `repeat(${cols}, ${currentCellSize}px)`, gridTemplateRows: `repeat(${rows}, ${currentCellSize}px)` }}>
             {Array.from({ length: cols * rows }).map((_, i) => {
