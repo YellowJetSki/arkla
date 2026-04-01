@@ -1,4 +1,7 @@
-import { Shield, Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, Info, X, Droplets, Droplet, Backpack } from 'lucide-react';
+import { useState } from 'react';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { Shield, Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, Info, X, Droplets, Droplet, Backpack, Sparkles } from 'lucide-react';
 import { getModifier, parseAndScaleAttack, getConditionMechanics } from '../../services/arklaEngine';
 import VitalStats from '../shared/VitalStats';
 import { CONDITIONS_LIST, CONDITION_EFFECTS } from '../../data/campaignData';
@@ -15,6 +18,24 @@ export default function CombatTab({
   handleResourceToggle,
   showDialog
 }) {
+  const [newBuff, setNewBuff] = useState({ name: '', target: 'AC', value: 1 });
+
+  const tempBuffs = char.tempBuffs || [];
+  
+  const handleAddBuff = async (e) => {
+    e.preventDefault();
+    if (!newBuff.name || isDM) return;
+    const buffData = { id: `buff_${Date.now()}`, name: newBuff.name, target: newBuff.target, value: Number(newBuff.value) };
+    await updateDoc(doc(db, 'characters', charId), { tempBuffs: arrayUnion(buffData) });
+    setNewBuff({ name: '', target: 'AC', value: 1 });
+  };
+
+  const handleRemoveBuff = async (buffToRemove) => {
+    if (isDM) return;
+    // Safely filter and replace the array instead of relying on Firestore's strict arrayRemove
+    const updatedBuffs = tempBuffs.filter(b => b.id !== buffToRemove.id);
+    await updateDoc(doc(db, 'characters', charId), { tempBuffs: updatedBuffs });
+  };
 
   const mechanics = getConditionMechanics(activeConditions);
 
@@ -22,9 +43,12 @@ export default function CombatTab({
   const isEncumbered = (char.inventory || '').length > 500 && char.stats?.STR < 15;
   if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
 
+  // Compute Temp Buff Overrides
+  const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
+  const displayAc = (char.ac || 10) + acBuffTotal;
+
   // Dynamic Attack Sourcing: Merging char.attacks (Custom Actions) + inventory (Weapons)
   const inventoryWeapons = (char.inventory || []).filter(item => item.category === 'Weapon').map(w => {
-    // Safely extract properties if they are a string or an array from DMForge
     let propsStr = '';
     if (Array.isArray(w.properties)) {
       propsStr = w.properties.map(p => p.name).join(', ');
@@ -81,6 +105,7 @@ export default function CombatTab({
         </div>
       )}
 
+      {/* CORE STAT BLOCKS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl p-4 flex flex-col items-center justify-center relative overflow-hidden transition-colors ${mechanics.attackDisadvantage ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : mechanics.attackAdvantage ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'border-slate-700/80'}`}>
           <div className={`absolute top-0 w-full h-1 ${mechanics.attackDisadvantage ? 'bg-red-500' : mechanics.attackAdvantage ? 'bg-emerald-500' : 'bg-slate-700'}`}></div>
@@ -101,19 +126,78 @@ export default function CombatTab({
           </div>
         </div>
         
-        <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 flex flex-col items-center justify-center relative">
-          <div className="absolute top-0 w-full h-1 bg-amber-500"></div>
-          <Shield className="w-5 h-5 text-amber-400 mb-2" />
+        <div className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl p-4 flex flex-col items-center justify-center relative ${acBuffTotal > 0 ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : acBuffTotal < 0 ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border-slate-700/80'}`}>
+          <div className={`absolute top-0 w-full h-1 ${acBuffTotal > 0 ? 'bg-emerald-500' : acBuffTotal < 0 ? 'bg-red-500' : 'bg-amber-500'}`}></div>
+          <Shield className={`w-5 h-5 mb-2 ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-amber-400'}`} />
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Armor Class</span>
-          <span className="text-2xl font-black text-white mt-1">{char.ac}</span>
+          <div className="flex items-baseline gap-1 mt-1">
+             <span className={`text-2xl font-black ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-white'}`}>{displayAc}</span>
+          </div>
         </div>
         
         <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 flex flex-col items-center justify-center relative">
-          <div className="absolute top-0 w-full h-1 bg-emerald-500"></div>
-          <Activity className="w-5 h-5 text-emerald-400 mb-2" />
+          <div className="absolute top-0 w-full h-1 bg-fuchsia-500"></div>
+          <Activity className="w-5 h-5 text-fuchsia-400 mb-2" />
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Initiative</span>
           <span className="text-2xl font-black text-white mt-1">{char.initiative !== '--' ? char.initiative : (getModifier(char.stats?.DEX || 10) >= 0 ? `+${getModifier(char.stats?.DEX || 10)}` : getModifier(char.stats?.DEX || 10))}</span>
         </div>
+      </div>
+
+      {/* TEMPORARY BUFFS ENGINE */}
+      <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 md:p-5 shadow-inner">
+        <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 mb-4 border-b border-slate-700/50 pb-2">
+          <Sparkles className={`w-4 h-4 ${activeTheme.text}`} /> Temporary Buffs
+        </h3>
+        
+        {!isDM && (
+          <form onSubmit={handleAddBuff} className="flex gap-2 mb-4">
+            <input 
+              type="text" 
+              required
+              value={newBuff.name}
+              onChange={(e) => setNewBuff({...newBuff, name: e.target.value})}
+              placeholder="e.g. Shield of Faith" 
+              className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner"
+            />
+            <select 
+              value={newBuff.target}
+              onChange={(e) => setNewBuff({...newBuff, target: e.target.value})}
+              className="w-24 bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none"
+            >
+              <option value="AC">AC</option>
+            </select>
+            <input 
+              type="number" 
+              required
+              value={newBuff.value}
+              onChange={(e) => setNewBuff({...newBuff, value: e.target.value})}
+              className="w-16 bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm text-center focus:outline-none shadow-inner"
+            />
+            <button type="submit" className={`px-4 py-2 rounded-lg font-bold text-white text-xs uppercase tracking-wider ${activeTheme.bg} ${activeTheme.hoverBg} transition-colors shadow-md`}>Add</button>
+          </form>
+        )}
+
+        {tempBuffs.length === 0 ? (
+          <p className="text-xs text-slate-500 italic">No temporary buffs or debuffs active.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {tempBuffs.map((buff, idx) => (
+              <div key={idx} className="bg-slate-900 border border-slate-700 rounded-lg p-2.5 flex items-center justify-between group shadow-sm">
+                <div>
+                  <span className="text-xs font-bold text-white block">{buff.name}</span>
+                  <span className={`text-[10px] uppercase font-black tracking-widest ${buff.value > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {buff.value > 0 ? '+' : ''}{buff.value} {buff.target}
+                  </span>
+                </div>
+                {!isDM && (
+                  <button onClick={() => handleRemoveBuff(buff)} className="text-slate-500 hover:text-red-400 bg-slate-950 p-1.5 rounded transition-colors shadow-inner">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {resources.length > 0 && (

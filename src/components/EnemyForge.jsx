@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, addDoc, setDoc, doc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, X, Save, Shield, Heart, Wind, Swords, Search, Loader2, Plus, Target, Brain, Eye } from 'lucide-react';
+import { Skull, X, Save, Shield, Heart, Wind, Swords, Search, Loader2, Plus, Target, Brain, Eye, Wand2 } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import ImageSelector from './shared/ImageSelector';
 import { applySanctuaryFilter } from '../services/arklaEngine';
+import { fetchAllSpells, fetchSpellDetails } from '../services/srdApi';
 
 export default function EnemyForge({ onClose }) {
   const [activeTab, setActiveTab] = useState('custom'); 
@@ -25,6 +26,40 @@ export default function EnemyForge({ onClose }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [srdEnemies, setSrdEnemies] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Spell Injector State
+  const [srdSpells, setSrdSpells] = useState([]);
+  const [spellSearch, setSpellSearch] = useState('');
+  const [filteredSpells, setFilteredSpells] = useState([]);
+  const [showSpellDropdown, setShowSpellDropdown] = useState(false);
+
+  useEffect(() => {
+    fetchAllSpells().then(setSrdSpells);
+  }, []);
+
+  const handleSpellSearchChange = (e) => {
+    const val = e.target.value;
+    setSpellSearch(val);
+    if (val.length > 1) {
+      setFilteredSpells(srdSpells.filter(s => s.name.toLowerCase().includes(val.toLowerCase())));
+      setShowSpellDropdown(true);
+    } else {
+      setShowSpellDropdown(false);
+    }
+  };
+
+  const handleInjectSpell = async (indexStr, targetField) => {
+    setShowSpellDropdown(false);
+    setSpellSearch('');
+    const details = await fetchSpellDetails(indexStr);
+    if (details) {
+      const spellText = `***${details.name}.*** *Level ${details.level} ${details.school}*.\n**Casting Time:** ${details.castingTime}\n**Range:** ${details.range}\n**Components:** ${details.components}\n**Duration:** ${details.duration}\n\n${details.desc}`;
+      setEnemy(prev => ({
+        ...prev,
+        [targetField]: prev[targetField] ? `${prev[targetField]}\n\n${spellText}` : spellText
+      }));
+    }
+  };
 
   const handleStatChange = (stat, val) => {
     setEnemy(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(val) } }));
@@ -83,7 +118,6 @@ export default function EnemyForge({ onClose }) {
     setIsSearching(false);
   };
 
-  // NEW: Load the API data directly into the Custom Board for editing
   const loadApiEnemyIntoForge = async (url) => {
     setIsSaving(true);
     try {
@@ -130,7 +164,7 @@ export default function EnemyForge({ onClose }) {
         tokenUrl: data.image ? `https://www.dnd5eapi.co${data.image}` : ''
       });
 
-      setActiveTab('custom'); // Kick them over to the Custom tab to review/edit
+      setActiveTab('custom');
     } catch (err) {
       console.error(err);
       setDialog({ isOpen: true, title: 'Import Error', message: 'Failed to load monster data into the forge.', type: 'alert' });
@@ -143,7 +177,7 @@ export default function EnemyForge({ onClose }) {
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onCancel={closeDialog} />
 
       <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
-        <div className="bg-slate-900 border border-red-500/50 rounded-2xl w-full max-w-4xl shadow-[0_0_40px_rgba(220,38,38,0.2)] flex flex-col max-h-[90dvh] relative overflow-hidden">
+        <div className="bg-slate-900 border border-red-500/50 rounded-2xl w-full max-w-5xl shadow-[0_0_40px_rgba(220,38,38,0.2)] flex flex-col max-h-[90dvh] relative overflow-hidden">
           
           <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/90 rounded-t-2xl shrink-0">
             <div className="flex items-center gap-4">
@@ -228,14 +262,49 @@ export default function EnemyForge({ onClose }) {
                   <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Languages</label><input type="text" value={enemy.languages} onChange={e => setEnemy({...enemy, languages: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-red-500" placeholder="e.g. Common, Goblin" /></div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Swords className="w-3 h-3 text-red-400" /> Actions & Attacks</label>
-                    <textarea value={enemy.actions} onChange={e => setEnemy({...enemy, actions: e.target.value})} className="w-full h-32 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-red-500 shadow-inner resize-y custom-scrollbar" placeholder="Multiattack. The Brevar makes two attacks..." />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Left Column: Actions & Traits */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Swords className="w-3 h-3 text-red-400" /> Actions & Attacks</label>
+                      <textarea value={enemy.actions} onChange={e => setEnemy({...enemy, actions: e.target.value})} className="w-full h-40 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-red-500 shadow-inner resize-y custom-scrollbar leading-relaxed" placeholder="Multiattack. The Brevar makes two attacks..." />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Traits & Passive Abilities</label>
+                      <textarea value={enemy.traits} onChange={e => setEnemy({...enemy, traits: e.target.value})} className="w-full h-40 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-red-500 shadow-inner resize-y custom-scrollbar leading-relaxed" placeholder="Pack Tactics. The creature has advantage..." />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Traits & Passive Abilities</label>
-                    <textarea value={enemy.traits} onChange={e => setEnemy({...enemy, traits: e.target.value})} className="w-full h-32 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-red-500 shadow-inner resize-y custom-scrollbar" placeholder="Pack Tactics. The creature has advantage..." />
+
+                  {/* Right Column: Spell Injector */}
+                  <div className="bg-slate-800/50 p-4 rounded-xl border border-fuchsia-900/30 shadow-inner">
+                    <label className="block text-[10px] font-black text-fuchsia-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                      <Wand2 className="w-3 h-3" /> Spell Injector
+                    </label>
+                    <p className="text-[10px] text-slate-400 mb-3 leading-relaxed">Search the SRD to instantly append full spell descriptions into the monster's block.</p>
+                    
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input 
+                        type="text" 
+                        value={spellSearch} 
+                        onChange={handleSpellSearchChange} 
+                        placeholder="Search Spells..." 
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-white text-sm focus:outline-none focus:border-fuchsia-500" 
+                      />
+                      {showSpellDropdown && filteredSpells.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-600 rounded-lg shadow-2xl z-50">
+                          {filteredSpells.map(s => (
+                            <div key={s.index} className="px-3 py-2 text-sm text-slate-300 hover:bg-fuchsia-600 hover:text-white border-b border-slate-800 last:border-0 flex items-center justify-between group">
+                              <span>{s.name}</span>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => handleInjectSpell(s.index, 'actions')} className="bg-slate-950 hover:bg-white hover:text-fuchsia-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">To Actions</button>
+                                <button onClick={() => handleInjectSpell(s.index, 'traits')} className="bg-slate-950 hover:bg-white hover:text-fuchsia-600 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">To Traits</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

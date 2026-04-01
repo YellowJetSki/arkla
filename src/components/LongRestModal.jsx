@@ -37,24 +37,30 @@ export default function LongRestModal({ char, charId, onClose }) {
       }
 
       if (char.resources && char.resources.length > 0) {
-        const resetResources = char.resources.map(res => ({
-          ...res,
-          current: res.max
-        }));
+        const resetResources = char.resources.map(res => {
+          if (res.recharge === 'long' || res.recharge === 'short' || !res.recharge) {
+            return { ...res, current: res.max };
+          }
+          return res;
+        });
         updates.resources = resetResources;
       }
 
       if (char.conditions && char.conditions.length > 0) {
-        const clearedConditions = ['Unconscious', 'Prone'];
+        // Clear all standard combat conditions. 
+        // Exhaustion, Petrified, and custom curses are preserved.
+        const clearedConditions = [
+          'Blinded', 'Charmed', 'Deafened', 'Frightened', 
+          'Incapacitated', 'Invisible', 'Paralyzed', 'Poisoned', 
+          'Prone', 'Restrained', 'Stunned', 'Unconscious'
+        ];
         updates.conditions = char.conditions.filter(c => !clearedConditions.includes(c));
       } else {
         updates.conditions = [];
       }
 
-      // Update Character Document Optimistically
       batch.update(charRef, updates);
 
-      // Safely sync to map token via dot notation
       const mapDoc = await getDoc(mapRef);
       if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
         let mapUpdates = {
@@ -81,7 +87,6 @@ export default function LongRestModal({ char, charId, onClose }) {
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl h-[100dvh] overflow-hidden animate-in fade-in duration-700">
       
-      {/* Immersive Moonlight Background */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950 pointer-events-none"></div>
       <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] rounded-full pointer-events-none animate-pulse"></div>
 
@@ -108,7 +113,7 @@ export default function LongRestModal({ char, charId, onClose }) {
                 <div className="flex items-center gap-3 text-emerald-400 text-sm font-bold"><ShieldPlus className="w-5 h-5"/> Full HP Recovered</div>
                 <div className="flex items-center gap-3 text-indigo-400 text-sm font-bold"><Activity className="w-5 h-5"/> {recoverAmount} Hit Dice Recovered</div>
                 <div className="flex items-center gap-3 text-fuchsia-400 text-sm font-bold"><Flame className="w-5 h-5"/> Spell Slots Replenished</div>
-                {(char.resources || []).length > 0 && <div className="flex items-center gap-3 text-amber-400 text-sm font-bold"><CheckCircle2 className="w-5 h-5"/> Custom Resources Reset</div>}
+                {(char.resources || []).length > 0 && <div className="flex items-center gap-3 text-amber-400 text-sm font-bold"><CheckCircle2 className="w-5 h-5"/> Cooldown Resources Reset</div>}
               </div>
             </div>
           ) : (

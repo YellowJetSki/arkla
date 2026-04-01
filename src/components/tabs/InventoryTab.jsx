@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon } from 'lucide-react';
+import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon, Filter } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
+
+const INVENTORY_FILTERS = ['All', 'Weapon', 'Armor', 'Consumable', 'Potion', 'Adventuring Gear', 'Wondrous Item'];
 
 export default function InventoryTab({ char, charId, isDM, updateField, activeTheme, showDialog }) {
   const [isForgingItem, setIsForgingItem] = useState(false);
   const [openItems, setOpenItems] = useState({}); 
+  const [activeFilter, setActiveFilter] = useState('All');
   
   const [customItem, setCustomItem] = useState({ 
     name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' 
@@ -31,6 +34,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   }, []);
 
   const inventoryArray = Array.isArray(char.inventory) ? char.inventory : [];
+  const filteredInventoryArray = inventoryArray.filter(item => activeFilter === 'All' || item.category === activeFilter);
 
   const runInventoryTransaction = async (mutationFn) => {
     try {
@@ -110,25 +114,42 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   };
 
   const updateQuantity = async (idx, delta) => {
+    const item = filteredInventoryArray[idx];
+    const realIndex = inventoryArray.findIndex(i => 
+      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
+    );
+    if (realIndex === -1) return;
+
     await runInventoryTransaction((inv) => {
-      if (!inv[idx]) return inv;
-      inv[idx].quantity += delta;
-      if (inv[idx].quantity <= 0) {
-        inv.splice(idx, 1);
+      if (!inv[realIndex]) return inv;
+      inv[realIndex].quantity += delta;
+      if (inv[realIndex].quantity <= 0) {
+        inv.splice(realIndex, 1);
       }
       return inv;
     });
   };
 
   const deleteItem = async (idx) => {
+    const item = filteredInventoryArray[idx];
+    const realIndex = inventoryArray.findIndex(i => 
+      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
+    );
+    if (realIndex === -1) return;
+
     await runInventoryTransaction((inv) => {
-      if (!inv[idx]) return inv;
-      inv.splice(idx, 1);
+      if (!inv[realIndex]) return inv;
+      inv.splice(realIndex, 1);
       return inv;
     });
   };
 
-  const handleConsume = (item, index) => {
+  const handleConsume = (item, idx) => {
+    const realIndex = inventoryArray.findIndex(i => 
+      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
+    );
+    if (realIndex === -1) return;
+
     const isDice = (item.hpRecovery || '').includes('d');
     const promptMsg = isDice 
       ? `Roll your ${item.hpRecovery} and enter the total HP regained below. This will consume 1x ${item.name}.`
@@ -147,10 +168,10 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         }
 
         await runInventoryTransaction((inv) => {
-          if (!inv[index]) return inv;
-          inv[index].quantity -= 1;
-          if (inv[index].quantity <= 0) {
-             inv.splice(index, 1);
+          if (!inv[realIndex]) return inv;
+          inv[realIndex].quantity -= 1;
+          if (inv[realIndex].quantity <= 0) {
+             inv.splice(realIndex, 1);
           }
           return inv;
         });
@@ -169,15 +190,20 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
     });
   };
 
-  const handleShareToParty = async (item, index) => {
+  const handleShareToParty = async (item, idx) => {
+    const realIndex = inventoryArray.findIndex(i => 
+      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
+    );
+    if (realIndex === -1) return;
+
     showDialog({
       title: 'Share with Party?',
       message: `Send ${item.name} to the Shared Party Loot? It will be removed from your personal inventory.`,
       type: 'confirm',
       onConfirm: async () => {
         await runInventoryTransaction((inv) => {
-          if (!inv[index]) return inv;
-          inv.splice(index, 1);
+          if (!inv[realIndex]) return inv;
+          inv.splice(realIndex, 1);
           return inv;
         });
 
@@ -237,26 +263,47 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           const current = currency[transactionType] || 0;
           transaction.update(charRef, { [`currency.${transactionType}`]: current + amount });
         } else {
-          const currentGold = currency.assarions || 0;
-          const currentSilver = currency.quadrans || 0;
-          const currentCopper = currency.leptons || 0;
+          let currentGold = currency.assarions || 0;
+          let currentSilver = currency.quadrans || 0;
+          let currentCopper = currency.leptons || 0;
 
-          let costInCopper = 0;
-          if (transactionType === 'assarions') costInCopper = amount * 100;
-          if (transactionType === 'quadrans') costInCopper = amount * 10;
-          if (transactionType === 'leptons') costInCopper = amount;
+          // COIN DEVOURER FIX: Try to subtract directly from the selected pool first
+          let handledDirectly = false;
 
-          const totalCopper = (currentGold * 100) + (currentSilver * 10) + currentCopper;
-
-          if (totalCopper < costInCopper) {
-            return Promise.reject("Not enough funds");
+          if (transactionType === 'assarions' && currentGold >= amount) {
+            currentGold -= amount;
+            handledDirectly = true;
+          } else if (transactionType === 'quadrans' && currentSilver >= amount) {
+            currentSilver -= amount;
+            handledDirectly = true;
+          } else if (transactionType === 'leptons' && currentCopper >= amount) {
+            currentCopper -= amount;
+            handledDirectly = true;
           }
 
-          const remainingCopperTotal = totalCopper - costInCopper;
+          if (!handledDirectly) {
+            // Fallback: Convert everything to copper and make change (The Banker)
+            let costInCopper = 0;
+            if (transactionType === 'assarions') costInCopper = amount * 100;
+            if (transactionType === 'quadrans') costInCopper = amount * 10;
+            if (transactionType === 'leptons') costInCopper = amount;
+
+            const totalCopper = (currentGold * 100) + (currentSilver * 10) + currentCopper;
+
+            if (totalCopper < costInCopper) {
+              return Promise.reject("Not enough funds");
+            }
+
+            const remainingCopperTotal = totalCopper - costInCopper;
+            currentGold = Math.floor(remainingCopperTotal / 100);
+            currentSilver = Math.floor((remainingCopperTotal % 100) / 10);
+            currentCopper = remainingCopperTotal % 10;
+          }
+
           transaction.update(charRef, {
-            'currency.assarions': Math.floor(remainingCopperTotal / 100),
-            'currency.quadrans': Math.floor((remainingCopperTotal % 100) / 10),
-            'currency.leptons': remainingCopperTotal % 10
+            'currency.assarions': currentGold,
+            'currency.quadrans': currentSilver,
+            'currency.leptons': currentCopper
           });
         }
       });
@@ -284,6 +331,21 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
             </button>
           )}
         </div>
+
+        {inventoryArray.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-3 mb-2 relative z-10">
+            <Filter className="w-4 h-4 text-slate-500 shrink-0 my-auto mr-2" />
+            {INVENTORY_FILTERS.map(filter => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border shadow-sm ${activeFilter === filter ? `${activeTheme.bg} text-white ${activeTheme.activeBorder} shadow-[0_0_10px_rgba(255,255,255,0.1)]` : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-white'}`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        )}
         
         {isDM && isForgingItem && (
           <form onSubmit={handleForgeCustomItem} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-indigo-500/30 mb-6 animate-in fade-in slide-in-from-top-2 space-y-4 shadow-inner relative z-10">
@@ -382,10 +444,10 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         )}
 
         <div className="space-y-4 relative z-10">
-          {inventoryArray.length === 0 ? (
-             <p className="text-slate-500 italic p-6 text-center bg-slate-900/50 rounded-xl border border-slate-800 border-dashed">Your bags are empty.</p>
+          {filteredInventoryArray.length === 0 ? (
+             <p className="text-slate-500 italic p-6 text-center bg-slate-900/50 rounded-xl border border-slate-800 border-dashed">No items found.</p>
           ) : (
-            inventoryArray.map((item, i) => (
+            filteredInventoryArray.map((item, i) => (
               <div key={item.id || i} className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl overflow-hidden transition-colors shadow-sm ${openItems[i] ? `${activeTheme.activeBorder} shadow-[0_0_15px_rgba(255,255,255,0.05)]` : 'border-slate-700/80 hover:border-slate-500'}`}>
                 <div className="flex justify-between items-center p-3 sm:p-4 cursor-pointer" onClick={() => toggleItemOpen(i)}>
                   

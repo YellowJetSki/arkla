@@ -58,6 +58,12 @@ export default function DMPlayerCard({ charId }) {
   const wisMod = Math.floor(((char.stats?.WIS || 10) - 10) / 2);
   const passivePerception = 10 + wisMod;
 
+  // Automatically track Temporary Buffs for DM view
+  const acBuffTotal = (char.tempBuffs || [])
+    .filter(b => b.target === 'AC')
+    .reduce((sum, b) => sum + b.value, 0);
+  const displayAc = (char.ac || 10) + acBuffTotal;
+
   return (
     <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700 rounded-xl p-3 shadow-md relative overflow-hidden group">
       {isEditing && <DMEditSheet char={char} charId={charId} onCancel={() => setIsEditing(false)} />}
@@ -96,9 +102,9 @@ export default function DMPlayerCard({ charId }) {
             {char.hp} <span className="text-[10px] text-slate-500">/ {char.maxHp}</span>
           </span>
         </div>
-        <div className="bg-slate-950 border border-slate-800 rounded-lg p-2 flex flex-col items-center justify-center shadow-inner">
-          <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Shield className="w-2.5 h-2.5"/> AC</span>
-          <span className="text-sm font-black text-white leading-none">{char.ac}</span>
+        <div className={`bg-slate-950 border rounded-lg p-2 flex flex-col items-center justify-center shadow-inner transition-colors ${acBuffTotal > 0 ? 'border-emerald-500/50' : acBuffTotal < 0 ? 'border-red-500/50' : 'border-slate-800'}`}>
+          <span className={`text-[9px] font-black uppercase tracking-widest mb-1 flex items-center gap-1 ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-amber-400'}`}><Shield className="w-2.5 h-2.5"/> AC</span>
+          <span className={`text-sm font-black leading-none ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-white'}`}>{displayAc}</span>
         </div>
         <div className="bg-slate-950 border border-slate-800 rounded-lg p-2 flex flex-col items-center justify-center shadow-inner">
           <span className="text-[9px] font-black text-sky-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Target className="w-2.5 h-2.5"/> PP</span>
@@ -106,7 +112,6 @@ export default function DMPlayerCard({ charId }) {
         </div>
       </div>
 
-      {/* Rest of the component features (Trackers, Spells) remain perfectly functional */}
       <div className="space-y-2 relative z-10">
         {Object.keys(spellSlots).length > 0 && (
           <div className="bg-slate-800/50 p-2.5 rounded-lg border border-fuchsia-900/30 shadow-inner">
