@@ -4,6 +4,7 @@ import { db } from '../services/firebase';
 import { UserPlus, ChevronRight, ChevronLeft, X } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import { fetchAllEquipment, fetchEquipmentDetails, fetchSpeciesData, fetchClassData, fetchClassProgression } from '../services/srdApi';
+import { calculateSpellcastingStats } from '../services/arklaEngine'; // <-- NEW IMPORT
 
 import StepIdentity from './builder-steps/StepIdentity';
 import StepAttributes from './builder-steps/StepAttributes';
@@ -29,11 +30,9 @@ export default function DMCharacterBuilder({ onClose }) {
 
   const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '', savingThrows: '' });
   
-  // Separated Traits (Species) and Features (Class)
   const [speciesTraits, setSpeciesTraits] = useState([]);
   const [classFeatures, setClassFeatures] = useState([]);
   
-  // Spells Data
   const [spellcastingMeta, setSpellcastingMeta] = useState(null);
   const [spells, setSpells] = useState([]);
   const [forceShowSpells, setForceShowSpells] = useState(false);
@@ -75,7 +74,6 @@ export default function DMCharacterBuilder({ onClose }) {
     return () => clearTimeout(timer);
   }, [formData.class]);
 
-  // Dynamic Tabs based on spellcasting ability
   const hasSpells = !!spellcastingMeta || forceShowSpells;
   const steps = ['identity', 'attributes', 'traits', 'features', ...(hasSpells ? ['spells'] : []), 'companion', 'inventory', 'lore'];
   const currentStep = steps[stepIndex];
@@ -110,7 +108,6 @@ export default function DMCharacterBuilder({ onClose }) {
     if (srdClassOffer.skills) updateProf('skills', srdClassOffer.skills);
     if (srdClassOffer.tools) updateProf('tools', customProfs.tools ? `${customProfs.tools}, ${srdClassOffer.tools}` : srdClassOffer.tools);
     
-    // Fetch Level Progression
     const startLevel = Math.max(1, Number(formData.level) || 1);
     const prog = await fetchClassProgression(formData.class, startLevel);
     if (prog) {
@@ -163,7 +160,6 @@ export default function DMCharacterBuilder({ onClose }) {
       const conMod = Math.floor((formData.stats.CON - 10) / 2);
       const dexMod = Math.floor((formData.stats.DEX - 10) / 2);
 
-      // Merge Traits and Features into the singular `features` array for the character sheet
       const combinedFeatures = [
         ...speciesTraits.filter(t => t.name && t.desc).map(t => ({ name: t.name.includes('Trait:') ? t.name : `${formData.species || 'Base'} Trait: ${t.name}`, desc: t.desc })),
         ...classFeatures.filter(f => f.name && f.desc).map(f => ({ name: `Class Feature: ${f.name}`, desc: f.desc }))
@@ -177,7 +173,6 @@ export default function DMCharacterBuilder({ onClose }) {
       const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
       const totalMaxHp = levelOneHp + higherLevelHp;
 
-      // Extract Spell Slots if available
       const slots = {};
       if (spellcastingMeta) {
          Object.keys(spellcastingMeta).forEach(key => {
@@ -188,13 +183,22 @@ export default function DMCharacterBuilder({ onClose }) {
          });
       }
 
+      // NEW: Calculate Spell Save DC and Attack right at creation!
+      const classesToPass = [{ name: formData.class || 'Fighter', level: startLevel }];
+      const spellStats = calculateSpellcastingStats(classesToPass, formData.stats);
+
       const newChar = {
         name: formData.name, species: formData.species || 'Human', class: formData.class || 'Fighter',
-        classes: [{ name: formData.class || 'Fighter', level: startLevel }], level: startLevel, theme: formData.theme,
+        classes: classesToPass, level: startLevel, theme: formData.theme,
         exp: 0, alignment: formData.alignment,
         age: formData.age, height: formData.height, weight: formData.weight, eyes: formData.eyes, skin: formData.skin, hair: formData.hair,
         hp: totalMaxHp, maxHp: totalMaxHp, tempHp: 0, hitDice: { current: startLevel, max: startLevel, type: formData.hitDie },
-        ac: 10 + dexMod, speed: formData.speed, initiative: '--', spellSave: '--', spellAttack: '--',
+        ac: 10 + dexMod, speed: formData.speed, initiative: '--', 
+        
+        // Injects calculated stats instead of '--'
+        spellSave: spellStats.spellSave || '--', 
+        spellAttack: spellStats.spellAttack || '--',
+        
         combatInitiative: null, inspiration: false, isConcentrating: false, conditions: [], hasCompletedTutorial: false, journal: '',
         stats: formData.stats, currency: { assarions: 0, quadrans: 0, leptons: 0 }, imageUrl: formData.imageUrl, img: formData.tokenImg,
         deathSaves: { successes: 0, failures: 0 }, resources: [],
