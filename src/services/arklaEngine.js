@@ -105,15 +105,17 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, className = '') =
   const toHit = pb + useStatMod;
   const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
 
-  // BUG FIX: Safely inject the modifier without erasing secondary damage dice
-  const baseDiceMatch = (attack.damage || '').match(/(\d+d\d+)/);
-  const baseDice = baseDiceMatch ? baseDiceMatch[0] : '';
-  
-  let formattedDamage = attack.damage; 
-  if (baseDice) {
-     const modString = useStatMod === 0 ? '' : useStatMod > 0 ? ` + ${useStatMod}` : ` - ${Math.abs(useStatMod)}`;
-     // Replaces ONLY the first instance of the base dice, appending the modifier directly after it
-     formattedDamage = attack.damage.replace(baseDice, `${baseDice}${modString}`);
+  let formattedDamage = attack.damage || ''; 
+  const modString = useStatMod === 0 ? '' : useStatMod > 0 ? ` + ${useStatMod}` : ` - ${Math.abs(useStatMod)}`;
+
+  if (formattedDamage) {
+     // 1. Safely inject modifier to the first dice (Base Damage)
+     formattedDamage = formattedDamage.replace(/(\d+d\d+)/, `$1${modString}`);
+     
+     // 2. If there are parentheses (Versatile Damage), safely inject the modifier in there too!
+     if (formattedDamage.includes('(')) {
+       formattedDamage = formattedDamage.replace(/\((\d+d\d+)\)/, `($1${modString})`);
+     }
   }
 
   return { ...attack, hit: formattedHit, damage: formattedDamage };

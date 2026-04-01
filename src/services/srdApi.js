@@ -32,10 +32,19 @@ export const fetchEquipmentDetails = async (index) => {
     if (data.equipment_category?.index === 'armor') category = 'Armor';
     if (data.equipment_category?.index === 'potion') category = 'Potion';
 
+    let dDice = data.damage?.damage_dice || '';
+    if (data.two_handed_damage?.damage_dice) {
+       dDice += ` (${data.two_handed_damage.damage_dice})`;
+    }
+
     const result = {
-      name: data.name, category, damageDice: data.damage?.damage_dice || '',
-      damageType: data.damage?.damage_type?.name || '', properties: data.properties?.map(p => p.name).join(', ') || '',
-      ac: data.armor_class?.base || 14, desc: data.desc?.join('\n') || ''
+      name: data.name,
+      category,
+      damageDice: dDice,
+      damageType: data.damage?.damage_type?.name || '',
+      properties: data.properties?.map(p => p.name).join(', ') || '',
+      ac: data.armor_class?.base || 14,
+      desc: data.desc?.join('\n') || ''
     };
     equipmentDetailsCache.set(index, result);
     return result;
@@ -112,7 +121,6 @@ export const fetchClassData = async (classInput) => {
     const data = await res.json();
     let armorProfs = [], weaponProfs = [], savingThrows = [], toolProfs = [], skillChoices = '';
 
-    // FIX: Safely parse Weapons out of Tools by matching all weapon subclasses
     data.proficiencies?.forEach(p => {
       const idx = p.index || '';
       if (idx.includes('armor') || idx.includes('shield')) {
@@ -162,6 +170,7 @@ export const fetchClassProgression = async (classInput, targetLevel) => {
     let featureUrls = new Map();
     let spellcasting = null;
 
+    // Fetch features up to the selected level
     for (let i = 1; i <= targetLevel; i++) {
       const res = await fetch(`${BASE_URL}/classes/${normalized}/levels/${i}`);
       if (res.ok) {
@@ -169,6 +178,7 @@ export const fetchClassProgression = async (classInput, targetLevel) => {
         if (data.features) {
           data.features.forEach(f => featureUrls.set(f.index, { name: f.name, url: f.url }));
         }
+        // Capture spellcasting capability at the target level
         if (i === Number(targetLevel) && data.spellcasting) {
           spellcasting = data.spellcasting; 
         }
@@ -208,6 +218,7 @@ export const fetchTraitOrFeatureDetails = async (url) => {
   } catch (e) { return null; }
 };
 
+// NEW: Spells Fetchers
 export const fetchAllSpells = async () => {
   if (spellListCache) return spellListCache;
   try {
@@ -234,7 +245,6 @@ export const fetchSpellDetails = async (index) => {
   } catch (e) { return null; }
 };
 
-// NEW: Universal Data Fetchers for the Autocomplete engine
 export const fetchAllProficiencies = async () => {
   if (proficienciesListCache) return proficienciesListCache;
   try {
