@@ -4,7 +4,7 @@ import { db } from '../services/firebase';
 import { UserPlus, ChevronRight, ChevronLeft, Dices, X, Wand2, Backpack, BookOpen, Fingerprint, Plus, Trash2, Shield, Sword, PawPrint, Search, Sparkles } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import ImageSelector from './shared/ImageSelector';
-import { fetchAllEquipment, fetchEquipmentDetails, fetchSpeciesData } from '../services/srdApi';
+import { fetchAllEquipment, fetchEquipmentDetails, fetchSpeciesData, fetchClassData } from '../services/srdApi';
 
 export default function DMCharacterBuilder({ onClose }) {
   const [stepIndex, setStepIndex] = useState(0);
@@ -16,35 +16,35 @@ export default function DMCharacterBuilder({ onClose }) {
     name: '',
     species: '',
     class: '',
+    level: 1, // NEW: Starting Level
     theme: 'indigo',
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
     alignment: 'Neutral',
     backstory: '',
     speed: 30,
+    hitDie: 'd10', 
     imageUrl: '',
-    tokenImg: ''
+    tokenImg: '',
+    // NEW: Syncing with your BioTab
+    age: '', height: '', weight: '', eyes: '', skin: '', hair: ''
   });
 
-  // Homebrew Species State
   const [isCustomSpecies, setIsCustomSpecies] = useState(false);
-  const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '' });
+  const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '', savingThrows: '' });
   const [speciesTraits, setSpeciesTraits] = useState([]);
   
-  // SRD Species Oracle State
   const [srdSpeciesOffer, setSrdSpeciesOffer] = useState(null);
+  const [srdClassOffer, setSrdClassOffer] = useState(null); 
 
-  // Companion State
   const [hasCompanion, setHasCompanion] = useState(false);
   const [companionData, setCompanionData] = useState({
     name: '', species: '', isDormant: false, awakeLevel: 1, hp: 10, ac: 10, speed: 30,
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }, attacks: '', desc: ''
   });
 
-  // Structured Inventory State
   const [inventory, setInventory] = useState([]);
   const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '' });
   
-  // SRD Equipment State
   const [srdEquipmentList, setSrdEquipmentList] = useState([]);
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
@@ -55,14 +55,10 @@ export default function DMCharacterBuilder({ onClose }) {
   
   const currentStep = steps[stepIndex];
 
-  // --- SRD EFFECTS ---
-  
-  // Load Equipment List on Mount
   useEffect(() => {
     fetchAllEquipment().then(setSrdEquipmentList);
   }, []);
 
-  // Listen to Species input for SRD Autocomplete
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (formData.species.length > 2) {
@@ -75,7 +71,17 @@ export default function DMCharacterBuilder({ onClose }) {
     return () => clearTimeout(timer);
   }, [formData.species, isCustomSpecies]);
 
-  // --- HANDLERS ---
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (formData.class.length > 2) {
+        const data = await fetchClassData(formData.class);
+        if (data) setSrdClassOffer(data);
+      } else {
+        setSrdClassOffer(null);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [formData.class]);
 
   const updateField = (field, val) => setFormData(prev => ({ ...prev, [field]: val }));
   const updateStat = (stat, val) => setFormData(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(val) } }));
@@ -108,11 +114,21 @@ export default function DMCharacterBuilder({ onClose }) {
 
   const handleApplySrdSpecies = () => {
     if (!srdSpeciesOffer) return;
-    setIsCustomSpecies(true);
     updateField('speed', srdSpeciesOffer.speed);
     updateProf('languages', srdSpeciesOffer.languages);
     setSpeciesTraits(srdSpeciesOffer.traits);
     setSrdSpeciesOffer(null);
+  };
+
+  const handleApplySrdClass = () => {
+    if (!srdClassOffer) return;
+    updateField('hitDie', srdClassOffer.hitDie);
+    updateProf('armor', srdClassOffer.armor);
+    updateProf('weapons', srdClassOffer.weapons);
+    updateProf('savingThrows', srdClassOffer.savingThrows);
+    if (srdClassOffer.skills) updateProf('skills', srdClassOffer.skills);
+    if (srdClassOffer.tools) updateProf('tools', customProfs.tools ? `${customProfs.tools}, ${srdClassOffer.tools}` : srdClassOffer.tools);
+    setSrdClassOffer(null);
   };
 
   const handleItemNameChange = (e) => {
@@ -170,29 +186,40 @@ export default function DMCharacterBuilder({ onClose }) {
       const conMod = Math.floor((formData.stats.CON - 10) / 2);
       const dexMod = Math.floor((formData.stats.DEX - 10) / 2);
 
-      let finalSpeed = formData.speed;
-      let finalProfs = isCustomSpecies ? customProfs : { skills: '', tools: '', weapons: '', armor: '', languages: 'Common' };
-      let finalFeatures = isCustomSpecies 
-        ? speciesTraits.filter(t => t.name && t.desc).map(t => ({ name: `${formData.species || 'Custom'} Trait: ${t.name}`, desc: t.desc }))
-        : [];
+      let finalFeatures = speciesTraits.filter(t => t.name && t.desc).map(t => ({ 
+        name: `${formData.species || 'Base'} Trait: ${t.name}`, 
+        desc: t.desc 
+      }));
       
-      const startingHp = 10 + conMod; 
+      // HP Auto-Scaler Engine
+      const startLevel = Math.max(1, Number(formData.level) || 1);
+      const hitDieValue = parseInt((formData.hitDie || 'd10').replace('d', ''), 10);
+      const hitDieAvg = Math.floor(hitDieValue / 2) + 1; // 5e Average (e.g., d10 = 6)
+      
+      const levelOneHp = hitDieValue + conMod;
+      const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
+      const totalMaxHp = levelOneHp + higherLevelHp;
 
       const newChar = {
         name: formData.name,
         species: formData.species || 'Human',
         class: formData.class || 'Fighter',
-        classes: [{ name: formData.class || 'Fighter', level: 1 }],
-        level: 1,
+        classes: [{ name: formData.class || 'Fighter', level: startLevel }],
+        level: startLevel,
         theme: formData.theme,
         exp: 0,
         alignment: formData.alignment,
-        hp: startingHp,
-        maxHp: startingHp,
+        
+        // Physical Traits synced from BioTab
+        age: formData.age, height: formData.height, weight: formData.weight,
+        eyes: formData.eyes, skin: formData.skin, hair: formData.hair,
+
+        hp: totalMaxHp,
+        maxHp: totalMaxHp,
         tempHp: 0,
-        hitDice: { current: 1, max: 1, type: 'd10' },
+        hitDice: { current: startLevel, max: startLevel, type: formData.hitDie },
         ac: 10 + dexMod,
-        speed: finalSpeed,
+        speed: formData.speed,
         initiative: '--',
         spellSave: '--',
         spellAttack: '--',
@@ -212,7 +239,7 @@ export default function DMCharacterBuilder({ onClose }) {
         spells: [],
         dmNotes: '',
         attacks: [], 
-        proficiencies: finalProfs,
+        proficiencies: customProfs,
         features: finalFeatures,
         inventory: inventory,
         traits: { personality: '', ideal: '', bond: '', flaws: '' },
@@ -279,7 +306,7 @@ export default function DMCharacterBuilder({ onClose }) {
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-slate-950 border border-slate-700 rounded-xl p-3 shadow-inner relative">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Species</label>
                     <input 
@@ -287,8 +314,8 @@ export default function DMCharacterBuilder({ onClose }) {
                       onFocus={(e) => e.target.select()} 
                       value={formData.species} 
                       onChange={e => updateField('species', e.target.value)} 
-                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 mb-3" 
-                      placeholder="e.g. Elf, Tiefling, custom..." 
+                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 mb-3" 
+                      placeholder="e.g. Rock Gnome" 
                     />
                     
                     <label className="flex items-center gap-2 cursor-pointer group">
@@ -296,34 +323,52 @@ export default function DMCharacterBuilder({ onClose }) {
                         type="checkbox" 
                         checked={isCustomSpecies} 
                         onChange={(e) => setIsCustomSpecies(e.target.checked)} 
-                        className="w-4 h-4 rounded border-slate-600 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-slate-900 bg-slate-800" 
+                        className="w-4 h-4 rounded border-slate-600 text-indigo-500 bg-slate-800" 
                       />
-                      <span className="text-xs text-slate-300 group-hover:text-white transition-colors">This is a Custom/Homebrew Species</span>
+                      <span className="text-[10px] text-slate-300 group-hover:text-white transition-colors">Open Forge Details</span>
                     </label>
 
-                    {/* SRD Species Oracle Offer */}
                     {srdSpeciesOffer && !isCustomSpecies && (
                        <div className="absolute top-full left-0 right-0 mt-2 bg-indigo-900/90 backdrop-blur-md border border-indigo-500 rounded-xl p-3 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
                          <p className="text-xs text-indigo-200 font-bold mb-2 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5"/> SRD Data found for {srdSpeciesOffer.name}!</p>
-                         <button 
-                           onClick={handleApplySrdSpecies} 
-                           className="w-full bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-black uppercase tracking-widest py-2 rounded-lg transition-colors shadow-sm"
-                         >
-                           Auto-Fill Base Stats & Traits
+                         <button onClick={handleApplySrdSpecies} className="w-full bg-indigo-500 hover:bg-indigo-400 text-white text-[10px] font-black uppercase tracking-widest py-2 rounded-lg transition-colors">
+                           Auto-Fill Base Stats
                          </button>
                        </div>
                     )}
                   </div>
                   
-                  <div className="bg-slate-950 border border-slate-700 rounded-xl p-3 shadow-inner">
+                  <div className="bg-slate-950 border border-slate-700 rounded-xl p-3 shadow-inner relative">
                     <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Arkla Class</label>
                     <input 
                       type="text" 
                       value={formData.class} 
                       onChange={e => updateField('class', e.target.value)} 
-                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500" 
-                      placeholder="Type or select a class..." 
+                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
+                      placeholder="Class..." 
                     />
+
+                    {srdClassOffer && (
+                       <div className="absolute top-full left-0 right-0 mt-2 bg-indigo-900/90 backdrop-blur-md border border-indigo-500 rounded-xl p-3 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
+                         <p className="text-xs text-indigo-200 font-bold mb-2 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5"/> SRD Data found for {srdClassOffer.name}!</p>
+                         <button onClick={handleApplySrdClass} className="w-full bg-indigo-500 hover:bg-indigo-400 text-white text-[10px] font-black uppercase tracking-widest py-2 rounded-lg transition-colors">
+                           Auto-Fill Hit Die & Profs
+                         </button>
+                       </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-950 border border-slate-700 rounded-xl p-3 shadow-inner">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Start Level</label>
+                    <input 
+                      type="number" 
+                      min="1" max="20"
+                      value={formData.level} 
+                      onFocus={e => e.target.select()}
+                      onChange={e => updateField('level', e.target.value)} 
+                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold text-center focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" 
+                    />
+                    <p className="text-[9px] text-slate-500 mt-2 leading-tight">HP and Hit Dice will automatically scale to this level.</p>
                   </div>
                 </div>
 
@@ -382,7 +427,7 @@ export default function DMCharacterBuilder({ onClose }) {
             {currentStep === 'speciesForge' && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                 <div className="flex items-center gap-3 text-emerald-400 border-b border-emerald-900/50 pb-2 mb-4">
-                  <Fingerprint className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Homebrew Species Forge</h3>
+                  <Fingerprint className="w-5 h-5" /> <h3 className="font-bold uppercase tracking-widest text-sm">Species Forge & Proficiencies</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -407,6 +452,29 @@ export default function DMCharacterBuilder({ onClose }) {
                       className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500" 
                       placeholder="e.g. Common, Elvish" 
                     />
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner space-y-4">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-2">Class & Background Proficiencies</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Skills</label>
+                      <input type="text" value={customProfs.skills} onChange={e => updateProf('skills', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Athletics, Perception" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tools</label>
+                      <input type="text" value={customProfs.tools} onChange={e => updateProf('tools', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Thieves' Tools" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Weapons</label>
+                      <input type="text" value={customProfs.weapons} onChange={e => updateProf('weapons', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Simple Weapons" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Armor</label>
+                      <input type="text" value={customProfs.armor} onChange={e => updateProf('armor', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Light, Medium" />
+                    </div>
                   </div>
                 </div>
 
@@ -595,7 +663,6 @@ export default function DMCharacterBuilder({ onClose }) {
                         placeholder="e.g. Longsword" 
                       />
                       
-                      {/* SRD Autocomplete Dropdown */}
                       {showEquipDropdown && filteredEquip.length > 0 && (
                         <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50">
                           {filteredEquip.map(item => (
@@ -740,6 +807,32 @@ export default function DMCharacterBuilder({ onClose }) {
                     onChange={(val) => updateField('tokenImg', val)}
                     inputClassName="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner"
                   />
+                </div>
+                
+                {/* BIO TAB SYNC: Physical Appearance */}
+                <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 shadow-inner">
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Physical Appearance (Optional)</label>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                    {[
+                      { label: 'Age', field: 'age', placeholder: '24' },
+                      { label: 'Height', field: 'height', placeholder: '5\'10"' },
+                      { label: 'Weight', field: 'weight', placeholder: '160 lbs' },
+                      { label: 'Eyes', field: 'eyes', placeholder: 'Emerald' },
+                      { label: 'Skin', field: 'skin', placeholder: 'Fair' },
+                      { label: 'Hair', field: 'hair', placeholder: 'Black' }
+                    ].map((item) => (
+                      <div key={item.field} className="bg-slate-950 border border-slate-700 rounded-lg p-2 focus-within:border-indigo-500 transition-colors">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">{item.label}</span>
+                        <input 
+                          type="text" 
+                          value={formData[item.field]} 
+                          onChange={(e) => updateField(item.field, e.target.value)} 
+                          placeholder={item.placeholder}
+                          className="w-full bg-transparent text-white text-xs font-bold focus:outline-none placeholder-slate-700" 
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div>

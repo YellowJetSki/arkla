@@ -167,7 +167,7 @@ export default function CombatTab({
         <div className="space-y-3 relative z-10">
           {allAttacks.length === 0 ? (
             <div className="text-center p-6 bg-slate-900/50 rounded-xl border border-slate-700/50 border-dashed">
-              <p className="text-sm text-slate-400 italic">No weapons equipped or assigned.</p>
+              <p className="text-sm text-slate-400 italic">No weapons in bags or actions assigned.</p>
             </div>
           ) : (
             allAttacks.map((atk, idx) => {
