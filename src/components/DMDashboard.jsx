@@ -27,7 +27,6 @@ export default function DMDashboard({ onLogout }) {
   const [activeManager, setActiveManager] = useState(null); 
   const [isBattleMode, setIsBattleMode] = useState(false); 
   
-  // NEW: State to manage the floating sidebars
   const [showPartyPanel, setShowPartyPanel] = useState(true);
   const [showThreatsPanel, setShowThreatsPanel] = useState(true);
 
@@ -57,7 +56,6 @@ export default function DMDashboard({ onLogout }) {
   };
 
   useEffect(() => {
-    // Automatically close panels on smaller screens to prioritize battlemap space
     if (window.innerWidth < 1024) {
       setShowPartyPanel(false);
       setShowThreatsPanel(false);
@@ -256,7 +254,6 @@ export default function DMDashboard({ onLogout }) {
         </div>
       )}
 
-      {/* HEADER COMMAND NAV */}
       <header className="h-14 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-sm">
         <div className="flex items-center gap-4">
           <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2">
@@ -282,7 +279,6 @@ export default function DMDashboard({ onLogout }) {
         </div>
       </header>
 
-      {/* THREE-PANE VTT LAYOUT */}
       <main className="flex-1 flex overflow-hidden relative z-10 bg-slate-950">
         
         {/* LEFT FLOATING PANEL: THE PARTY */}
@@ -301,9 +297,15 @@ export default function DMDashboard({ onLogout }) {
           </button>
         </div>
 
-        {/* CENTER PANEL: THE BOARD */}
-        <section className="flex-1 flex flex-col min-w-0 h-full relative z-10">
-          <div className="shrink-0 bg-slate-900/80 border-b border-slate-800 max-h-[35vh] overflow-y-auto custom-scrollbar relative z-10">
+        {/* CENTER PANEL: THE BOARD & COLLAPSIBLE INITIATIVE */}
+        <section className="flex-1 flex flex-col min-w-0 h-full relative z-10 bg-slate-950 overflow-hidden">
+          
+          <div className="flex-1 relative overflow-hidden flex flex-col z-0">
+            {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>}
+            <DMBattleMap />
+          </div>
+
+          <div className="shrink-0 relative z-20 w-full">
             <InitiativeTracker 
               unlockedCharacters={unlockedCharacters} 
               activeEnemies={activeEnemies} 
@@ -312,10 +314,7 @@ export default function DMDashboard({ onLogout }) {
               onExitBattle={() => setIsBattleMode(false)}
             />
           </div>
-          <div className="flex-1 relative overflow-hidden flex flex-col">
-            {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>}
-            <DMBattleMap />
-          </div>
+
         </section>
 
         {/* RIGHT FLOATING PANEL: THREATS */}

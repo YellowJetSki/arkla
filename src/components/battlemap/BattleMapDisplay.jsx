@@ -103,16 +103,27 @@ export default function BattleMapDisplay({ onLogout }) {
         </div>
       )}
 
-      {/* Battlemap Container - Let MapGrid handle the background and drawing layers entirely */}
-      <MapGrid 
-        mapData={mapData} 
-        tokens={tokens} 
-        onTileClick={() => {}} 
-        onTokenClick={() => {}}
-        selectedTokenId={null}
-        isDM={false} 
-        isDisplayMode={true}
-      />
+      {/* Battlemap Container - Centered with Soft Vignette Fade */}
+      <div className="relative w-full h-full flex items-center justify-center">
+        <MapGrid 
+          mapData={mapData} 
+          tokens={tokens} 
+          onTileClick={() => {}} 
+          onTokenClick={() => {}}
+          selectedTokenId={null}
+          isDM={false} 
+          isDisplayMode={true}
+        />
+        
+        {/* Cinematic Edge Fade (Vignette) */}
+        <div 
+          className="absolute inset-0 pointer-events-none z-[10000]"
+          style={{
+            boxShadow: 'inset 0 0 250px 100px rgba(0,0,0,1)',
+            background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,1) 100%)'
+          }}
+        />
+      </div>
       
       <button 
         onClick={onLogout}
