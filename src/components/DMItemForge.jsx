@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Hammer, X, Save, Sword, Shield, Search } from 'lucide-react';
+import { Hammer, X, Save, Sword, Shield, Search, Utensils } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import ImageSelector from './shared/ImageSelector';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../services/srdApi';
@@ -26,6 +26,7 @@ export default function DMItemForge({ onClose }) {
     armor_class: { base: 11, dex_bonus: true, max_bonus: null },
     str_minimum: 0,
     stealth_disadvantage: false,
+    hpRecovery: '', // Added HP Recovery field
     isHomebrew: true
   });
 
@@ -116,6 +117,7 @@ export default function DMItemForge({ onClose }) {
 
   const isWeapon = item.equipment_category.name === 'Weapon';
   const isArmor = item.equipment_category.name === 'Armor';
+  const isConsumable = item.equipment_category.name === 'Consumable' || item.equipment_category.name === 'Potion';
 
   return (
     <>
@@ -169,7 +171,7 @@ export default function DMItemForge({ onClose }) {
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Category</label>
                 <select value={item.equipment_category.name} onChange={e => setItem({...item, equipment_category: { name: e.target.value }})} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-emerald-500 shadow-inner">
-                  {['Weapon', 'Armor', 'Adventuring Gear', 'Wondrous Item', 'Potion', 'Ring', 'Scroll'].map(c => <option key={c} value={c}>{c}</option>)}
+                  {['Weapon', 'Armor', 'Consumable', 'Adventuring Gear', 'Wondrous Item', 'Potion', 'Ring', 'Scroll'].map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
 
@@ -190,6 +192,17 @@ export default function DMItemForge({ onClose }) {
                 />
               </div>
             </div>
+
+            {isConsumable && (
+              <div className="bg-slate-800/50 p-5 rounded-2xl border border-emerald-500/30 shadow-inner animate-in fade-in slide-in-from-bottom-2">
+                <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-slate-700/50 pb-2 mb-4"><Utensils className="w-4 h-4 text-emerald-400" /> Recovery Mechanics</h3>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">HP Recovery (Dice or Flat Value)</label>
+                  <input type="text" value={item.hpRecovery} onChange={e => setItem({...item, hpRecovery: e.target.value})} placeholder="e.g. 2d4 + 2 or 10" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500" />
+                  <p className="text-[10px] text-slate-500 mt-2 italic">If set, players will see a "Consume" button that adds this amount to their HP.</p>
+                </div>
+              </div>
+            )}
 
             {isWeapon && (
               <div className="bg-slate-800/50 p-5 rounded-2xl border border-slate-700/50 shadow-inner animate-in fade-in slide-in-from-bottom-2">
