@@ -4,6 +4,9 @@ const BASE_URL = 'https://www.dnd5eapi.co/api';
 let equipmentListCache = null;
 let featuresListCache = null;
 let spellListCache = null;
+let proficienciesListCache = null;
+let languagesListCache = null;
+
 const equipmentDetailsCache = new Map();
 const speciesDataCache = new Map();
 const classDataCache = new Map();
@@ -109,11 +112,31 @@ export const fetchClassData = async (classInput) => {
     const data = await res.json();
     let armorProfs = [], weaponProfs = [], savingThrows = [], toolProfs = [], skillChoices = '';
 
+    // FIX: Safely parse Weapons out of Tools by matching all weapon subclasses
     data.proficiencies?.forEach(p => {
-      if (p.name.includes('armor') || p.name.includes('Shields')) armorProfs.push(p.name);
-      else if (p.name.includes('weapons')) weaponProfs.push(p.name);
-      else if (p.name.includes('Saving Throw:')) savingThrows.push(p.name.replace('Saving Throw: ', ''));
-      else toolProfs.push(p.name);
+      const idx = p.index || '';
+      if (idx.includes('armor') || idx.includes('shield')) {
+        armorProfs.push(p.name);
+      }
+      else if (
+        idx.includes('weapon') || idx.includes('sword') || idx.includes('crossbow') || 
+        idx.includes('blowgun') || idx.includes('dart') || idx.includes('sling') || 
+        idx.includes('net') || idx.includes('axe') || idx.includes('club') || 
+        idx.includes('dagger') || idx.includes('javelin') || idx.includes('mace') || 
+        idx.includes('staff') || idx.includes('sickle') || idx.includes('spear') || 
+        idx.includes('hammer') || idx.includes('flail') || idx.includes('glaive') || 
+        idx.includes('halberd') || idx.includes('lance') || idx.includes('morningstar') || 
+        idx.includes('pike') || idx.includes('trident') || idx.includes('whip') || 
+        idx.includes('rapier') || idx.includes('scimitar') || idx.includes('bow')
+      ) {
+        weaponProfs.push(p.name);
+      }
+      else if (idx.includes('saving-throw')) {
+        savingThrows.push(p.name.replace('Saving Throw: ', ''));
+      }
+      else {
+        toolProfs.push(p.name);
+      }
     });
 
     if (data.proficiency_choices && data.proficiency_choices.length > 0) {
@@ -139,7 +162,6 @@ export const fetchClassProgression = async (classInput, targetLevel) => {
     let featureUrls = new Map();
     let spellcasting = null;
 
-    // Fetch features up to the selected level
     for (let i = 1; i <= targetLevel; i++) {
       const res = await fetch(`${BASE_URL}/classes/${normalized}/levels/${i}`);
       if (res.ok) {
@@ -147,7 +169,6 @@ export const fetchClassProgression = async (classInput, targetLevel) => {
         if (data.features) {
           data.features.forEach(f => featureUrls.set(f.index, { name: f.name, url: f.url }));
         }
-        // Capture spellcasting capability at the target level
         if (i === Number(targetLevel) && data.spellcasting) {
           spellcasting = data.spellcasting; 
         }
@@ -187,7 +208,6 @@ export const fetchTraitOrFeatureDetails = async (url) => {
   } catch (e) { return null; }
 };
 
-// NEW: Spells Fetchers
 export const fetchAllSpells = async () => {
   if (spellListCache) return spellListCache;
   try {
@@ -212,4 +232,25 @@ export const fetchSpellDetails = async (index) => {
     spellDetailsCache.set(index, result);
     return result;
   } catch (e) { return null; }
+};
+
+// NEW: Universal Data Fetchers for the Autocomplete engine
+export const fetchAllProficiencies = async () => {
+  if (proficienciesListCache) return proficienciesListCache;
+  try {
+    const res = await fetch(`${BASE_URL}/proficiencies`);
+    const data = await res.json();
+    proficienciesListCache = data.results;
+    return proficienciesListCache;
+  } catch (e) { return []; }
+};
+
+export const fetchAllLanguages = async () => {
+  if (languagesListCache) return languagesListCache;
+  try {
+    const res = await fetch(`${BASE_URL}/languages`);
+    const data = await res.json();
+    languagesListCache = data.results;
+    return languagesListCache;
+  } catch (e) { return []; }
 };
