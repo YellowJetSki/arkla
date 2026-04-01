@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, runTransaction, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, setDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Image as ImageIcon } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
@@ -15,7 +15,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   const [transactionAmount, setTransactionAmount] = useState('');
   const [transactionType, setTransactionType] = useState('assarions'); 
 
-  // Premium input states
   const [isEditingGold, setIsEditingGold] = useState(false);
   const [displayGold, setDisplayGold] = useState("");
   const [isEditingSilver, setIsEditingSilver] = useState(false);
@@ -23,7 +22,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   const [isEditingCopper, setIsEditingCopper] = useState(false);
   const [displayCopper, setDisplayCopper] = useState("");
 
-  // SRD Autocomplete State
   const [srdEquipmentList, setSrdEquipmentList] = useState([]);
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
@@ -34,7 +32,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
 
   const inventoryArray = Array.isArray(char.inventory) ? char.inventory : [];
 
-  // Atomic Transaction Wrapper for Inventory Mutations
   const runInventoryTransaction = async (mutationFn) => {
     try {
       await runTransaction(db, async (transaction) => {
@@ -55,21 +52,26 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
     setCustomItem(prev => ({ ...prev, name: val }));
     
     if (val.length > 1) {
-      setFilteredEquip(srdEquipmentList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
+      const searchTerms = val.toLowerCase().split(' ').filter(Boolean);
+      setFilteredEquip(srdEquipmentList.filter(i => {
+        const itemName = i.name.toLowerCase();
+        if (val.toLowerCase().includes('health potion') && itemName.includes('potion of healing')) return true;
+        return searchTerms.every(term => itemName.includes(term));
+      }));
       setShowEquipDropdown(true);
     } else {
       setShowEquipDropdown(false);
     }
   };
 
-  const handleSelectSrdItem = async (indexStr) => {
+  const handleSelectSrdItem = async (urlOrIndex) => {
     setShowEquipDropdown(false);
-    const details = await fetchEquipmentDetails(indexStr);
+    const details = await fetchEquipmentDetails(urlOrIndex);
     if (details) {
       setCustomItem(prev => ({
         ...prev,
         name: details.name,
-        category: details.category === 'Adventuring Gear' || details.category === 'Potion' ? details.category : details.category,
+        category: details.category,
         desc: details.desc,
         damageDice: details.damageDice || '',
         damageType: details.damageType || 'Slashing',
@@ -88,7 +90,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
        name: customItem.name,
        category: customItem.category,
        desc: customItem.desc,
-       imageUrl: customItem.imageUrl,
+       imageUrl: customItem.imageUrl || '',
        quantity: 1,
        damageDice: customItem.category === 'Weapon' ? customItem.damageDice : null,
        damageType: customItem.category === 'Weapon' ? customItem.damageType : null,
@@ -142,7 +144,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           return; 
         }
 
-        // 1. Consume the item safely
         await runInventoryTransaction((inv) => {
           if (!inv[index]) return inv;
           inv[index].quantity -= 1;
@@ -152,7 +153,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           return inv;
         });
 
-        // 2. Update HP safely
         await runTransaction(db, async (t) => {
           const charRef = doc(db, 'characters', charId);
           const snap = await t.get(charRef);
@@ -173,7 +173,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
       message: `Send ${item.name} to the Shared Party Loot? It will be removed from your personal inventory.`,
       type: 'confirm',
       onConfirm: async () => {
-        // Safe remove from inventory
         await runInventoryTransaction((inv) => {
           if (!inv[index]) return inv;
           inv.splice(index, 1);
@@ -189,7 +188,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           id: `loot_${Date.now()}`,
           name: item.name,
           desc: descText,
-          url: item.imageUrl,
+          url: item.imageUrl || '',
           source: char.name
         };
         
@@ -302,13 +301,12 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                   placeholder="e.g. Ring of Fire or Longsword" 
                 />
                 
-                {/* SRD Autocomplete Dropdown */}
                 {showEquipDropdown && filteredEquip.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-600 rounded-lg shadow-2xl z-50">
                     {filteredEquip.map(item => (
                       <div 
-                        key={item.index} 
-                        onClick={() => handleSelectSrdItem(item.index)} 
+                        key={item.url || item.index} 
+                        onClick={() => handleSelectSrdItem(item.url || item.index)} 
                         className="px-3 py-2.5 text-sm text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors"
                       >
                         {item.name}
@@ -428,7 +426,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                         {item.category === 'Weapon' && (
                           <div className="flex flex-wrap gap-2 mb-3">
                             <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Damage: <span className="text-white">{item.damageDice || (item.damage?.damage_dice)} {item.damageType || (item.damage?.damage_type?.name)}</span></span>
-                            {/* Properties safely handled if array or string */}
                             {(item.properties && Array.isArray(item.properties) && item.properties.length > 0) && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties.map(p => p.name).join(', ')}</span></span>}
                             {(item.properties && typeof item.properties === 'string') && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties}</span></span>}
                           </div>
@@ -440,14 +437,12 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                         )}
                         <p className="whitespace-pre-wrap leading-relaxed">{typeof item.desc === 'string' ? item.desc : (item.desc || []).join('\n')}</p>
                         
-                        {/* THE NEW CONSUME BUTTON */}
                         {!isDM && (item.hpRecovery || item.category === 'Consumable' || item.category === 'Potion') && (
                           <button onClick={() => handleConsume(item, i)} className="mt-4 bg-emerald-900/40 border border-emerald-500/50 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm">
                             <Utensils className="w-3 h-3" /> Consume
                           </button>
                         )}
                         
-                        {/* WEAPON AUTO-EQUIP INDICATOR */}
                         {item.category === 'Weapon' && (
                           <div className="flex items-center gap-1.5 mt-4">
                              <Sword className="w-3 h-3 text-slate-500" />

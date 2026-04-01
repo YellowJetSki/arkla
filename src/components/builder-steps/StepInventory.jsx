@@ -29,15 +29,15 @@ export default function StepInventory({
               onChange={handleItemNameChange} 
               required 
               className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
-              placeholder="e.g. Longsword" 
+              placeholder="e.g. Longsword or Potion" 
             />
             
             {showEquipDropdown && filteredEquip.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50">
                 {filteredEquip.map(item => (
                   <div 
-                    key={item.index} 
-                    onClick={() => handleSelectSrdItem(item.index)} 
+                    key={item.url || item.index} 
+                    onClick={() => handleSelectSrdItem(item.url || item.index)} 
                     className="px-3 py-2 text-sm text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors"
                   >
                     {item.name}
@@ -53,10 +53,12 @@ export default function StepInventory({
               onChange={e => setNewItem({...newItem, category: e.target.value})} 
               className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none"
             >
+              <option value="Wondrous Item">Wondrous Item</option>
               <option value="Weapon">Weapon</option>
               <option value="Armor">Armor</option>
-              <option value="Adventuring Gear">Adventuring Gear</option>
+              <option value="Consumable">Consumable</option>
               <option value="Potion">Potion</option>
+              <option value="Adventuring Gear">Adventuring Gear</option>
             </select>
           </div>
         </div>

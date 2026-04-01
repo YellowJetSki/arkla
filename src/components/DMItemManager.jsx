@@ -9,6 +9,9 @@ export default function DMItemManager({ onClose, activePlayers }) {
   const [stashedItems, setStashedItems] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState('');
   
+  // NEW: Secure mapping of player IDs to their actual Names
+  const [playerMap, setPlayerMap] = useState({});
+  
   // Unified Forge Form State
   const [newItem, setNewItem] = useState({ 
     name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', 
@@ -23,7 +26,6 @@ export default function DMItemManager({ onClose, activePlayers }) {
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
-  // Load DM Stash & SRD List
   useEffect(() => {
     const fetchStash = async () => {
       const stashRef = doc(db, 'campaign', 'dm_stash');
@@ -34,9 +36,21 @@ export default function DMItemManager({ onClose, activePlayers }) {
         await updateDoc(doc(db, 'campaign', 'dm_stash'), { items: [] });
       }
     };
+    
+    // Fetch actual names for the dropdown and filter out ghost IDs
+    const fetchPlayers = async () => {
+      const map = {};
+      for (const id of activePlayers) {
+        const snap = await getDoc(doc(db, 'characters', id));
+        if (snap.exists()) map[id] = snap.data().name;
+      }
+      setPlayerMap(map);
+    };
+
     fetchStash();
     fetchAllEquipment().then(setSrdEquipmentList);
-  }, []);
+    if (activePlayers && activePlayers.length > 0) fetchPlayers();
+  }, [activePlayers]);
 
   const saveStashToDb = async (newItems) => {
     setStashedItems(newItems);
@@ -46,22 +60,30 @@ export default function DMItemManager({ onClose, activePlayers }) {
   const handleItemNameChange = (e) => {
     const val = e.target.value;
     setNewItem(prev => ({ ...prev, name: val }));
+    
     if (val.length > 1) {
-      setFilteredEquip(srdEquipmentList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
+      const searchTerms = val.toLowerCase().split(' ').filter(Boolean);
+      
+      setFilteredEquip(srdEquipmentList.filter(i => {
+        const itemName = i.name.toLowerCase();
+        // Magic alias check!
+        if (val.toLowerCase().includes('health potion') && itemName.includes('potion of healing')) return true;
+        return searchTerms.every(term => itemName.includes(term));
+      }));
       setShowEquipDropdown(true);
     } else {
       setShowEquipDropdown(false);
     }
   };
 
-  const handleSelectSrdItem = async (indexStr) => {
+  const handleSelectSrdItem = async (urlOrIndex) => {
     setShowEquipDropdown(false);
-    const details = await fetchEquipmentDetails(indexStr);
+    const details = await fetchEquipmentDetails(urlOrIndex);
     if (details) {
       setNewItem(prev => ({
         ...prev,
         name: details.name,
-        category: details.category === 'Adventuring Gear' || details.category === 'Potion' ? details.category : details.category,
+        category: details.category,
         desc: details.desc,
         damageDice: details.damageDice || '',
         damageType: details.damageType || 'Slashing',
@@ -91,7 +113,6 @@ export default function DMItemManager({ onClose, activePlayers }) {
     
     await saveStashToDb([structuredItem, ...stashedItems]);
     
-    // Reset Form
     setNewItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '', quantity: 1 });
     setDialog({ isOpen: true, title: 'Item Forged', message: `${structuredItem.name} has been added to your Vault.`, type: 'alert' });
   };
@@ -122,7 +143,9 @@ export default function DMItemManager({ onClose, activePlayers }) {
   };
 
   const sendToAllPlayers = async (item) => {
-    if (!activePlayers || activePlayers.length === 0) {
+    const validPlayers = activePlayers?.filter(id => playerMap[id]) || [];
+    
+    if (validPlayers.length === 0) {
       setDialog({ isOpen: true, title: 'No Players', message: 'There are no active players in the session.', type: 'alert' });
       return;
     }
@@ -135,14 +158,13 @@ export default function DMItemManager({ onClose, activePlayers }) {
         try {
           const batch = writeBatch(db);
           
-          for (const playerId of activePlayers) {
+          for (const playerId of validPlayers) {
             const pRef = doc(db, 'characters', playerId);
             const pSnap = await getDoc(pRef);
             if (pSnap.exists()) {
               const currentInv = pSnap.data().inventory || [];
               const invArray = Array.isArray(currentInv) ? currentInv : [];
               
-              // Create a deep copy with a unique ID for each player so they don't share reference bugs
               const itemCopy = { ...item, id: `item_${Date.now()}_${playerId}` };
               batch.update(pRef, { inventory: [...invArray, itemCopy] });
             }
@@ -153,7 +175,7 @@ export default function DMItemManager({ onClose, activePlayers }) {
           
           closeDialog();
           setTimeout(() => {
-            setDialog({ isOpen: true, title: 'Mass Grant Complete', message: `All ${activePlayers.length} players received the item.`, type: 'alert' });
+            setDialog({ isOpen: true, title: 'Mass Grant Complete', message: `All ${validPlayers.length} players received the item.`, type: 'alert' });
           }, 300);
         } catch(e) {
           console.error(e);
@@ -164,9 +186,7 @@ export default function DMItemManager({ onClose, activePlayers }) {
     });
   };
 
-  const removeStashedItem = (id) => {
-    saveStashToDb(stashedItems.filter(i => i.id !== id));
-  };
+  const removeStashedItem = (id) => saveStashToDb(stashedItems.filter(i => i.id !== id));
 
   return (
     <>
@@ -204,15 +224,15 @@ export default function DMItemManager({ onClose, activePlayers }) {
                       onChange={handleItemNameChange} 
                       required 
                       className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
-                      placeholder="e.g. Longsword" 
+                      placeholder="e.g. Longsword or Potion" 
                     />
                     
                     {showEquipDropdown && filteredEquip.length > 0 && (
                       <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-950 border border-slate-600 rounded-lg shadow-2xl z-50">
                         {filteredEquip.map(item => (
                           <div 
-                            key={item.index} 
-                            onClick={() => handleSelectSrdItem(item.index)} 
+                            key={item.url || item.index} 
+                            onClick={() => handleSelectSrdItem(item.url || item.index)} 
                             className="px-3 py-2 text-sm text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors"
                           >
                             {item.name}
@@ -349,7 +369,10 @@ export default function DMItemManager({ onClose, activePlayers }) {
               <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 shadow-inner mb-2 flex gap-2">
                 <select value={selectedPlayer} onChange={e => setSelectedPlayer(e.target.value)} className="flex-1 bg-slate-950 text-white border border-slate-600 rounded-lg p-2.5 text-sm focus:outline-none focus:border-emerald-500 shadow-inner">
                   <option value="">-- Select a Player --</option>
-                  {activePlayers?.map(id => <option key={id} value={id}>{id}</option>)}
+                  {/* Safely map over activePlayers ensuring we only show ones that actually exist in the DB */}
+                  {activePlayers?.filter(id => playerMap[id]).map(id => (
+                    <option key={id} value={id}>{playerMap[id]}</option>
+                  ))}
                 </select>
               </div>
 

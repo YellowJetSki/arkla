@@ -15,22 +15,42 @@ const spellDetailsCache = new Map();
 export const fetchAllEquipment = async () => {
   if (equipmentListCache) return equipmentListCache;
   try {
-    const res = await fetch(`${BASE_URL}/equipment`);
-    const data = await res.json();
-    equipmentListCache = data.results;
+    // Fetch BOTH standard equipment and magic items
+    const [equipRes, magicRes] = await Promise.all([
+      fetch(`${BASE_URL}/equipment`),
+      fetch(`${BASE_URL}/magic-items`)
+    ]);
+    const equipData = await equipRes.json();
+    const magicData = await magicRes.json();
+    
+    // Combine and sort alphabetically
+    equipmentListCache = [
+      ...(equipData.results || []),
+      ...(magicData.results || [])
+    ].sort((a, b) => a.name.localeCompare(b.name));
+    
     return equipmentListCache;
   } catch (e) { return []; }
 };
 
-export const fetchEquipmentDetails = async (index) => {
-  if (equipmentDetailsCache.has(index)) return equipmentDetailsCache.get(index);
+export const fetchEquipmentDetails = async (urlOrIndex) => {
+  if (equipmentDetailsCache.has(urlOrIndex)) return equipmentDetailsCache.get(urlOrIndex);
   try {
-    const res = await fetch(`${BASE_URL}/equipment/${index}`);
+    // Check if we were passed a full URL (for magic items) or just an index
+    const endpoint = urlOrIndex.startsWith('/api/') ? urlOrIndex : `/api/equipment/${urlOrIndex}`;
+    const res = await fetch(`https://www.dnd5eapi.co${endpoint}`);
     const data = await res.json();
+    
     let category = 'Adventuring Gear';
     if (data.equipment_category?.index === 'weapon') category = 'Weapon';
     if (data.equipment_category?.index === 'armor') category = 'Armor';
     if (data.equipment_category?.index === 'potion') category = 'Potion';
+    
+    // Magic Items use the name field instead of index
+    if (data.equipment_category?.name?.includes('Wondrous')) category = 'Wondrous Item';
+    if (data.equipment_category?.name?.includes('Weapon')) category = 'Weapon';
+    if (data.equipment_category?.name?.includes('Armor')) category = 'Armor';
+    if (data.equipment_category?.name?.includes('Potion')) category = 'Potion';
 
     let dDice = data.damage?.damage_dice || '';
     if (data.two_handed_damage?.damage_dice) {
@@ -46,7 +66,7 @@ export const fetchEquipmentDetails = async (index) => {
       ac: data.armor_class?.base || 14,
       desc: data.desc?.join('\n') || ''
     };
-    equipmentDetailsCache.set(index, result);
+    equipmentDetailsCache.set(urlOrIndex, result);
     return result;
   } catch (e) { return null; }
 };
@@ -170,7 +190,6 @@ export const fetchClassProgression = async (classInput, targetLevel) => {
     let featureUrls = new Map();
     let spellcasting = null;
 
-    // Fetch features up to the selected level
     for (let i = 1; i <= targetLevel; i++) {
       const res = await fetch(`${BASE_URL}/classes/${normalized}/levels/${i}`);
       if (res.ok) {
@@ -178,7 +197,6 @@ export const fetchClassProgression = async (classInput, targetLevel) => {
         if (data.features) {
           data.features.forEach(f => featureUrls.set(f.index, { name: f.name, url: f.url }));
         }
-        // Capture spellcasting capability at the target level
         if (i === Number(targetLevel) && data.spellcasting) {
           spellcasting = data.spellcasting; 
         }
@@ -218,7 +236,6 @@ export const fetchTraitOrFeatureDetails = async (url) => {
   } catch (e) { return null; }
 };
 
-// NEW: Spells Fetchers
 export const fetchAllSpells = async () => {
   if (spellListCache) return spellListCache;
   try {
