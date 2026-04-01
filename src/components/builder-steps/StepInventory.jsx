@@ -1,4 +1,4 @@
-import { Backpack, Search, Sword, Shield, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Backpack, Search, Sword, Shield, Plus, Trash2, Crosshair, Image as ImageIcon } from 'lucide-react';
 
 export default function StepInventory({ 
   newItem, 
@@ -64,7 +64,7 @@ export default function StepInventory({
         </div>
 
         {newItem.category === 'Weapon' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-900 p-3 rounded-lg border border-slate-700">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900 p-3 rounded-lg border border-slate-700">
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Sword className="w-3 h-3 inline"/> Damage</label>
               <input 
@@ -83,6 +83,16 @@ export default function StepInventory({
                 onChange={e => setNewItem({...newItem, damageType: e.target.value})} 
                 className="w-full bg-slate-950 border border-slate-600 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" 
                 placeholder="Slashing" 
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Crosshair className="w-3 h-3 inline"/> Range</label>
+              <input 
+                type="text" 
+                value={newItem.range || ''} 
+                onChange={e => setNewItem({...newItem, range: e.target.value})} 
+                className="w-full bg-slate-950 border border-slate-600 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" 
+                placeholder="5 ft" 
               />
             </div>
             <div className="col-span-2 sm:col-span-1">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Image as ImageIcon } from 'lucide-react';
+import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
 
 export default function InventoryTab({ char, charId, isDM, updateField, activeTheme, showDialog }) {
@@ -9,7 +9,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   const [openItems, setOpenItems] = useState({}); 
   
   const [customItem, setCustomItem] = useState({ 
-    name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' 
+    name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' 
   });
   
   const [transactionAmount, setTransactionAmount] = useState('');
@@ -76,6 +76,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         damageDice: details.damageDice || '',
         damageType: details.damageType || 'Slashing',
         properties: details.properties || '',
+        range: details.range || '',
         ac: details.ac || 14
       }));
     }
@@ -95,6 +96,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
        damageDice: customItem.category === 'Weapon' ? customItem.damageDice : null,
        damageType: customItem.category === 'Weapon' ? customItem.damageType : null,
        properties: customItem.category === 'Weapon' ? customItem.properties : null,
+       range: customItem.category === 'Weapon' ? customItem.range : null,
        ac: customItem.category === 'Armor' ? Number(customItem.ac) : null,
        hpRecovery: customItem.category === 'Consumable' || customItem.category === 'Potion' ? customItem.hpRecovery : null
     };
@@ -103,7 +105,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
       return [...inv, newItem];
     });
     
-    setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' });
+    setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' });
     setIsForgingItem(false);
   };
 
@@ -328,20 +330,24 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
               </div>
 
               {customItem.category === 'Weapon' && (
-                <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800 sm:col-span-2">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Damage Dice</label>
-                    <input type="text" required value={customItem.damageDice} onChange={e => setCustomItem({...customItem, damageDice: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 1d10" />
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Sword className="w-3 h-3 inline"/> Damage</label>
+                    <input type="text" value={customItem.damageDice} onChange={e => setCustomItem({...customItem, damageDice: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="1d8" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Damage Type</label>
-                    <input type="text" required value={customItem.damageType} onChange={e => setCustomItem({...customItem, damageType: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. Fire" />
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Type</label>
+                    <input type="text" value={customItem.damageType} onChange={e => setCustomItem({...customItem, damageType: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="Slashing" />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Properties (Comma Separated)</label>
-                    <input type="text" value={customItem.properties} onChange={e => setCustomItem({...customItem, properties: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. Finesse, Light" />
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Crosshair className="w-3 h-3 inline"/> Range</label>
+                    <input type="text" value={customItem.range || ''} onChange={e => setCustomItem({...customItem, range: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="5 ft" />
                   </div>
-                </>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Properties</label>
+                    <input type="text" value={customItem.properties} onChange={e => setCustomItem({...customItem, properties: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="Finesse, Light" />
+                  </div>
+                </div>
               )}
 
               {(customItem.category === 'Consumable' || customItem.category === 'Potion') && (
@@ -426,6 +432,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                         {item.category === 'Weapon' && (
                           <div className="flex flex-wrap gap-2 mb-3">
                             <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Damage: <span className="text-white">{item.damageDice || (item.damage?.damage_dice)} {item.damageType || (item.damage?.damage_type?.name)}</span></span>
+                            {item.range && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Range: <span className="text-white">{item.range}</span></span>}
                             {(item.properties && Array.isArray(item.properties) && item.properties.length > 0) && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties.map(p => p.name).join(', ')}</span></span>}
                             {(item.properties && typeof item.properties === 'string') && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties}</span></span>}
                           </div>

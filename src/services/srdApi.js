@@ -57,14 +57,27 @@ export const fetchEquipmentDetails = async (urlOrIndex) => {
        dDice += ` (${data.two_handed_damage.damage_dice})`;
     }
 
+    let rangeStr = '';
+    if (data.range) {
+       rangeStr = data.range.normal ? `${data.range.normal} ft` : '';
+       if (data.range.long) rangeStr += ` / ${data.range.long} ft`;
+    }
+
+    let descText = data.desc?.join('\n') || '';
+    // Intelligently strip out descriptions that just tell the user to read a table
+    if (descText.match(/(refer to|see|see the).*table/i)) {
+       descText = '';
+    }
+
     const result = {
       name: data.name,
       category,
       damageDice: dDice,
       damageType: data.damage?.damage_type?.name || '',
       properties: data.properties?.map(p => p.name).join(', ') || '',
+      range: rangeStr,
       ac: data.armor_class?.base || 14,
-      desc: data.desc?.join('\n') || ''
+      desc: descText
     };
     equipmentDetailsCache.set(urlOrIndex, result);
     return result;
