@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 
 export default function MapDrawings({ 
   drawings = [], 
+  isDM = false,
   isDrawingMode = false, 
   drawingShape = 'freehand',
   onDrawEnd, 
@@ -126,18 +127,33 @@ export default function MapDrawings({
       {/* THE FOG OF WAR MASK LAYER */}
       {fogOfWar && (
         <defs>
+          {/* Gaussian Blur filter to give the reveal brush "soft edges/shadows" */}
+          <filter id="softRevealEdge" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="15" />
+          </filter>
+
           <mask id="fogMask">
             {/* White makes the fog opaque */}
             <rect width="100%" height="100%" fill="white" />
-            {/* Black cuts holes in the fog */}
-            {reveals.map((line, i) => renderShape(line, `rev-${i}`, true))}
-            {currentReveals && renderShape(currentReveals, 'curr-rev', true)}
+            
+            {/* Black cuts holes in the fog, wrapped in the blur filter */}
+            <g filter="url(#softRevealEdge)">
+              {reveals.map((line, i) => renderShape(line, `rev-${i}`, true))}
+              {currentReveals && renderShape(currentReveals, 'curr-rev', true)}
+            </g>
           </mask>
         </defs>
       )}
 
       {fogOfWar && (
-        <rect width="100%" height="100%" fill="#020617" mask="url(#fogMask)" opacity="0.97" />
+        <rect 
+          width="100%" 
+          height="100%" 
+          fill="#020617" 
+          mask="url(#fogMask)" 
+          // Make the fog semi-transparent for the DM, and fully dark for players
+          opacity={isDM ? "0.45" : "0.98"} 
+        />
       )}
 
       {/* THE STANDARD DRAWING LAYER */}

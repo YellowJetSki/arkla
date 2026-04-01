@@ -5,7 +5,6 @@ import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, Monito
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
-import MapDrawings from './MapDrawings';
 import TokenContextMenu from './TokenContextMenu';
 import ImageSelector from '../shared/ImageSelector';
 
@@ -48,8 +47,6 @@ export default function DMBattleMap() {
   
   const [imagePrompt, setImagePrompt] = useState({ isOpen: false, tokenId: null, url: '' });
   const [contextMenu, setContextMenu] = useState(null);
-
-  const containerRef = useRef(null);
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
@@ -494,7 +491,7 @@ export default function DMBattleMap() {
         </div>
       )}
 
-      {/* Map Area */}
+      {/* Map Area - Cleaned up to allow MapGrid to handle the sizing and background correctly */}
       <div className="flex-1 overflow-auto bg-slate-950 p-4 custom-scrollbar relative min-h-0">
         {!mapData.imageUrl ? (
           <div className="h-full flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-800 rounded-2xl bg-slate-900/30">
@@ -503,95 +500,17 @@ export default function DMBattleMap() {
             <button onClick={() => setIsEditingMap(true)} className="mt-4 bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Configure Map</button>
           </div>
         ) : (
-          <div className="min-w-max min-h-max bg-slate-900 p-2 rounded-xl border border-slate-800 shadow-2xl mx-auto w-max relative group">
-            <div ref={containerRef} className="relative overflow-hidden rounded-lg shadow-inner border border-slate-700" style={{ width: `${mapData.cols * 50}px`, height: `${mapData.rows * 50}px`, backgroundImage: `url(${mapData.imageUrl})`, backgroundSize: '100% 100%' }}>
-              <MapGrid 
-                mapData={mapData} tokens={tokens} activePlayers={activePlayers} activeEnemies={activeEnemies}
-                onTileClick={handleTileClick} onTokenClick={(id) => setSelectedTokenId(selectedTokenId === id ? null : id)}
-                selectedTokenId={selectedTokenId} isDM={true} onTokenDrop={handleTokenDrop}
-                showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null} onToggleRuler={(id) => setShowRulerFor(showRulerFor === id ? null : id)}
-                isDrawingMode={isDrawingMode} drawingColor={drawingColor} drawingShape={drawingShape}
-                onDrawEnd={handleDrawEnd} onUpdateHpLive={handleUpdateTokenHpLive} onToggleSize={handleToggleTokenSize}
-                onToggleAura={handleToggleAura} onToggleElevation={handleToggleElevation} onToggleConcentration={handleToggleConcentration}
-                onToggleCondition={toggleCondition} onUpdateImage={handleUpdateTokenImage} onToggleHidden={handleToggleHidden}
-                onRemoveToken={removeToken} onDeselect={() => setSelectedTokenId(null)}
-              />
-
-              {/* Pass new Fog properties to MapDrawings */}
-              <MapDrawings 
-                drawings={mapData.drawings || []} 
-                activeTool={isDrawingMode ? 'draw' : 'move'} 
-                currentColor={drawingColor} 
-                containerRef={containerRef} 
-                onSaveDrawing={handleDrawEnd}
-                fogOfWar={mapData.fogOfWar}
-                currentCellSize={50}
-                cols={mapData.cols}
-                rows={mapData.rows}
-                drawingShape={drawingShape}
-                isDrawingMode={isDrawingMode}
-              />
-
-              {Object.values(tokens).map(token => {
-                const isSelected = mapData.activeTokenId === token.id || selectedTokenId === token.id;
-                return (
-                  <div
-                    key={token.id}
-                    className={`absolute cursor-grab active:cursor-grabbing transition-all duration-200 z-40 ${isSelected ? 'z-50 scale-110' : ''}`}
-                    style={{ width: `${50 * token.size}px`, height: `${50 * token.size}px`, transform: `translate(${token.x * 50}px, ${token.y * 50}px)` }}
-                    onDragEnd={(e) => {
-                      if (isDrawingMode) return;
-                      const rect = e.target.parentElement.getBoundingClientRect();
-                      const x = Math.max(0, Math.min(mapData.cols - token.size, Math.floor((e.clientX - rect.left) / 50)));
-                      const y = Math.max(0, Math.min(mapData.rows - token.size, Math.floor((e.clientY - rect.top) / 50)));
-                      handleTokenDrop(token.id, x, y);
-                    }}
-                    draggable={!isDrawingMode}
-                    onContextMenu={(e) => { e.preventDefault(); setContextMenu({ token, x: e.clientX, y: e.clientY }); }}
-                    onClick={(e) => { e.stopPropagation(); setSelectedTokenId(selectedTokenId === token.id ? null : token.id); }}
-                  >
-                    <div className="relative w-full h-full p-0.5 group/token">
-                       
-                       {/* Quick HP HUD (DM Only, when selected) */}
-                       {isSelected && (
-                         <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-slate-900/95 p-1 rounded-lg border border-slate-700 shadow-2xl z-50 pointer-events-auto">
-                           <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp - 10); }} className="px-1.5 py-0.5 bg-red-900/80 hover:bg-red-600 text-white text-[10px] font-bold rounded cursor-pointer">-10</button>
-                           <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp - 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">-1</button>
-                           <span className="text-[10px] font-black px-1.5 text-white min-w-[24px] text-center">{token.hp}</span>
-                           <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp + 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">+1</button>
-                         </div>
-                       )}
-
-                       {isSelected && <div className={`absolute inset-0 rounded-full animate-ping opacity-50 ${token.type === 'player' ? 'bg-indigo-500' : 'bg-red-500'}`}></div>}
-                       
-                       <div className={`w-full h-full rounded-full border-2 shadow-[0_0_15px_rgba(0,0,0,0.8)] overflow-hidden bg-slate-900 relative ${isSelected ? (token.type === 'player' ? 'border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.6)]' : 'border-red-400 shadow-[0_0_20px_rgba(239,68,68,0.6)]') : (token.type === 'player' ? 'border-indigo-600' : 'border-red-600')}`}>
-                         <img src={token.img} alt={token.name} className={`w-full h-full object-cover ${token.isHidden ? 'opacity-50 grayscale' : ''}`} draggable={false} />
-                       </div>
-                       
-                       {/* HP Bar */}
-                       <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[80%] h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700">
-                         <div className={`h-full ${token.hp > (token.maxHp/2) ? 'bg-emerald-500' : token.hp > (token.maxHp/4) ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.max(0, Math.min(100, (token.hp / token.maxHp) * 100))}%` }}></div>
-                       </div>
-                       
-                       {/* Name Tag (Hover) */}
-                       <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/token:opacity-100 transition-opacity pointer-events-none border border-slate-700 z-50">
-                         {token.name} {token.isHidden && '(Hidden)'}
-                       </div>
-
-                       {/* Status Indicators */}
-                       {(token.conditions?.length > 0 || token.isConcentrating) && (
-                         <div className="absolute -right-1 -top-1 flex gap-0.5 flex-wrap w-6 z-40">
-                            {token.isConcentrating && <div className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-slate-900 shadow-sm animate-pulse" title="Concentrating"></div>}
-                            {token.conditions?.length > 0 && <div className="w-2.5 h-2.5 rounded-full bg-fuchsia-500 border border-slate-900 shadow-sm" title={token.conditions.join(', ')}></div>}
-                         </div>
-                       )}
-                    </div>
-                  </div>
-                );
-              })}
-
-            </div>
-          </div>
+          <MapGrid 
+            mapData={mapData} tokens={tokens} activePlayers={activePlayers} activeEnemies={activeEnemies}
+            onTileClick={handleTileClick} onTokenClick={(id) => setSelectedTokenId(selectedTokenId === id ? null : id)}
+            selectedTokenId={selectedTokenId} isDM={true} onTokenDrop={handleTokenDrop}
+            showMovementRangeFor={showRulerFor ? tokens[showRulerFor] : null} onToggleRuler={(id) => setShowRulerFor(showRulerFor === id ? null : id)}
+            isDrawingMode={isDrawingMode} drawingColor={drawingColor} drawingShape={drawingShape}
+            onDrawEnd={handleDrawEnd} onUpdateHpLive={handleUpdateTokenHpLive} onToggleSize={handleToggleTokenSize}
+            onToggleAura={handleToggleAura} onToggleElevation={handleToggleElevation} onToggleConcentration={handleToggleConcentration}
+            onToggleCondition={toggleCondition} onUpdateImage={handleUpdateTokenImage} onToggleHidden={handleToggleHidden}
+            onRemoveToken={removeToken} onDeselect={() => setSelectedTokenId(null)}
+          />
         )}
       </div>
     </div>
