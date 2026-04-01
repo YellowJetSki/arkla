@@ -3,12 +3,13 @@ import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { UserPlus, ChevronRight, ChevronLeft, X } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
-import { fetchAllEquipment, fetchEquipmentDetails, fetchSpeciesData, fetchClassData } from '../services/srdApi';
+import { fetchAllEquipment, fetchEquipmentDetails, fetchSpeciesData, fetchClassData, fetchClassProgression } from '../services/srdApi';
 
-// Import our new step components
 import StepIdentity from './builder-steps/StepIdentity';
 import StepAttributes from './builder-steps/StepAttributes';
-import StepSpeciesForge from './builder-steps/StepSpeciesForge';
+import StepTraits from './builder-steps/StepTraits';
+import StepFeatures from './builder-steps/StepFeatures';
+import StepSpells from './builder-steps/StepSpells';
 import StepCompanion from './builder-steps/StepCompanion';
 import StepInventory from './builder-steps/StepInventory';
 import StepLore from './builder-steps/StepLore';
@@ -20,23 +21,22 @@ export default function DMCharacterBuilder({ onClose }) {
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
   const [formData, setFormData] = useState({
-    name: '',
-    species: '',
-    class: '',
-    level: 1, 
-    theme: 'indigo',
+    name: '', species: '', class: '', level: 1, theme: 'indigo',
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
-    alignment: 'Neutral',
-    backstory: '',
-    speed: 30,
-    hitDie: 'd10', 
-    imageUrl: '',
-    tokenImg: '',
-    age: '', height: '', weight: '', eyes: '', skin: '', hair: ''
+    alignment: 'Neutral', backstory: '', speed: 30, hitDie: 'd10', 
+    imageUrl: '', tokenImg: '', age: '', height: '', weight: '', eyes: '', skin: '', hair: ''
   });
 
   const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '', savingThrows: '' });
+  
+  // Separated Traits (Species) and Features (Class)
   const [speciesTraits, setSpeciesTraits] = useState([]);
+  const [classFeatures, setClassFeatures] = useState([]);
+  
+  // Spells Data
+  const [spellcastingMeta, setSpellcastingMeta] = useState(null);
+  const [spells, setSpells] = useState([]);
+  const [forceShowSpells, setForceShowSpells] = useState(false);
   
   const [srdSpeciesOffer, setSrdSpeciesOffer] = useState(null);
   const [srdClassOffer, setSrdClassOffer] = useState(null); 
@@ -49,26 +49,18 @@ export default function DMCharacterBuilder({ onClose }) {
 
   const [inventory, setInventory] = useState([]);
   const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '' });
-  
   const [srdEquipmentList, setSrdEquipmentList] = useState([]);
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
 
-  const steps = ['identity', 'attributes', 'speciesForge', 'companion', 'inventory', 'lore'];
-  const currentStep = steps[stepIndex];
-
-  useEffect(() => {
-    fetchAllEquipment().then(setSrdEquipmentList);
-  }, []);
+  useEffect(() => { fetchAllEquipment().then(setSrdEquipmentList); }, []);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (formData.species.length > 2) {
         const data = await fetchSpeciesData(formData.species);
         if (data) setSrdSpeciesOffer(data);
-      } else {
-        setSrdSpeciesOffer(null);
-      }
+      } else setSrdSpeciesOffer(null);
     }, 800);
     return () => clearTimeout(timer);
   }, [formData.species]);
@@ -78,38 +70,28 @@ export default function DMCharacterBuilder({ onClose }) {
       if (formData.class.length > 2) {
         const data = await fetchClassData(formData.class);
         if (data) setSrdClassOffer(data);
-      } else {
-        setSrdClassOffer(null);
-      }
+      } else setSrdClassOffer(null);
     }, 800);
     return () => clearTimeout(timer);
   }, [formData.class]);
 
+  // Dynamic Tabs based on spellcasting ability
+  const hasSpells = !!spellcastingMeta || forceShowSpells;
+  const steps = ['identity', 'attributes', 'traits', 'features', ...(hasSpells ? ['spells'] : []), 'companion', 'inventory', 'lore'];
+  const currentStep = steps[stepIndex];
+
   const updateField = (field, val) => setFormData(prev => ({ ...prev, [field]: val }));
   const updateStat = (stat, val) => setFormData(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(val) } }));
   const updateProf = (field, val) => setCustomProfs(prev => ({ ...prev, [field]: val }));
-  const updateCompField = (field, val) => setCompanionData(prev => ({ ...prev, [field]: val }));
-  const updateCompStat = (stat, val) => setCompanionData(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(val) } }));
-
+  
   const rollStat = () => {
     const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1).sort((a, b) => b - a);
     return rolls[0] + rolls[1] + rolls[2];
   };
 
   const handleRollAll = () => {
-    setFormData(prev => ({
-      ...prev,
-      stats: { STR: rollStat(), DEX: rollStat(), CON: rollStat(), INT: rollStat(), WIS: rollStat(), CHA: rollStat() }
-    }));
+    setFormData(prev => ({ ...prev, stats: { STR: rollStat(), DEX: rollStat(), CON: rollStat(), INT: rollStat(), WIS: rollStat(), CHA: rollStat() } }));
   };
-
-  const addTrait = () => setSpeciesTraits(prev => [...prev, { name: '', desc: '' }]);
-  const updateTrait = (index, field, value) => {
-    const newTraits = [...speciesTraits];
-    newTraits[index][field] = value;
-    setSpeciesTraits(newTraits);
-  };
-  const removeTrait = (index) => setSpeciesTraits(prev => prev.filter((_, i) => i !== index));
 
   const handleApplySrdSpecies = () => {
     if (!srdSpeciesOffer) return;
@@ -119,7 +101,7 @@ export default function DMCharacterBuilder({ onClose }) {
     setSrdSpeciesOffer(null);
   };
 
-  const handleApplySrdClass = () => {
+  const handleApplySrdClass = async () => {
     if (!srdClassOffer) return;
     updateField('hitDie', srdClassOffer.hitDie);
     updateProf('armor', srdClassOffer.armor);
@@ -127,6 +109,15 @@ export default function DMCharacterBuilder({ onClose }) {
     updateProf('savingThrows', srdClassOffer.savingThrows);
     if (srdClassOffer.skills) updateProf('skills', srdClassOffer.skills);
     if (srdClassOffer.tools) updateProf('tools', customProfs.tools ? `${customProfs.tools}, ${srdClassOffer.tools}` : srdClassOffer.tools);
+    
+    // Fetch Level Progression
+    const startLevel = Math.max(1, Number(formData.level) || 1);
+    const prog = await fetchClassProgression(formData.class, startLevel);
+    if (prog) {
+      setClassFeatures(prog.features);
+      setSpellcastingMeta(prog.spellcasting);
+    }
+    
     setSrdClassOffer(null);
   };
 
@@ -149,15 +140,9 @@ export default function DMCharacterBuilder({ onClose }) {
     e.preventDefault();
     if (!newItem.name) return;
     const formattedItem = {
-      id: `item_${Date.now()}`,
-      name: newItem.name,
-      category: newItem.category,
-      quantity: Number(newItem.quantity) || 1,
-      desc: newItem.desc,
-      imageUrl: '',
-      damageDice: newItem.category === 'Weapon' ? newItem.damageDice : null,
-      damageType: newItem.category === 'Weapon' ? newItem.damageType : null,
-      properties: newItem.category === 'Weapon' ? newItem.properties : null,
+      id: `item_${Date.now()}`, name: newItem.name, category: newItem.category, quantity: Number(newItem.quantity) || 1,
+      desc: newItem.desc, imageUrl: '', damageDice: newItem.category === 'Weapon' ? newItem.damageDice : null,
+      damageType: newItem.category === 'Weapon' ? newItem.damageType : null, properties: newItem.category === 'Weapon' ? newItem.properties : null,
       ac: newItem.category === 'Armor' ? Number(newItem.ac) : null
     };
     setInventory(prev => [...prev, formattedItem]);
@@ -178,10 +163,11 @@ export default function DMCharacterBuilder({ onClose }) {
       const conMod = Math.floor((formData.stats.CON - 10) / 2);
       const dexMod = Math.floor((formData.stats.DEX - 10) / 2);
 
-      let finalFeatures = speciesTraits.filter(t => t.name && t.desc).map(t => ({ 
-        name: `${formData.species || 'Base'} Trait: ${t.name}`, 
-        desc: t.desc 
-      }));
+      // Merge Traits and Features into the singular `features` array for the character sheet
+      const combinedFeatures = [
+        ...speciesTraits.filter(t => t.name && t.desc).map(t => ({ name: t.name.includes('Trait:') ? t.name : `${formData.species || 'Base'} Trait: ${t.name}`, desc: t.desc })),
+        ...classFeatures.filter(f => f.name && f.desc).map(f => ({ name: `Class Feature: ${f.name}`, desc: f.desc }))
+      ];
       
       const startLevel = Math.max(1, Number(formData.level) || 1);
       const hitDieValue = parseInt((formData.hitDie || 'd10').replace('d', ''), 10);
@@ -191,36 +177,31 @@ export default function DMCharacterBuilder({ onClose }) {
       const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
       const totalMaxHp = levelOneHp + higherLevelHp;
 
+      // Extract Spell Slots if available
+      const slots = {};
+      if (spellcastingMeta) {
+         Object.keys(spellcastingMeta).forEach(key => {
+           if (key.startsWith('spell_slots_level_')) {
+             const lvl = key.replace('spell_slots_level_', '');
+             if (spellcastingMeta[key] > 0) slots[lvl] = { current: spellcastingMeta[key], max: spellcastingMeta[key] };
+           }
+         });
+      }
+
       const newChar = {
-        name: formData.name,
-        species: formData.species || 'Human',
-        class: formData.class || 'Fighter',
-        classes: [{ name: formData.class || 'Fighter', level: startLevel }],
-        level: startLevel,
-        theme: formData.theme,
-        exp: 0,
-        alignment: formData.alignment,
-        age: formData.age, height: formData.height, weight: formData.weight,
-        eyes: formData.eyes, skin: formData.skin, hair: formData.hair,
-        hp: totalMaxHp, maxHp: totalMaxHp, tempHp: 0,
-        hitDice: { current: startLevel, max: startLevel, type: formData.hitDie },
-        ac: 10 + dexMod,
-        speed: formData.speed,
-        initiative: '--', spellSave: '--', spellAttack: '--',
-        combatInitiative: null, inspiration: false, isConcentrating: false,
-        conditions: [], hasCompletedTutorial: false, journal: '',
-        stats: formData.stats,
-        currency: { assarions: 0, quadrans: 0, leptons: 0 },
-        imageUrl: formData.imageUrl, img: formData.tokenImg,
-        deathSaves: { successes: 0, failures: 0 },
-        resources: [], spellSlots: {}, spells: [], dmNotes: '', attacks: [], 
-        proficiencies: customProfs, features: finalFeatures, inventory: inventory,
-        traits: { personality: '', ideal: '', bond: '', flaws: '' },
-        backstory: formData.backstory, notes: '', levelUpPending: false,
-        companion: hasCompanion ? {
-          ...companionData, hp: Number(companionData.hp), ac: Number(companionData.ac),
-          speed: Number(companionData.speed), awakeLevel: Number(companionData.awakeLevel)
-        } : null
+        name: formData.name, species: formData.species || 'Human', class: formData.class || 'Fighter',
+        classes: [{ name: formData.class || 'Fighter', level: startLevel }], level: startLevel, theme: formData.theme,
+        exp: 0, alignment: formData.alignment,
+        age: formData.age, height: formData.height, weight: formData.weight, eyes: formData.eyes, skin: formData.skin, hair: formData.hair,
+        hp: totalMaxHp, maxHp: totalMaxHp, tempHp: 0, hitDice: { current: startLevel, max: startLevel, type: formData.hitDie },
+        ac: 10 + dexMod, speed: formData.speed, initiative: '--', spellSave: '--', spellAttack: '--',
+        combatInitiative: null, inspiration: false, isConcentrating: false, conditions: [], hasCompletedTutorial: false, journal: '',
+        stats: formData.stats, currency: { assarions: 0, quadrans: 0, leptons: 0 }, imageUrl: formData.imageUrl, img: formData.tokenImg,
+        deathSaves: { successes: 0, failures: 0 }, resources: [],
+        spellSlots: slots, spells: spells, dmNotes: '', attacks: [], 
+        proficiencies: customProfs, features: combinedFeatures, inventory: inventory,
+        traits: { personality: '', ideal: '', bond: '', flaws: '' }, backstory: formData.backstory, notes: '', levelUpPending: false,
+        companion: hasCompanion ? { ...companionData, hp: Number(companionData.hp), ac: Number(companionData.ac), speed: Number(companionData.speed), awakeLevel: Number(companionData.awakeLevel) } : null
       };
 
       const batch = writeBatch(db);
@@ -256,8 +237,10 @@ export default function DMCharacterBuilder({ onClose }) {
           <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
             {currentStep === 'identity' && <StepIdentity formData={formData} updateField={updateField} srdSpeciesOffer={srdSpeciesOffer} handleApplySrdSpecies={handleApplySrdSpecies} srdClassOffer={srdClassOffer} handleApplySrdClass={handleApplySrdClass} />}
             {currentStep === 'attributes' && <StepAttributes formData={formData} updateStat={updateStat} handleRollAll={handleRollAll} />}
-            {currentStep === 'speciesForge' && <StepSpeciesForge formData={formData} updateField={updateField} customProfs={customProfs} updateProf={updateProf} speciesTraits={speciesTraits} addTrait={addTrait} updateTrait={updateTrait} removeTrait={removeTrait} />}
-            {currentStep === 'companion' && <StepCompanion hasCompanion={hasCompanion} setHasCompanion={setHasCompanion} companionData={companionData} updateCompField={updateCompField} updateCompStat={updateCompStat} />}
+            {currentStep === 'traits' && <StepTraits formData={formData} level={formData.level} updateField={updateField} customProfs={customProfs} updateProf={updateProf} speciesTraits={speciesTraits} setSpeciesTraits={setSpeciesTraits} />}
+            {currentStep === 'features' && <StepFeatures classFeatures={classFeatures} setClassFeatures={setClassFeatures} forceShowSpells={forceShowSpells} setForceShowSpells={setForceShowSpells} />}
+            {currentStep === 'spells' && <StepSpells spells={spells} setSpells={setSpells} spellcastingMeta={spellcastingMeta} />}
+            {currentStep === 'companion' && <StepCompanion hasCompanion={hasCompanion} setHasCompanion={setHasCompanion} companionData={companionData} updateCompField={(f, v) => updateCompField(f, v)} updateCompStat={(s, v) => updateCompStat(s, v)} />}
             {currentStep === 'inventory' && <StepInventory newItem={newItem} setNewItem={setNewItem} handleItemNameChange={handleItemNameChange} showEquipDropdown={showEquipDropdown} filteredEquip={filteredEquip} handleSelectSrdItem={handleSelectSrdItem} handleAddItem={handleAddItem} inventory={inventory} removeInventoryItem={removeInventoryItem} />}
             {currentStep === 'lore' && <StepLore formData={formData} updateField={updateField} />}
           </div>
