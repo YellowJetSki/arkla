@@ -15,9 +15,9 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     name: '', level: 0, castTime: '1 Action', range: '60 feet', components: 'V, S', duration: 'Instantaneous', desc: '' 
   });
   
-  // SRD Search State
+  // SRD Search State (Fixed naming collision)
   const [srdSpellsList, setSrdSpellsList] = useState([]);
-  const [filteredSpells, setFilteredSpells] = useState([]);
+  const [filteredSrdSpells, setFilteredSrdSpells] = useState([]);
   const [showSpellDropdown, setShowSpellDropdown] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState('All');
@@ -34,7 +34,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     const val = e.target.value;
     setCustomSpell(prev => ({ ...prev, name: val }));
     if (val.length > 1) {
-      setFilteredSpells(srdSpellsList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
+      setFilteredSrdSpells(srdSpellsList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
       setShowSpellDropdown(true);
     } else {
       setShowSpellDropdown(false);
@@ -159,6 +159,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     await updateDoc(doc(db, 'characters', charId), { spellSlots: updatedSlots });
   };
 
+  // This is the variable that caused the collision!
   const filteredSpells = spells.filter(spell => {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'Cantrips') return spell.level === 0;
@@ -334,10 +335,10 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> Spell Name (SRD Search)</label>
                 <input type="text" required value={customSpell.name} onChange={handleSpellNameChange} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Fireball" />
                 
-                {/* AUTOFILL DROPDOWN */}
-                {showSpellDropdown && filteredSpells.length > 0 && (
+                {/* AUTOFILL DROPDOWN (Now uses filteredSrdSpells) */}
+                {showSpellDropdown && filteredSrdSpells.length > 0 && (
                   <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50">
-                    {filteredSpells.map(item => (
+                    {filteredSrdSpells.map(item => (
                       <div key={item.index} onClick={() => handleSelectSrdSpell(item.index)} className="px-3 py-2 text-sm text-slate-300 hover:bg-fuchsia-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors">
                         {item.name}
                       </div>
@@ -410,7 +411,7 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
                             {isDM && (
                               <button 
                                 onClick={() => removeSpellFromGrimoire(spell)}
-                                className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 bg-slate-950 p-1.5 rounded transition-all shadow-inner"
+                                className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 bg-slate-950 p-1.5 rounded transition-all shadow-inner ml-2"
                                 title="Remove Spell"
                               >
                                 <Trash2 className="w-4 h-4" />
