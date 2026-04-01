@@ -16,20 +16,19 @@ export default function DMCharacterBuilder({ onClose }) {
     name: '',
     species: '',
     class: '',
-    level: 1, // NEW: Starting Level
+    level: 1, // Restored: Starting Level
     theme: 'indigo',
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
     alignment: 'Neutral',
     backstory: '',
     speed: 30,
-    hitDie: 'd10', 
+    hitDie: 'd10', // Restored: Hit Die tracking
     imageUrl: '',
     tokenImg: '',
-    // NEW: Syncing with your BioTab
+    // Restored: Bio Tab sync
     age: '', height: '', weight: '', eyes: '', skin: '', hair: ''
   });
 
-  const [isCustomSpecies, setIsCustomSpecies] = useState(false);
   const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '', savingThrows: '' });
   const [speciesTraits, setSpeciesTraits] = useState([]);
   
@@ -49,28 +48,28 @@ export default function DMCharacterBuilder({ onClose }) {
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
 
-  const steps = ['identity', 'attributes'];
-  if (isCustomSpecies) steps.push('speciesForge');
-  steps.push('companion', 'inventory', 'lore');
-  
+  // The forge is now a permanent step in the flow
+  const steps = ['identity', 'attributes', 'speciesForge', 'companion', 'inventory', 'lore'];
   const currentStep = steps[stepIndex];
 
   useEffect(() => {
     fetchAllEquipment().then(setSrdEquipmentList);
   }, []);
 
+  // SRD Species Listener (No longer checking for isCustomSpecies)
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (formData.species.length > 2) {
         const data = await fetchSpeciesData(formData.species);
-        if (data && !isCustomSpecies) setSrdSpeciesOffer(data);
+        if (data) setSrdSpeciesOffer(data);
       } else {
         setSrdSpeciesOffer(null);
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [formData.species, isCustomSpecies]);
+  }, [formData.species]);
 
+  // SRD Class Listener
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (formData.class.length > 2) {
@@ -186,6 +185,7 @@ export default function DMCharacterBuilder({ onClose }) {
       const conMod = Math.floor((formData.stats.CON - 10) / 2);
       const dexMod = Math.floor((formData.stats.DEX - 10) / 2);
 
+      // Now we always pass whatever traits were set, either manually or via Auto-Fill
       let finalFeatures = speciesTraits.filter(t => t.name && t.desc).map(t => ({ 
         name: `${formData.species || 'Base'} Trait: ${t.name}`, 
         desc: t.desc 
@@ -194,7 +194,7 @@ export default function DMCharacterBuilder({ onClose }) {
       // HP Auto-Scaler Engine
       const startLevel = Math.max(1, Number(formData.level) || 1);
       const hitDieValue = parseInt((formData.hitDie || 'd10').replace('d', ''), 10);
-      const hitDieAvg = Math.floor(hitDieValue / 2) + 1; // 5e Average (e.g., d10 = 6)
+      const hitDieAvg = Math.floor(hitDieValue / 2) + 1; 
       
       const levelOneHp = hitDieValue + conMod;
       const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
@@ -210,7 +210,6 @@ export default function DMCharacterBuilder({ onClose }) {
         exp: 0,
         alignment: formData.alignment,
         
-        // Physical Traits synced from BioTab
         age: formData.age, height: formData.height, weight: formData.weight,
         eyes: formData.eyes, skin: formData.skin, hair: formData.hair,
 
@@ -314,25 +313,15 @@ export default function DMCharacterBuilder({ onClose }) {
                       onFocus={(e) => e.target.select()} 
                       value={formData.species} 
                       onChange={e => updateField('species', e.target.value)} 
-                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 mb-3" 
+                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
                       placeholder="e.g. Rock Gnome" 
                     />
-                    
-                    <label className="flex items-center gap-2 cursor-pointer group">
-                      <input 
-                        type="checkbox" 
-                        checked={isCustomSpecies} 
-                        onChange={(e) => setIsCustomSpecies(e.target.checked)} 
-                        className="w-4 h-4 rounded border-slate-600 text-indigo-500 bg-slate-800" 
-                      />
-                      <span className="text-[10px] text-slate-300 group-hover:text-white transition-colors">Open Forge Details</span>
-                    </label>
 
-                    {srdSpeciesOffer && !isCustomSpecies && (
+                    {srdSpeciesOffer && (
                        <div className="absolute top-full left-0 right-0 mt-2 bg-indigo-900/90 backdrop-blur-md border border-indigo-500 rounded-xl p-3 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2">
                          <p className="text-xs text-indigo-200 font-bold mb-2 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5"/> SRD Data found for {srdSpeciesOffer.name}!</p>
                          <button onClick={handleApplySrdSpecies} className="w-full bg-indigo-500 hover:bg-indigo-400 text-white text-[10px] font-black uppercase tracking-widest py-2 rounded-lg transition-colors">
-                           Auto-Fill Base Stats
+                           Auto-Fill Base Stats & Traits
                          </button>
                        </div>
                     )}
@@ -345,7 +334,7 @@ export default function DMCharacterBuilder({ onClose }) {
                       value={formData.class} 
                       onChange={e => updateField('class', e.target.value)} 
                       className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
-                      placeholder="Class..." 
+                      placeholder="Type or select a class..." 
                     />
 
                     {srdClassOffer && (
