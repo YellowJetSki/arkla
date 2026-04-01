@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Save, X, AlertTriangle, Plus, Trash2, PawPrint } from 'lucide-react';
+import { Save, X, AlertTriangle, Plus, Trash2, PawPrint, Sparkles, Wand2 } from 'lucide-react';
 import { calculateSpellcastingStats } from '../services/arklaEngine';
+import { fetchSpeciesData, fetchClassData } from '../services/srdApi';
 
 export default function DMEditSheet({ char, charId, onCancel }) {
   const [formData, setFormData] = useState({
@@ -10,6 +11,7 @@ export default function DMEditSheet({ char, charId, onCancel }) {
     class: char.class,
     species: char.species || char.race,
     level: char.level,
+    hitDie: char.hitDice?.type || 'd10',
     ac: char.ac,
     speed: char.speed,
     initiative: char.initiative,
@@ -22,35 +24,65 @@ export default function DMEditSheet({ char, charId, onCancel }) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const [srdSpeciesOffer, setSrdSpeciesOffer] = useState(null);
+  const [srdClassOffer, setSrdClassOffer] = useState(null);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (formData.species?.length > 2 && formData.species !== char.species && formData.species !== char.race) {
+        const data = await fetchSpeciesData(formData.species);
+        if (data) setSrdSpeciesOffer(data);
+      } else setSrdSpeciesOffer(null);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [formData.species, char.species, char.race]);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (formData.class?.length > 2 && formData.class !== char.class) {
+        const data = await fetchClassData(formData.class);
+        if (data) setSrdClassOffer(data);
+      } else setSrdClassOffer(null);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [formData.class, char.class]);
+
+  const handleApplySrdSpecies = () => {
+    if (!srdSpeciesOffer) return;
+    handleChange('speed', srdSpeciesOffer.speed);
+    setSrdSpeciesOffer(null);
   };
 
-  const handleStatChange = (stat, value) => {
-    setFormData(prev => ({
-      ...prev,
-      stats: { ...prev.stats, [stat]: Number(value) }
-    }));
+  const handleApplySrdClass = () => {
+    if (!srdClassOffer) return;
+    handleChange('hitDie', srdClassOffer.hitDie);
+    setSrdClassOffer(null);
   };
 
-  const handleCompanionChange = (field, value) => {
-    if (!companionData) return;
-    setCompanionData(prev => ({ ...prev, [field]: value }));
+  const handleRecalculateHP = () => {
+    const startLevel = Math.max(1, Number(formData.level) || 1);
+    const hitDieValue = parseInt((formData.hitDie || 'd10').replace('d', ''), 10);
+    const hitDieAvg = Math.floor(hitDieValue / 2) + 1; 
+    const conMod = Math.floor((formData.stats.CON - 10) / 2);
+    
+    const levelOneHp = hitDieValue + conMod;
+    const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
+    const totalMaxHp = levelOneHp + higherLevelHp;
+    
+    handleChange('maxHp', totalMaxHp);
   };
 
-  const addResource = () => {
-    setResources([...resources, { name: 'New Tracker', max: 1, current: 1, recharge: 'long', isPool: false }]);
-  };
+  const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
+  const handleStatChange = (stat, value) => setFormData(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(value) } }));
+  const handleCompanionChange = (field, value) => { if (companionData) setCompanionData(prev => ({ ...prev, [field]: value })); };
 
+  const addResource = () => setResources([...resources, { name: 'New Tracker', max: 1, current: 1, recharge: 'long', isPool: false }]);
   const updateResource = (idx, field, val) => {
     const newRes = [...resources];
     newRes[idx][field] = field === 'max' || field === 'current' ? Number(val) : val;
     setResources(newRes);
   };
-
-  const removeResource = (idx) => {
-    setResources(resources.filter((_, i) => i !== idx));
-  };
+  const removeResource = (idx) => setResources(resources.filter((_, i) => i !== idx));
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -78,12 +110,13 @@ export default function DMEditSheet({ char, charId, onCancel }) {
         levelUpPending: false 
       };
 
+      if (formData.hitDie !== char.hitDice?.type || Number(formData.level) !== char.level) {
+         updates.hitDice = { current: Number(formData.level), max: Number(formData.level), type: formData.hitDie };
+      }
+
       if (companionData) {
         updates.companion = {
-           ...companionData,
-           hp: Number(companionData.hp),
-           ac: Number(companionData.ac),
-           speed: Number(companionData.speed)
+           ...companionData, hp: Number(companionData.hp), ac: Number(companionData.ac), speed: Number(companionData.speed)
         };
       }
 
@@ -96,13 +129,8 @@ export default function DMEditSheet({ char, charId, onCancel }) {
 
       getDoc(mapRef).then(mapDoc => {
         if (mapDoc.exists() && mapDoc.data().tokens && mapDoc.data().tokens[charId]) {
-          let mapUpdates = {
-            [`tokens.${charId}.maxHp`]: newMaxHp,
-            [`tokens.${charId}.speed`]: newSpeed
-          };
-          if (mapDoc.data().tokens[charId].hp > newMaxHp) {
-             mapUpdates[`tokens.${charId}.hp`] = newMaxHp;
-          }
+          let mapUpdates = { [`tokens.${charId}.maxHp`]: newMaxHp, [`tokens.${charId}.speed`]: newSpeed };
+          if (mapDoc.data().tokens[charId].hp > newMaxHp) mapUpdates[`tokens.${charId}.hp`] = newMaxHp;
           updateDoc(mapRef, mapUpdates).catch(console.error);
         }
       });
@@ -135,20 +163,45 @@ export default function DMEditSheet({ char, charId, onCancel }) {
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Level (Total)</label>
             <input type="number" onFocus={(e) => e.target.select()} value={formData.level} onChange={e => handleChange('level', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
           </div>
-          <div>
+          
+          <div className="relative">
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Class & Level(s)</label>
-            <input type="text" value={formData.class} onChange={e => handleChange('class', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Fighter 3 / Rogue 1" />
+            <input type="text" value={formData.class} onChange={e => handleChange('class', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500" placeholder="e.g. Fighter 3" />
+            {srdClassOffer && (
+               <div className="absolute top-full left-0 right-0 mt-2 bg-slate-950 border border-amber-500 rounded-lg p-2 shadow-2xl z-50">
+                 <p className="text-[10px] text-amber-200 font-bold mb-1.5 flex items-center gap-1.5"><Sparkles className="w-3 h-3"/> SRD Class found!</p>
+                 <button onClick={handleApplySrdClass} className="w-full bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest py-1.5 rounded transition-colors">
+                   Auto-Fill Hit Die
+                 </button>
+               </div>
+            )}
           </div>
-          <div>
+          
+          <div className="relative">
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Species</label>
             <input type="text" value={formData.species} onChange={e => handleChange('species', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white focus:outline-none focus:border-amber-500" />
+            {srdSpeciesOffer && (
+               <div className="absolute top-full left-0 right-0 mt-2 bg-slate-950 border border-amber-500 rounded-lg p-2 shadow-2xl z-50">
+                 <p className="text-[10px] text-amber-200 font-bold mb-1.5 flex items-center gap-1.5"><Sparkles className="w-3 h-3"/> SRD Species found!</p>
+                 <button onClick={handleApplySrdSpecies} className="w-full bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-black uppercase tracking-widest py-1.5 rounded transition-colors">
+                   Auto-Fill Base Speed
+                 </button>
+               </div>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-slate-800 p-4 rounded-xl border border-slate-700">
           <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Hit Die</label>
+            <input type="text" onFocus={(e) => e.target.select()} value={formData.hitDie} onChange={e => handleChange('hitDie', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500" placeholder="d10" />
+          </div>
+          <div className="relative col-span-2 md:col-span-1">
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Max HP</label>
-            <input type="number" onFocus={(e) => e.target.select()} value={formData.maxHp} onChange={e => handleChange('maxHp', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+            <div className="flex gap-2">
+               <input type="number" onFocus={(e) => e.target.select()} value={formData.maxHp} onChange={e => handleChange('maxHp', e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+               <button onClick={handleRecalculateHP} title="Auto-Scale HP (5e Math)" className="bg-amber-600 hover:bg-amber-500 text-white px-3 rounded flex items-center justify-center transition-colors shadow-inner"><Wand2 className="w-4 h-4"/></button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Armor Class</label>

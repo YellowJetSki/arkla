@@ -3,8 +3,8 @@ import { Sparkles, Plus, Trash2, Search, Wand2 } from 'lucide-react';
 import { fetchAllTraitsAndFeatures, fetchTraitOrFeatureDetails } from '../../services/srdApi';
 
 export default function StepFeatures({ classFeatures, setClassFeatures, forceShowSpells, setForceShowSpells }) {
-  const [newFeatureName, setNewFeatureName] = useState('');
-  const [newFeatureDesc, setNewFeatureDesc] = useState('');
+  const [customFeat, setCustomFeat] = useState({ name: '', desc: '' });
+  
   const [srdList, setSrdList] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -13,25 +13,29 @@ export default function StepFeatures({ classFeatures, setClassFeatures, forceSho
 
   const handleNameChange = (e) => {
     const val = e.target.value;
-    setNewFeatureName(val);
+    setCustomFeat(prev => ({ ...prev, name: val }));
     if (val.length > 1) {
       setFiltered(srdList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
       setShowDropdown(true);
-    } else setShowDropdown(false);
+    } else {
+      setShowDropdown(false);
+    }
   };
 
   const handleSelectSrd = async (item) => {
     setShowDropdown(false);
-    setNewFeatureName(item.name);
+    setCustomFeat(prev => ({ ...prev, name: item.name }));
     const details = await fetchTraitOrFeatureDetails(item.url);
-    if (details) setNewFeatureDesc(details.desc);
+    if (details) {
+      setCustomFeat(prev => ({ ...prev, desc: details.desc }));
+    }
   };
 
   const handleAddFeature = (e) => {
     e.preventDefault();
-    if (!newFeatureName) return;
-    setClassFeatures(prev => [...prev, { name: newFeatureName, desc: newFeatureDesc }]);
-    setNewFeatureName(''); setNewFeatureDesc('');
+    if (!customFeat.name) return;
+    setClassFeatures(prev => [...prev, { name: customFeat.name, desc: customFeat.desc }]);
+    setCustomFeat({ name: '', desc: '' });
   };
 
   return (
@@ -48,20 +52,44 @@ export default function StepFeatures({ classFeatures, setClassFeatures, forceSho
 
       <form onSubmit={handleAddFeature} className="bg-slate-800/50 p-4 rounded-xl border border-amber-900/30 shadow-inner space-y-4">
         <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-wider border-b border-amber-900/50 pb-2 mb-3">Add Custom Feature / Feat</h4>
+        
         <div className="relative">
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> Search SRD Features & Feats</label>
-          <input type="text" value={newFeatureName} onChange={handleNameChange} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500" placeholder="e.g. Action Surge, Mobile..." />
+          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+            <Search className="w-3 h-3"/> Feature Name (SRD Search)
+          </label>
+          <input 
+            type="text" 
+            required 
+            value={customFeat.name} 
+            onChange={handleNameChange} 
+            className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500" 
+            placeholder="e.g. Action Surge, Mobile..." 
+          />
           {showDropdown && filtered.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50">
-              {filtered.map(item => <div key={item.index} onClick={() => handleSelectSrd(item)} className="px-3 py-2 text-sm text-slate-300 hover:bg-amber-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0">{item.name}</div>)}
+              {filtered.map(item => (
+                <div key={item.index} onClick={() => handleSelectSrd(item)} className="px-3 py-2 text-sm text-slate-300 hover:bg-amber-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0">
+                  {item.name}
+                </div>
+              ))}
             </div>
           )}
         </div>
+
         <div>
           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description</label>
-          <textarea value={newFeatureDesc} onChange={(e) => setNewFeatureDesc(e.target.value)} className="w-full h-20 bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500 resize-y custom-scrollbar" placeholder="Mechanics..." />
+          <textarea 
+            required
+            value={customFeat.desc} 
+            onChange={(e) => setCustomFeat(prev => ({ ...prev, desc: e.target.value }))} 
+            className="w-full h-20 bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500 resize-y custom-scrollbar" 
+            placeholder="Mechanics..." 
+          />
         </div>
-        <button type="submit" disabled={!newFeatureName} className="w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs py-2.5 rounded-lg flex justify-center items-center gap-2 transition-colors"><Plus className="w-4 h-4"/> Add to Sheet</button>
+        
+        <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-2.5 rounded-lg flex justify-center items-center gap-2 transition-colors">
+          <Plus className="w-4 h-4"/> Add to Sheet
+        </button>
       </form>
 
       <div className="space-y-3 mt-4">
