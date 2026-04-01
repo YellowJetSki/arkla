@@ -4,6 +4,7 @@ import { db } from '../services/firebase';
 import { UserPlus, ChevronRight, ChevronLeft, X } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import { fetchAllEquipment, fetchEquipmentDetails, fetchSpeciesData, fetchClassData, fetchClassProgression } from '../services/srdApi';
+import { calculateSpellcastingStats } from '../services/arklaEngine';
 
 import StepIdentity from './builder-steps/StepIdentity';
 import StepAttributes from './builder-steps/StepAttributes';
@@ -29,11 +30,9 @@ export default function DMCharacterBuilder({ onClose }) {
 
   const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '', savingThrows: '' });
   
-  // Separated Traits (Species) and Features (Class)
   const [speciesTraits, setSpeciesTraits] = useState([]);
   const [classFeatures, setClassFeatures] = useState([]);
   
-  // Spells Data
   const [spellcastingMeta, setSpellcastingMeta] = useState(null);
   const [spells, setSpells] = useState([]);
   const [forceShowSpells, setForceShowSpells] = useState(false);
@@ -48,7 +47,7 @@ export default function DMCharacterBuilder({ onClose }) {
   });
 
   const [inventory, setInventory] = useState([]);
-  const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '' });
+  const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
   const [srdEquipmentList, setSrdEquipmentList] = useState([]);
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
@@ -75,7 +74,6 @@ export default function DMCharacterBuilder({ onClose }) {
     return () => clearTimeout(timer);
   }, [formData.class]);
 
-  // Dynamic Tabs based on spellcasting ability
   const hasSpells = !!spellcastingMeta || forceShowSpells;
   const steps = ['identity', 'attributes', 'traits', 'features', ...(hasSpells ? ['spells'] : []), 'companion', 'inventory', 'lore'];
   const currentStep = steps[stepIndex];
@@ -110,7 +108,6 @@ export default function DMCharacterBuilder({ onClose }) {
     if (srdClassOffer.skills) updateProf('skills', srdClassOffer.skills);
     if (srdClassOffer.tools) updateProf('tools', customProfs.tools ? `${customProfs.tools}, ${srdClassOffer.tools}` : srdClassOffer.tools);
     
-    // Fetch Level Progression
     const startLevel = Math.max(1, Number(formData.level) || 1);
     const prog = await fetchClassProgression(formData.class, startLevel);
     if (prog) {
@@ -125,14 +122,19 @@ export default function DMCharacterBuilder({ onClose }) {
     const val = e.target.value;
     setNewItem(prev => ({ ...prev, name: val }));
     if (val.length > 1) {
-      setFilteredEquip(srdEquipmentList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
+      const searchTerms = val.toLowerCase().split(' ').filter(Boolean);
+      setFilteredEquip(srdEquipmentList.filter(i => {
+        const itemName = i.name.toLowerCase();
+        if (val.toLowerCase().includes('health potion') && itemName.includes('potion of healing')) return true;
+        return searchTerms.every(term => itemName.includes(term));
+      }));
       setShowEquipDropdown(true);
     } else setShowEquipDropdown(false);
   };
 
-  const handleSelectSrdItem = async (indexStr) => {
+  const handleSelectSrdItem = async (urlOrIndex) => {
     setShowEquipDropdown(false);
-    const details = await fetchEquipmentDetails(indexStr);
+    const details = await fetchEquipmentDetails(urlOrIndex);
     if (details) setNewItem(prev => ({ ...prev, ...details, quantity: 1 }));
   };
 
@@ -141,12 +143,12 @@ export default function DMCharacterBuilder({ onClose }) {
     if (!newItem.name) return;
     const formattedItem = {
       id: `item_${Date.now()}`, name: newItem.name, category: newItem.category, quantity: Number(newItem.quantity) || 1,
-      desc: newItem.desc, imageUrl: '', damageDice: newItem.category === 'Weapon' ? newItem.damageDice : null,
+      desc: newItem.desc, imageUrl: newItem.imageUrl || '', damageDice: newItem.category === 'Weapon' ? newItem.damageDice : null,
       damageType: newItem.category === 'Weapon' ? newItem.damageType : null, properties: newItem.category === 'Weapon' ? newItem.properties : null,
       ac: newItem.category === 'Armor' ? Number(newItem.ac) : null
     };
     setInventory(prev => [...prev, formattedItem]);
-    setNewItem({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '' });
+    setNewItem({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
   };
 
   const removeInventoryItem = (index) => setInventory(prev => prev.filter((_, i) => i !== index));
@@ -163,7 +165,6 @@ export default function DMCharacterBuilder({ onClose }) {
       const conMod = Math.floor((formData.stats.CON - 10) / 2);
       const dexMod = Math.floor((formData.stats.DEX - 10) / 2);
 
-      // Merge Traits and Features into the singular `features` array for the character sheet
       const combinedFeatures = [
         ...speciesTraits.filter(t => t.name && t.desc).map(t => ({ name: t.name.includes('Trait:') ? t.name : `${formData.species || 'Base'} Trait: ${t.name}`, desc: t.desc })),
         ...classFeatures.filter(f => f.name && f.desc).map(f => ({ name: `Class Feature: ${f.name}`, desc: f.desc }))
@@ -177,7 +178,6 @@ export default function DMCharacterBuilder({ onClose }) {
       const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
       const totalMaxHp = levelOneHp + higherLevelHp;
 
-      // Extract Spell Slots if available
       const slots = {};
       if (spellcastingMeta) {
          Object.keys(spellcastingMeta).forEach(key => {
@@ -188,13 +188,17 @@ export default function DMCharacterBuilder({ onClose }) {
          });
       }
 
+      const classesToPass = [{ name: formData.class || 'Fighter', level: startLevel }];
+      const spellStats = calculateSpellcastingStats(classesToPass, formData.stats);
+
       const newChar = {
         name: formData.name, species: formData.species || 'Human', class: formData.class || 'Fighter',
-        classes: [{ name: formData.class || 'Fighter', level: startLevel }], level: startLevel, theme: formData.theme,
+        classes: classesToPass, level: startLevel, theme: formData.theme,
         exp: 0, alignment: formData.alignment,
         age: formData.age, height: formData.height, weight: formData.weight, eyes: formData.eyes, skin: formData.skin, hair: formData.hair,
         hp: totalMaxHp, maxHp: totalMaxHp, tempHp: 0, hitDice: { current: startLevel, max: startLevel, type: formData.hitDie },
-        ac: 10 + dexMod, speed: formData.speed, initiative: '--', spellSave: '--', spellAttack: '--',
+        ac: 10 + dexMod, speed: formData.speed, initiative: '--', 
+        spellSave: spellStats.spellSave || '--', spellAttack: spellStats.spellAttack || '--',
         combatInitiative: null, inspiration: false, isConcentrating: false, conditions: [], hasCompletedTutorial: false, journal: '',
         stats: formData.stats, currency: { assarions: 0, quadrans: 0, leptons: 0 }, imageUrl: formData.imageUrl, img: formData.tokenImg,
         deathSaves: { successes: 0, failures: 0 }, resources: [],

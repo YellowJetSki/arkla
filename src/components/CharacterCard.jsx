@@ -36,66 +36,38 @@ import CompanionTab from './tabs/CompanionTab';
 import BattleMapLayer from './battlemap/BattleMapLayer';
 import StickyBattleNav from './battlemap/StickyBattleNav';
 
+import { fetchAllTraitsAndFeatures, fetchTraitOrFeatureDetails } from '../services/srdApi';
+
 const THEMES = {
   indigo: { 
-    text: 'text-indigo-400', 
-    bg: 'bg-indigo-600', 
-    hoverBg: 'hover:bg-indigo-600',
-    border: 'border-indigo-500/50', 
-    activeBorder: 'border-indigo-500',
-    hoverBorder: 'hover:border-indigo-500/50',
-    ring: 'ring-indigo-500', 
-    shadow: 'shadow-[0_0_15px_rgba(99,102,241,0.5)]', 
-    ambient: 'from-indigo-950/40 via-slate-950', 
-    accent: 'bg-indigo-500/10' 
+    text: 'text-indigo-400', bg: 'bg-indigo-600', hoverBg: 'hover:bg-indigo-600',
+    border: 'border-indigo-500/50', activeBorder: 'border-indigo-500',
+    hoverBorder: 'hover:border-indigo-500/50', ring: 'ring-indigo-500', 
+    shadow: 'shadow-[0_0_15px_rgba(99,102,241,0.5)]', ambient: 'from-indigo-950/40 via-slate-950', accent: 'bg-indigo-500/10' 
   },
   emerald: { 
-    text: 'text-emerald-400', 
-    bg: 'bg-emerald-600', 
-    hoverBg: 'hover:bg-emerald-600',
-    border: 'border-emerald-500/50', 
-    activeBorder: 'border-emerald-500',
-    hoverBorder: 'hover:border-emerald-500/50',
-    ring: 'ring-emerald-500', 
-    shadow: 'shadow-[0_0_15px_rgba(16,185,129,0.5)]', 
-    ambient: 'from-emerald-950/40 via-slate-950', 
-    accent: 'bg-emerald-500/10' 
+    text: 'text-emerald-400', bg: 'bg-emerald-600', hoverBg: 'hover:bg-emerald-600',
+    border: 'border-emerald-500/50', activeBorder: 'border-emerald-500',
+    hoverBorder: 'hover:border-emerald-500/50', ring: 'ring-emerald-500', 
+    shadow: 'shadow-[0_0_15px_rgba(16,185,129,0.5)]', ambient: 'from-emerald-950/40 via-slate-950', accent: 'bg-emerald-500/10' 
   },
   rose: { 
-    text: 'text-rose-400', 
-    bg: 'bg-rose-600', 
-    hoverBg: 'hover:bg-rose-600',
-    border: 'border-rose-500/50', 
-    activeBorder: 'border-rose-500',
-    hoverBorder: 'hover:border-rose-500/50',
-    ring: 'ring-rose-500', 
-    shadow: 'shadow-[0_0_15px_rgba(244,63,94,0.5)]', 
-    ambient: 'from-rose-950/40 via-slate-950', 
-    accent: 'bg-rose-500/10' 
+    text: 'text-rose-400', bg: 'bg-rose-600', hoverBg: 'hover:bg-rose-600',
+    border: 'border-rose-500/50', activeBorder: 'border-rose-500',
+    hoverBorder: 'hover:border-rose-500/50', ring: 'ring-rose-500', 
+    shadow: 'shadow-[0_0_15px_rgba(244,63,94,0.5)]', ambient: 'from-rose-950/40 via-slate-950', accent: 'bg-rose-500/10' 
   },
   amber: { 
-    text: 'text-amber-400', 
-    bg: 'bg-amber-600', 
-    hoverBg: 'hover:bg-amber-600',
-    border: 'border-amber-500/50', 
-    activeBorder: 'border-amber-500',
-    hoverBorder: 'hover:border-amber-500/50',
-    ring: 'ring-amber-500', 
-    shadow: 'shadow-[0_0_15px_rgba(245,158,11,0.5)]', 
-    ambient: 'from-amber-950/40 via-slate-950', 
-    accent: 'bg-amber-500/10' 
+    text: 'text-amber-400', bg: 'bg-amber-600', hoverBg: 'hover:bg-amber-600',
+    border: 'border-amber-500/50', activeBorder: 'border-amber-500',
+    hoverBorder: 'hover:border-amber-500/50', ring: 'ring-amber-500', 
+    shadow: 'shadow-[0_0_15px_rgba(245,158,11,0.5)]', ambient: 'from-amber-950/40 via-slate-950', accent: 'bg-amber-500/10' 
   },
   sky: { 
-    text: 'text-sky-400', 
-    bg: 'bg-sky-600', 
-    hoverBg: 'hover:bg-sky-600',
-    border: 'border-sky-500/50', 
-    activeBorder: 'border-sky-500',
-    hoverBorder: 'hover:border-sky-500/50',
-    ring: 'ring-sky-500', 
-    shadow: 'shadow-[0_0_15px_rgba(14,165,233,0.5)]', 
-    ambient: 'from-sky-950/40 via-slate-950', 
-    accent: 'bg-sky-500/10' 
+    text: 'text-sky-400', bg: 'bg-sky-600', hoverBg: 'hover:bg-sky-600',
+    border: 'border-sky-500/50', activeBorder: 'border-sky-500',
+    hoverBorder: 'hover:border-sky-500/50', ring: 'ring-sky-500', 
+    shadow: 'shadow-[0_0_15px_rgba(14,165,233,0.5)]', ambient: 'from-sky-950/40 via-slate-950', accent: 'bg-sky-500/10' 
   },
 };
 
@@ -124,13 +96,11 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [isBattleMapOpen, setIsBattleMapOpen] = useState(false);
   const [saveToast, setSaveToast] = useState(''); 
 
-  // Feature Forge State
   const [isForgingFeat, setIsForgingFeat] = useState(false);
-  const [activeForgeTab, setActiveForgeTab] = useState('custom');
-  const [searchQueryFeat, setSearchQueryFeat] = useState('');
-  const [srdFeats, setSrdFeats] = useState([]);
-  const [isSearchingFeat, setIsSearchingFeat] = useState(false);
   const [customFeat, setCustomFeat] = useState({ name: '', desc: '', hasTracker: false, trackerMax: 1, trackerRecharge: 'long' });
+  const [srdFeatsList, setSrdFeatsList] = useState([]);
+  const [filteredFeats, setFilteredFeats] = useState([]);
+  const [showFeatDropdown, setShowFeatDropdown] = useState(false);
   
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', inputPlaceholder: '', onConfirm: null });
 
@@ -181,6 +151,10 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     return () => { unsubscribeSession(); unsubscribeChar(); unsubscribeLoot(); };
   }, [currentUser.charId, isDM, isKicked]);
 
+  useEffect(() => {
+    fetchAllTraitsAndFeatures().then(setSrdFeatsList);
+  }, []);
+
   const updateField = async (field, value) => {
     if (!char) return;
     await updateDoc(doc(db, 'characters', currentUser.charId), { [field]: value });
@@ -225,34 +199,23 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     });
   };
 
-  const searchApiFeat = async (e) => {
-    e.preventDefault();
-    if (!searchQueryFeat.trim()) return;
-    setIsSearchingFeat(true);
-    try {
-      const res = await fetch(`https://www.dnd5eapi.co/api/features/?name=${encodeURIComponent(searchQueryFeat.trim())}`);
-      const data = await res.json();
-      setSrdFeats(data.results || []);
-    } catch (err) {
-      showDialog({ isOpen: true, title: 'API Error', message: 'Failed to search archives.', type: 'alert' });
+  const handleFeatNameChange = (e) => {
+    const val = e.target.value;
+    setCustomFeat(prev => ({ ...prev, name: val }));
+    if (val.length > 1) {
+      setFilteredFeats(srdFeatsList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
+      setShowFeatDropdown(true);
+    } else {
+      setShowFeatDropdown(false);
     }
-    setIsSearchingFeat(false);
   };
 
-  const loadApiFeatIntoForge = async (url) => {
-    try {
-      const res = await fetch(`https://www.dnd5eapi.co${url}`);
-      const data = await res.json();
-      setCustomFeat({
-        name: data.name,
-        desc: (data.desc || []).join('\n\n'),
-        hasTracker: false,
-        trackerMax: 1,
-        trackerRecharge: 'long'
-      });
-      setActiveForgeTab('custom');
-    } catch (err) {
-      showDialog({ isOpen: true, title: 'Import Error', message: 'Failed to load feature.', type: 'alert' });
+  const handleSelectSrdFeat = async (item) => {
+    setShowFeatDropdown(false);
+    setCustomFeat(prev => ({ ...prev, name: item.name }));
+    const details = await fetchTraitOrFeatureDetails(item.url);
+    if (details) {
+      setCustomFeat(prev => ({ ...prev, desc: details.desc }));
     }
   };
 
@@ -308,7 +271,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     await updateDoc(doc(db, 'characters', currentUser.charId), updates);
   };
 
-  // Safe fallback to prevent errors when trying to restore a char via DM Dashboard
   const restoreCharacter = async () => {};
 
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
@@ -331,20 +293,19 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   };
   const combatWarnings = getConditionWarnings(activeConditions);
 
+  const hasSpells = Object.keys(char.spellSlots || {}).length > 0 || (char.spells && char.spells.length > 0);
+  
   const availableTabs = [
-    { id: 'combat', icon: Swords, label: 'Combat' }, 
-    { id: 'spells', icon: Flame, label: 'Spells' }, 
-    { id: 'features', icon: Sparkles, label: 'Features' }, 
+    { id: 'combat', icon: Swords, label: 'Combat' },
+    ...(hasSpells ? [{ id: 'spells', icon: Flame, label: 'Spells' }] : []),
+    { id: 'features', icon: Sparkles, label: 'Features' },
+    ...(char.companion ? [{ id: 'companion', icon: PawPrint, label: 'Companion' }] : []),
     { id: 'inventory', icon: Backpack, label: 'Inventory' }, 
     { id: 'partyLoot', icon: Gem, label: 'Party Loot' }, 
     { id: 'bio', icon: BookOpen, label: 'Bio' }, 
     { id: 'journal', icon: PenTool, label: 'Journal' },
     { id: 'settings', icon: Settings, label: 'Settings' }
   ];
-
-  if (char.companion) {
-     availableTabs.splice(3, 0, { id: 'companion', icon: PawPrint, label: 'Companion' });
-  }
 
   return (
     <CardWrapper>
@@ -464,16 +425,10 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             
             {activeTab === 'combat' && (
               <CombatTab 
-                char={char} 
-                charId={currentUser.charId}
-                isDM={isDM} 
-                activeTheme={activeTheme} 
-                combatWarnings={combatWarnings}
-                activeConditions={activeConditions}
+                char={char} charId={currentUser.charId} isDM={isDM} activeTheme={activeTheme} 
+                combatWarnings={combatWarnings} activeConditions={activeConditions}
                 handleAddCondition={(e) => handleAddCondition(e.target.value)}
-                handleRemoveCondition={handleRemoveCondition}
-                handleResourceToggle={handleResourceToggle}
-                showDialog={showDialog}
+                handleRemoveCondition={handleRemoveCondition} handleResourceToggle={handleResourceToggle} showDialog={showDialog}
               />
             )}
 
@@ -495,87 +450,61 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 </div>
 
                 {isDM && isForgingFeat && (
-                  <div className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-amber-500/30 mb-6 animate-in fade-in slide-in-from-top-2 space-y-4 shadow-inner relative z-10">
+                  <form onSubmit={handleForgeCustomFeat} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-amber-500/30 mb-6 animate-in fade-in slide-in-from-top-2 space-y-4 shadow-inner relative z-10">
                     
-                    {/* TABS FOR CUSTOM vs API */}
                     <div className="flex justify-between items-center border-b border-amber-900/50 pb-2">
                       <h4 className="text-sm font-black text-amber-400 flex items-center gap-2 uppercase tracking-widest"><Hammer className="w-4 h-4" /> Feature Forge</h4>
-                      <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
-                        <button onClick={() => setActiveForgeTab('custom')} className={`px-3 py-1 text-xs font-bold uppercase rounded-md transition-colors ${activeForgeTab === 'custom' ? 'bg-amber-600 text-white' : 'text-slate-500 hover:text-white'}`}>Custom</button>
-                        <button onClick={() => setActiveForgeTab('api')} className={`px-3 py-1 text-xs font-bold uppercase rounded-md transition-colors ${activeForgeTab === 'api' ? 'bg-amber-600 text-white' : 'text-slate-500 hover:text-white'}`}>SRD API</button>
-                      </div>
                     </div>
 
-                    {activeForgeTab === 'custom' ? (
-                      <form onSubmit={handleForgeCustomFeat}>
-                        <div className="grid grid-cols-1 gap-4">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Feature Name</label>
-                            <input type="text" required value={customFeat.name} onChange={e => setCustomFeat({...customFeat, name: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner" placeholder="e.g. Action Surge" />
-                          </div>
-
-                          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
-                            <label className="flex items-center gap-2 cursor-pointer mb-3">
-                              <input type="checkbox" checked={customFeat.hasTracker} onChange={(e) => setCustomFeat({...customFeat, hasTracker: e.target.checked})} className="w-4 h-4 rounded border-slate-600 text-amber-500 bg-slate-800 focus:ring-amber-500" />
-                              <span className="text-sm font-bold text-slate-300">Needs Resource Tracker?</span>
-                            </label>
-                            
-                            {customFeat.hasTracker && (
-                              <div className="flex gap-4 animate-in fade-in">
-                                <div className="flex-1">
-                                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Max Slots</label>
-                                  <input type="number" value={customFeat.trackerMax} onChange={(e) => setCustomFeat({...customFeat, trackerMax: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
-                                </div>
-                                <div className="flex-1">
-                                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Recharges On</label>
-                                  <select value={customFeat.trackerRecharge} onChange={(e) => setCustomFeat({...customFeat, trackerRecharge: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500">
-                                    <option value="short">Short Rest</option>
-                                    <option value="long">Long Rest</option>
-                                    <option value="none">Never</option>
-                                  </select>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
-                            <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-amber-500 resize-y shadow-inner leading-relaxed" placeholder="Describe the mechanics..." />
-                          </div>
-                        </div>
-                        <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] flex items-center justify-center gap-2 mt-4">
-                          <Plus className="w-4 h-4" /> Inject Feature
-                        </button>
-                      </form>
-                    ) : (
-                      <div className="space-y-4 animate-in fade-in">
-                        <form onSubmit={searchApiFeat} className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                          <input type="text" value={searchQueryFeat} onChange={(e) => setSearchQueryFeat(e.target.value)} placeholder="Search SRD for Features (e.g. Action Surge)..." className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-4 text-white font-bold focus:outline-none focus:border-amber-500 shadow-inner" />
-                          <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 bg-amber-600 hover:bg-amber-500 transition-colors px-4 py-2 rounded-lg text-white font-bold text-sm uppercase tracking-wider">Search</button>
-                        </form>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="relative">
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> Feature Name (SRD Search)</label>
+                        <input type="text" required value={customFeat.name} onChange={handleFeatNameChange} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner" placeholder="e.g. Action Surge" />
                         
-                        {isSearchingFeat ? (
-                          <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 text-amber-500 animate-spin" /></div>
-                        ) : (
-                          <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                            {srdFeats.map(feat => (
-                              <div key={feat.index} className="bg-slate-950 p-3 rounded-lg border border-slate-700 flex justify-between items-center group">
-                                <span className="font-bold text-slate-300 flex items-center gap-2"><BookOpen className="w-4 h-4 text-slate-500"/> {feat.name}</span>
-                                <button 
-                                  onClick={() => loadApiFeatIntoForge(feat.url)} 
-                                  className="bg-amber-900/40 hover:bg-amber-600 text-amber-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider border border-amber-500/50 transition-colors flex items-center gap-1"
-                                >
-                                  <Plus className="w-3 h-3"/> Load Template
-                                </button>
+                        {showFeatDropdown && filteredFeats.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50">
+                            {filteredFeats.map(item => (
+                              <div key={item.index} onClick={() => handleSelectSrdFeat(item)} className="px-3 py-2 text-sm text-slate-300 hover:bg-amber-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors">
+                                {item.name}
                               </div>
                             ))}
-                            {searchQueryFeat && srdFeats.length === 0 && <p className="text-center text-slate-500 italic p-4">No features found.</p>}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
+
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                        <label className="flex items-center gap-2 cursor-pointer mb-3">
+                          <input type="checkbox" checked={customFeat.hasTracker} onChange={(e) => setCustomFeat({...customFeat, hasTracker: e.target.checked})} className="w-4 h-4 rounded border-slate-600 text-amber-500 bg-slate-800 focus:ring-amber-500" />
+                          <span className="text-sm font-bold text-slate-300">Needs Resource Tracker?</span>
+                        </label>
+                        
+                        {customFeat.hasTracker && (
+                          <div className="flex gap-4 animate-in fade-in">
+                            <div className="flex-1">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Max Slots</label>
+                              <input type="number" value={customFeat.trackerMax} onChange={(e) => setCustomFeat({...customFeat, trackerMax: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                            </div>
+                            <div className="flex-1">
+                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Recharges On</label>
+                              <select value={customFeat.trackerRecharge} onChange={(e) => setCustomFeat({...customFeat, trackerRecharge: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+                                <option value="short">Short Rest</option>
+                                <option value="long">Long Rest</option>
+                                <option value="none">Never</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
+                        <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-amber-500 resize-y shadow-inner leading-relaxed" placeholder="Describe the mechanics..." />
+                      </div>
+                    </div>
+                    <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] flex items-center justify-center gap-2 mt-4">
+                      <Plus className="w-4 h-4" /> Inject Feature
+                    </button>
+                  </form>
                 )}
 
                 {(!char.features || char.features.length === 0) ? (
@@ -612,15 +541,10 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             )}
 
             {activeTab === 'companion' && <CompanionTab char={char} activeTheme={activeTheme} />}
-
             {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
-
             {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} charId={currentUser.charId} />}
-
             {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
-
             {activeTab === 'journal' && <JournalTab char={char} updateField={updateField} activeTheme={activeTheme} />}
-
             {activeTab === 'settings' && <SettingsTab char={char} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
             
           </div>

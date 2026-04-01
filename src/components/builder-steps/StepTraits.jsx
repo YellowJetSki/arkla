@@ -1,6 +1,74 @@
 import { useState, useEffect } from 'react';
 import { Fingerprint, Plus, Trash2, Search, Target } from 'lucide-react';
-import { fetchAllTraitsAndFeatures, fetchTraitOrFeatureDetails } from '../../services/srdApi';
+import { 
+  fetchAllTraitsAndFeatures, 
+  fetchTraitOrFeatureDetails, 
+  fetchAllProficiencies, 
+  fetchAllLanguages 
+} from '../../services/srdApi';
+
+// Custom Component: Safely appends SRD proficiencies using commas
+const AppendingInput = ({ label, value, onChange, placeholder, dataset, color='emerald' }) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [filtered, setFiltered] = useState([]);
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    onChange(val);
+    const parts = val.split(',').map(s => s.trim());
+    const lastPart = parts[parts.length - 1]; // Look only at the current word being typed
+
+    if (lastPart.length >= 1) {
+      const matches = dataset.filter(item => {
+        // Strip out D&D API category prefixes for a cleaner look
+        const cleanName = item.name.replace(/^Skill: |^Tool: |^Weapon: |^Armor: |^Saving Throw: /, '');
+        return cleanName.toLowerCase().includes(lastPart.toLowerCase());
+      });
+      matches.sort((a, b) => a.name.localeCompare(b.name));
+      setFiltered(matches.slice(0, 15)); // Keep dropdown clean
+      setShowDropdown(matches.length > 0);
+    } else {
+      setShowDropdown(false);
+    }
+  };
+
+  const handleSelect = (itemName) => {
+    const cleanName = itemName.replace(/^Skill: |^Tool: |^Weapon: |^Armor: |^Saving Throw: /, '');
+    const parts = value.split(',').map(s => s.trim());
+    parts.pop(); // Remove the partial string the user was typing
+    if (cleanName) parts.push(cleanName); // Add the full SRD name
+    
+    onChange(parts.join(', ') + (parts.length > 0 ? ', ' : ''));
+    setShowDropdown(false);
+  };
+
+  return (
+    <div className="relative">
+      <label className={`block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1`}>{label}</label>
+      <input 
+        type="text" 
+        value={value} 
+        onChange={handleInput} 
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)} 
+        className={`w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-${color}-500`} 
+        placeholder={placeholder} 
+      />
+      {showDropdown && filtered.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50">
+          {filtered.map(item => (
+            <div 
+              key={item.index} 
+              onMouseDown={(e) => { e.preventDefault(); handleSelect(item.name); }} 
+              className={`px-3 py-2 text-sm text-slate-300 hover:bg-${color}-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0`}
+            >
+              {item.name.replace(/^Skill: |^Tool: |^Weapon: |^Armor: |^Saving Throw: /, '')}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function StepTraits({ 
   formData, level, updateField, customProfs, updateProf, speciesTraits, setSpeciesTraits
@@ -8,25 +76,33 @@ export default function StepTraits({
   
   const [newTraitName, setNewTraitName] = useState('');
   const [newTraitDesc, setNewTraitDesc] = useState('');
-  const [srdList, setSrdList] = useState([]);
-  const [filtered, setFiltered] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
+  
+  const [srdTraitsList, setSrdTraitsList] = useState([]);
+  const [srdProfsList, setSrdProfsList] = useState([]);
+  const [srdLangsList, setSrdLangsList] = useState([]);
+  
+  const [filteredTraits, setFilteredTraits] = useState([]);
+  const [showTraitDropdown, setShowTraitDropdown] = useState(false);
 
   const pb = Math.ceil((Number(level) || 1) / 4) + 1;
 
-  useEffect(() => { fetchAllTraitsAndFeatures().then(setSrdList); }, []);
+  useEffect(() => { 
+    fetchAllTraitsAndFeatures().then(setSrdTraitsList); 
+    fetchAllProficiencies().then(setSrdProfsList);
+    fetchAllLanguages().then(setSrdLangsList);
+  }, []);
 
   const handleNameChange = (e) => {
     const val = e.target.value;
     setNewTraitName(val);
     if (val.length > 1) {
-      setFiltered(srdList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
-      setShowDropdown(true);
-    } else setShowDropdown(false);
+      setFilteredTraits(srdTraitsList.filter(i => i.name.toLowerCase().includes(val.toLowerCase())));
+      setShowTraitDropdown(true);
+    } else setShowTraitDropdown(false);
   };
 
   const handleSelectSrd = async (item) => {
-    setShowDropdown(false);
+    setShowTraitDropdown(false);
     setNewTraitName(item.name);
     const details = await fetchTraitOrFeatureDetails(item.url);
     if (details) setNewTraitDesc(details.desc);
@@ -58,30 +134,23 @@ export default function StepTraits({
           <input type="number" onFocus={e => e.target.select()} value={formData.speed} onChange={e => updateField('speed', Number(e.target.value))} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-emerald-500" />
         </div>
         <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner">
-          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Languages</label>
-          <input type="text" onFocus={e => e.target.select()} value={customProfs.languages} onChange={e => updateProf('languages', e.target.value)} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500" placeholder="e.g. Common, Elvish" />
+          <AppendingInput 
+             label="Languages" 
+             value={customProfs.languages} 
+             onChange={val => updateProf('languages', val)} 
+             placeholder="e.g. Common, Elvish" 
+             dataset={srdLangsList} 
+          />
         </div>
       </div>
 
       <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner space-y-4">
         <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-2">Class & Background Proficiencies</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Skills</label>
-            <input type="text" value={customProfs.skills} onChange={e => updateProf('skills', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Athletics, Perception" />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tools</label>
-            <input type="text" value={customProfs.tools} onChange={e => updateProf('tools', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Thieves' Tools" />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Weapons</label>
-            <input type="text" value={customProfs.weapons} onChange={e => updateProf('weapons', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Simple Weapons" />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Armor</label>
-            <input type="text" value={customProfs.armor} onChange={e => updateProf('armor', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Light, Medium" />
-          </div>
+          <AppendingInput label="Skills" value={customProfs.skills} onChange={v => updateProf('skills', v)} placeholder="e.g. Athletics" dataset={srdProfsList} />
+          <AppendingInput label="Tools" value={customProfs.tools} onChange={v => updateProf('tools', v)} placeholder="e.g. Thieves' Tools" dataset={srdProfsList} />
+          <AppendingInput label="Weapons" value={customProfs.weapons} onChange={v => updateProf('weapons', v)} placeholder="e.g. Simple Weapons" dataset={srdProfsList} />
+          <AppendingInput label="Armor" value={customProfs.armor} onChange={v => updateProf('armor', v)} placeholder="e.g. Light Armor" dataset={srdProfsList} />
         </div>
       </div>
 
@@ -90,9 +159,9 @@ export default function StepTraits({
         <div className="relative">
           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> Search SRD Traits</label>
           <input type="text" value={newTraitName} onChange={handleNameChange} className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-emerald-500" placeholder="e.g. Darkvision..." />
-          {showDropdown && filtered.length > 0 && (
+          {showTraitDropdown && filteredTraits.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50">
-              {filtered.map(item => <div key={item.index} onClick={() => handleSelectSrd(item)} className="px-3 py-2 text-sm text-slate-300 hover:bg-emerald-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0">{item.name}</div>)}
+              {filteredTraits.map(item => <div key={item.index} onClick={() => handleSelectSrd(item)} className="px-3 py-2 text-sm text-slate-300 hover:bg-emerald-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0">{item.name}</div>)}
             </div>
           )}
         </div>
