@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, runTransaction, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon, Filter } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
@@ -167,6 +167,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           return; 
         }
 
+        // 1. Remove the item from inventory
         await runInventoryTransaction((inv) => {
           if (!inv[realIndex]) return inv;
           inv[realIndex].quantity -= 1;
@@ -176,14 +177,31 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           return inv;
         });
 
-        await runTransaction(db, async (t) => {
+        // 2. Dual-Sync the HP to both the Character Sheet and the Battlemap
+        try {
+          const batch = writeBatch(db);
           const charRef = doc(db, 'characters', charId);
-          const snap = await t.get(charRef);
-          if (!snap.exists()) return;
-          const currentHp = snap.data().hp || 0;
-          const maxHp = snap.data().maxHp || 10;
-          t.update(charRef, { hp: Math.min(maxHp, currentHp + healAmount) });
-        });
+          const mapRef = doc(db, 'campaign', 'battlemap');
+
+          const charSnap = await getDoc(charRef);
+          if (charSnap.exists()) {
+            const currentHp = charSnap.data().hp || 0;
+            const maxHp = charSnap.data().maxHp || 10;
+            const newHp = Math.min(maxHp, currentHp + healAmount);
+
+            batch.update(charRef, { hp: newHp });
+
+            const mapSnap = await getDoc(mapRef);
+            if (mapSnap.exists() && mapSnap.data().tokens && mapSnap.data().tokens[charId]) {
+              batch.update(mapRef, { [`tokens.${charId}.hp`]: newHp });
+            }
+
+            await batch.commit();
+          }
+        } catch (error) {
+          console.error("Failed to sync consumable HP to map:", error);
+        }
+
         showDialog({ isOpen: false });
       },
       onCancel: () => showDialog({ isOpen: false })
@@ -267,7 +285,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           let currentSilver = currency.quadrans || 0;
           let currentCopper = currency.leptons || 0;
 
-          // COIN DEVOURER FIX: Try to subtract directly from the selected pool first
           let handledDirectly = false;
 
           if (transactionType === 'assarions' && currentGold >= amount) {
@@ -282,7 +299,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           }
 
           if (!handledDirectly) {
-            // Fallback: Convert everything to copper and make change (The Banker)
             let costInCopper = 0;
             if (transactionType === 'assarions') costInCopper = amount * 100;
             if (transactionType === 'quadrans') costInCopper = amount * 10;
