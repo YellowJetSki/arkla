@@ -1,23 +1,21 @@
 import { useState } from 'react';
-import { Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, X, Droplets, Droplet, Backpack, ShieldPlus, Zap } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase';
-import { getModifier, parseAndScaleAttack, getConditionMechanics } from '../../services/arklaEngine';
+import { Target, Sword, AlertTriangle, X, Droplets, Droplet, Backpack, Zap } from 'lucide-react';
 import VitalStats from '../shared/VitalStats';
 import { CONDITIONS_LIST, CONDITION_EFFECTS } from '../../data/campaignData';
 import TempBuffsModal from '../TempBuffsModal';
+import { parseAndScaleAttack, getConditionMechanics } from '../../services/arklaEngine';
 
 export default function CombatTab({ 
   char, 
   charId, 
   isDM, 
+  isEditMode,
   activeTheme, 
   combatWarnings, 
   activeConditions, 
   handleAddCondition, 
   handleRemoveCondition, 
   handleResourceToggle,
-  showDialog
 }) {
   const [showBuffsModal, setShowBuffsModal] = useState(false);
 
@@ -28,8 +26,6 @@ export default function CombatTab({
   if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
 
   const tempBuffs = char.tempBuffs || [];
-  const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
-  const displayAc = (char.ac || 10) + acBuffTotal;
 
   const inventoryWeapons = (char.inventory || []).filter(item => item.category === 'Weapon').map(w => {
     let propsStr = '';
@@ -51,7 +47,6 @@ export default function CombatTab({
   const allAttacks = [...(char.attacks || []), ...inventoryWeapons];
   const resources = char.resources || [];
 
-  // Parse Class/Species Features for Combat Keywords to generate Quick Ref
   const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
   const combatFeatures = (char.features || []).filter(f => {
       const text = `${f.name} ${f.desc}`.toLowerCase();
@@ -65,7 +60,7 @@ export default function CombatTab({
         <TempBuffsModal 
           charId={charId} 
           tempBuffs={tempBuffs} 
-          isDM={isDM} 
+          isDM={isDM && !isEditMode} 
           activeTheme={activeTheme} 
           onClose={() => setShowBuffsModal(false)} 
         />
@@ -106,47 +101,21 @@ export default function CombatTab({
         </div>
       )}
 
-      {/* CORE STAT BLOCKS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        
-        <div className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl p-4 flex flex-col items-center justify-center relative overflow-hidden transition-colors ${mechanics.attackDisadvantage ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : mechanics.attackAdvantage ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'border-slate-700/80'}`}>
-          <div className={`absolute top-0 w-full h-1 ${mechanics.attackDisadvantage ? 'bg-red-500' : mechanics.attackAdvantage ? 'bg-emerald-500' : 'bg-slate-700'}`}></div>
-          <Target className={`w-5 h-5 mb-2 ${mechanics.attackDisadvantage ? 'text-red-400' : mechanics.attackAdvantage ? 'text-emerald-400' : 'text-slate-400'}`} />
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Hit Modifier</span>
-          <span className="text-lg font-black text-white mt-1">
-             {mechanics.attackDisadvantage ? 'DISADV' : mechanics.attackAdvantage ? 'ADVANTAGE' : 'Normal'}
-          </span>
+      {/* Combat Status Banner */}
+      <div className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden transition-colors ${mechanics.attackDisadvantage ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : mechanics.attackAdvantage ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'border-slate-700/80'}`}>
+        <div className={`absolute top-0 left-0 h-full w-1 ${mechanics.attackDisadvantage ? 'bg-red-500' : mechanics.attackAdvantage ? 'bg-emerald-500' : 'bg-slate-700'}`}></div>
+        <div className="flex items-center gap-3 pl-2">
+            <Target className={`w-6 h-6 ${mechanics.attackDisadvantage ? 'text-red-400' : mechanics.attackAdvantage ? 'text-emerald-400' : 'text-slate-400'}`} />
+            <div>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Attack Status</span>
+                <span className={`text-lg font-black uppercase tracking-wider ${mechanics.attackDisadvantage ? 'text-red-400' : mechanics.attackAdvantage ? 'text-emerald-400' : 'text-white'}`}>
+                    {mechanics.attackDisadvantage ? 'Disadvantage' : mechanics.attackAdvantage ? 'Advantage' : 'Normal'}
+                </span>
+            </div>
         </div>
-        
-        <div className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl p-4 flex flex-col items-center justify-center relative transition-colors ${displaySpeed < (char.speed || 30) ? 'border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)]' : 'border-slate-700/80'}`}>
-          <div className="absolute top-0 w-full h-1 bg-sky-500"></div>
-          <Wind className="w-5 h-5 text-sky-400 mb-2" />
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Movement</span>
-          <div className="flex items-baseline gap-1 mt-1">
-             <span className={`text-2xl font-black ${displaySpeed < (char.speed || 30) ? 'text-amber-400' : 'text-white'}`}>{displaySpeed}</span>
-             <span className="text-xs text-slate-400 font-bold">ft</span>
-          </div>
-        </div>
-        
-        <button onClick={() => setShowBuffsModal(true)} className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl p-4 flex flex-col items-center justify-center relative w-full transition-all hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-white ${acBuffTotal > 0 ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : acBuffTotal < 0 ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border-slate-700/80 hover:border-slate-500'}`}>
-          <div className={`absolute top-0 w-full h-1 ${acBuffTotal > 0 ? 'bg-emerald-500' : acBuffTotal < 0 ? 'bg-red-500' : 'bg-amber-500'}`}></div>
-          <ShieldPlus className={`w-5 h-5 mb-2 ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-amber-400'}`} />
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Armor Class</span>
-          <div className="flex items-baseline gap-1 mt-1">
-             <span className={`text-2xl font-black ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-white'}`}>{displayAc}</span>
-          </div>
-          <div className="absolute top-2 right-2 bg-slate-950/80 p-1 rounded border border-slate-700 shadow-inner">
-             <Plus className="w-3 h-3 text-slate-400" />
-          </div>
+        <button onClick={() => setShowBuffsModal(true)} className={`text-xs font-bold px-4 py-2 rounded-lg transition-colors border shadow-sm ${(isDM && !isEditMode) ? 'pointer-events-none' : 'hover:scale-105 cursor-pointer'} ${tempBuffs.length > 0 ? `${activeTheme.bg} text-white border-transparent` : 'bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700'}`}>
+            {tempBuffs.length > 0 ? `Manage Buffs (${tempBuffs.length})` : 'Add Temp Buff'}
         </button>
-        
-        <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 flex flex-col items-center justify-center relative">
-          <div className="absolute top-0 w-full h-1 bg-fuchsia-500"></div>
-          <Activity className="w-5 h-5 text-fuchsia-400 mb-2" />
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Initiative</span>
-          <span className="text-2xl font-black text-white mt-1">{char.initiative !== '--' ? char.initiative : (getModifier(char.stats?.DEX || 10) >= 0 ? `+${getModifier(char.stats?.DEX || 10)}` : getModifier(char.stats?.DEX || 10))}</span>
-        </div>
-
       </div>
 
       {resources.length > 0 && (
@@ -259,7 +228,7 @@ export default function CombatTab({
                 e.target.value = '';
               }
             }}
-            disabled={isDM}
+            disabled={isDM && !isEditMode}
             className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-slate-300 text-sm focus:outline-none focus:border-amber-500 shadow-inner"
             defaultValue=""
           >
@@ -278,7 +247,7 @@ export default function CombatTab({
                   <span className="text-amber-400 font-bold text-sm block mb-1">{cond}</span>
                   <p className="text-[10px] text-slate-400 leading-relaxed">{CONDITION_EFFECTS[cond]}</p>
                 </div>
-                {!isDM && (
+                {(!isDM || isEditMode) && (
                   <button onClick={() => handleRemoveCondition(cond)} className="text-slate-500 hover:text-red-400 p-1 bg-slate-950 rounded transition-colors shrink-0">
                     <X className="w-3 h-3" />
                   </button>

@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 
 import StatGrid from './shared/StatGrid';
-import QuickTraits from './shared/QuickTraits';
+import QuickTraits from './shared/QuickTraits'; 
+import FeatureCard from './shared/FeatureCard';
 import ImageModal from './shared/ImageModal'; 
 import GlobalLoader from './shared/GlobalLoader';
 import DialogModal from './shared/DialogModal';
@@ -18,7 +19,6 @@ import LevelUpModal from './LevelUpModal';
 import SessionResetModal from './SessionResetModal';
 import PlayerGuideModal from './PlayerGuideModal';
 import PartyLootModal from './PartyLootModal'; 
-import DMEditSheet from './DMEditSheet';
 import ShortRestModal from './ShortRestModal'; 
 import LongRestModal from './LongRestModal'; 
 import Spellbook from './Spellbook'; 
@@ -157,7 +157,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const updateField = async (field, value) => {
     if (!char) return;
     await updateDoc(doc(db, 'characters', currentUser.charId), { [field]: value });
-    if (['inventory', 'backstory', 'journal', 'theme'].includes(field)) {
+    if (['inventory', 'backstory', 'journal', 'theme', 'stats', 'ac', 'speed', 'initiative'].includes(field)) {
       setSaveToast('Saved to Cloud');
       setTimeout(() => setSaveToast(''), 2500);
     }
@@ -174,7 +174,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   };
 
   const handleResourceToggle = async (resourceIndex, newCurrentValue) => {
-    if (!char || !char.resources || isDM) return;
+    if (!char || !char.resources || (isDM && !isEditMode)) return;
     const updatedResources = [...char.resources];
     updatedResources[resourceIndex] = {
       ...updatedResources[resourceIndex],
@@ -345,7 +345,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
 
         <ImageModal isOpen={isImageOpen} url={`/${currentUser.charId}.png`} alt={char.name || 'Character'} onClose={() => setIsImageOpen(false)} />
         <ImageModal isOpen={!!activeLoot} url={activeLoot?.url} alt={activeLoot?.name} onClose={() => setActiveLoot(null)} />
-        {isDM && isEditMode && <DMEditSheet char={char} charId={currentUser.charId} onCancel={() => setIsEditMode(false)} />}
 
         <div className={`${isDM ? 'p-6' : 'max-w-4xl mx-auto p-3 md:p-8 min-h-[100dvh]'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'}`}>
           
@@ -353,7 +352,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-4 sticky top-0 bg-slate-900 z-40 pt-2">
               <h2 className="text-xl font-bold text-white flex items-center gap-2"><User className="w-6 h-6 text-indigo-400" /> {char.name}'s Sheet (DM Mode)</h2>
               <div className="flex items-center gap-2">
-                <button onClick={() => setIsEditMode(true)} className="flex items-center gap-2 text-indigo-400 hover:text-white transition-colors bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-500/30 hover:bg-indigo-600 text-sm"><Edit3 className="w-4 h-4" /> Edit Core Stats</button>
+                <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center gap-2 transition-colors px-3 py-1.5 rounded-lg border text-sm font-bold shadow-sm ${isEditMode ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'text-indigo-400 bg-indigo-900/30 border-indigo-500/30 hover:bg-indigo-600 hover:text-white'}`}>
+                  <Edit3 className="w-4 h-4" /> {isEditMode ? 'Exit Edit Mode' : 'Edit Live Sheet'}
+                </button>
                 <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-800 p-1.5 rounded-lg"><X className="w-5 h-5" /></button>
               </div>
             </div>
@@ -391,6 +392,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             char={char} 
             charId={currentUser.charId} 
             isDM={isDM} 
+            isEditMode={isEditMode}
             activeTheme={activeTheme} 
             showDialog={showDialog}
             onOpenImage={() => setIsImageOpen(true)}
@@ -400,7 +402,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           />
 
           <div className="mb-6">
-            <StatGrid char={char} activeTheme={activeTheme} />
+            <StatGrid char={char} activeTheme={activeTheme} isEditMode={isEditMode} updateField={updateField} />
             <QuickTraits features={char.features} />
           </div>
 
@@ -424,21 +426,22 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             
             {activeTab === 'combat' && (
               <CombatTab 
-                char={char} charId={currentUser.charId} isDM={isDM} activeTheme={activeTheme} 
+                char={char} charId={currentUser.charId} 
+                isDM={isDM} isEditMode={isEditMode} activeTheme={activeTheme} 
                 combatWarnings={combatWarnings} activeConditions={activeConditions}
                 handleAddCondition={(e) => handleAddCondition(e.target.value)}
                 handleRemoveCondition={handleRemoveCondition} handleResourceToggle={handleResourceToggle} showDialog={showDialog}
               />
             )}
 
-            {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM} showDialog={showDialog} />}
+            {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} showDialog={showDialog} />}
 
             {activeTab === 'features' && (
               <div className="space-y-6">
                 
                 <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-2">
                   <h3 className="text-lg font-bold text-white flex items-center gap-2"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
-                  {isDM && (
+                  {(isDM || isEditMode) && (
                     <button 
                       onClick={() => setIsForgingFeat(!isForgingFeat)}
                       className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isForgingFeat ? 'bg-amber-700 border-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.3)]' : `bg-slate-800/80 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
@@ -448,7 +451,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                   )}
                 </div>
 
-                {isDM && isForgingFeat && (
+                {(isDM || isEditMode) && isForgingFeat && (
                   <form onSubmit={handleForgeCustomFeat} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-amber-500/30 mb-6 animate-in fade-in slide-in-from-top-2 space-y-4 shadow-inner relative z-10">
                     
                     <div className="flex justify-between items-center border-b border-amber-900/50 pb-2">
@@ -518,7 +521,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                          title={
                            <div className="flex items-center gap-2">
                              {feat.name}
-                             {isDM && (
+                             {(isDM || isEditMode) && (
                                <button 
                                  onClick={(e) => { e.stopPropagation(); removeFeature(feat); }}
                                  className="text-slate-500 hover:text-red-400 bg-slate-900 p-1.5 rounded transition-all shadow-inner ml-2"
@@ -540,9 +543,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             )}
 
             {activeTab === 'companion' && <CompanionTab char={char} activeTheme={activeTheme} />}
-            {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
+            {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
             {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} charId={currentUser.charId} />}
-            {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
+            {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
             {activeTab === 'journal' && <JournalTab char={char} updateField={updateField} activeTheme={activeTheme} />}
             {activeTab === 'settings' && <SettingsTab char={char} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
             

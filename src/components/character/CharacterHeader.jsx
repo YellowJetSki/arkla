@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Skull, Maximize, Star, Heart, Shield, Tent, Moon } from 'lucide-react';
+import { Skull, Maximize, Star, Heart, Shield, Tent, Moon, Wind, Zap } from 'lucide-react';
 import useCharacterVitals from '../../hooks/useCharacterVitals';
 import XPBar from '../shared/XPBar';
+import { getModifier, getConditionMechanics } from '../../services/arklaEngine';
 
-export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpenImage, onOpenShortRest, onOpenLongRest, onOpenLevelUp }) {
+export default function CharacterHeader({ char, charId, isDM, isEditMode, activeTheme, onOpenImage, onOpenShortRest, onOpenLongRest, onOpenLevelUp }) {
   const [displayHp, setDisplayHp] = useState("");
   const [isEditingHp, setIsEditingHp] = useState(false);
   const [displayMaxHp, setDisplayMaxHp] = useState("");
@@ -33,6 +34,19 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
     canLevelUp
   } = useCharacterVitals(char, charId, isDM);
 
+  const activeConditions = char.conditions || [];
+  const mechanics = getConditionMechanics(activeConditions);
+  
+  const tempBuffs = char.tempBuffs || [];
+  const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
+  const displayAc = (char.ac || 10) + acBuffTotal;
+
+  let displaySpeed = mechanics.speedOverride !== null ? mechanics.speedOverride : Math.floor((char.speed || 30) * mechanics.speedMultiplier);
+  const isEncumbered = (char.inventory || '').length > 500 && char.stats?.STR < 15;
+  if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
+  
+  const initScore = char.initiative !== '--' ? char.initiative : (getModifier(char.stats?.DEX || 10) >= 0 ? `+${getModifier(char.stats?.DEX || 10)}` : getModifier(char.stats?.DEX || 10));
+
   return (
     <div className={`bg-slate-900 border ${isUnconscious ? 'border-red-900 shadow-[0_0_30px_rgba(220,38,38,0.2)]' : 'border-slate-700 shadow-xl'} rounded-2xl mb-6 relative flex flex-col overflow-hidden`}>
       
@@ -47,10 +61,57 @@ export default function CharacterHeader({ char, charId, isDM, activeTheme, onOpe
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent pointer-events-none z-10"></div>
         
-        <button onClick={(e) => { e.stopPropagation(); onOpenImage(); }} className="absolute top-3 right-3 p-1.5 bg-slate-900/50 backdrop-blur-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer"><Maximize className="w-4 h-4 text-white" /></button>
+        <button onClick={(e) => { e.stopPropagation(); onOpenImage(); }} className="absolute bottom-3 right-4 p-1.5 bg-slate-900/50 backdrop-blur-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer"><Maximize className="w-4 h-4 text-white" /></button>
         
         {isUnconscious && <div className="absolute inset-0 flex items-center justify-center bg-red-950/60 backdrop-blur-[1px] pointer-events-none z-10"><Skull className="w-12 h-12 text-white drop-shadow-md animate-pulse" /></div>}
         
+        {/* Core Stat Portrait Badges */}
+        <div className="absolute top-4 right-4 flex flex-col gap-3 z-30 pointer-events-auto">
+          {/* AC Badge */}
+          <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full border-[3px] border-slate-950 flex flex-col items-center justify-center shadow-2xl backdrop-blur-md transition-colors ${acBuffTotal > 0 ? 'bg-emerald-500' : acBuffTotal < 0 ? 'bg-red-500' : 'bg-slate-800'}`}>
+            <Shield className="w-3 h-3 md:w-4 md:h-4 text-white/70 absolute top-1.5" />
+            {isEditMode ? (
+              <input 
+                type="number" 
+                defaultValue={char.ac || 10} 
+                onBlur={(e) => updateField('ac', Number(e.target.value))}
+                className="w-8 mt-2 bg-transparent text-center text-sm md:text-base font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none z-10 relative"
+              />
+            ) : (
+              <span className="text-sm md:text-base font-black text-white mt-2 leading-none">{displayAc}</span>
+            )}
+          </div>
+          {/* Speed Badge */}
+          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-800 border-[3px] border-slate-950 flex flex-col items-center justify-center shadow-2xl backdrop-blur-md">
+            <Wind className="w-3 h-3 md:w-4 md:h-4 text-sky-400 absolute top-1.5" />
+            {isEditMode ? (
+              <input 
+                type="number" 
+                defaultValue={char.speed || 30} 
+                onBlur={(e) => updateField('speed', Number(e.target.value))}
+                className="w-8 mt-2 bg-transparent text-center text-sm md:text-base font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none z-10 relative"
+              />
+            ) : (
+              <span className="text-sm md:text-base font-black text-white mt-2 leading-none">{displaySpeed}</span>
+            )}
+          </div>
+          {/* Initiative Badge */}
+          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-800 border-[3px] border-slate-950 flex flex-col items-center justify-center shadow-2xl backdrop-blur-md">
+            <Zap className="w-3 h-3 md:w-4 md:h-4 text-fuchsia-400 absolute top-1.5" />
+            {isEditMode ? (
+              <input 
+                type="text" 
+                defaultValue={char.initiative !== '--' ? char.initiative : ''} 
+                placeholder="Auto"
+                onBlur={(e) => updateField('initiative', e.target.value || '--')}
+                className="w-8 mt-2 bg-transparent text-center text-[10px] md:text-xs font-black text-white focus:outline-none z-10 relative"
+              />
+            ) : (
+              <span className="text-sm md:text-base font-black text-white mt-2 leading-none">{initScore}</span>
+            )}
+          </div>
+        </div>
+
         <div className="absolute bottom-3 left-4 md:left-6 text-left pointer-events-none z-10">
           <div className="flex items-center gap-2 mb-0.5">
             <h2 className={`text-2xl md:text-3xl font-black leading-tight drop-shadow-lg text-balance ${isUnconscious ? 'text-red-400' : 'text-white'}`}>{char.name}</h2>
