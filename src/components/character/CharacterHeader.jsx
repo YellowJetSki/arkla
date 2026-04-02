@@ -53,10 +53,13 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
       <div className="w-full h-32 md:h-48 relative group shrink-0 overflow-hidden block">
         <div className={`w-full h-full relative ${char.isConcentrating ? `ring-[4px] ring-inset ${activeTheme.ring} animate-pulse z-20` : ''} ${isFrightened ? 'ring-[4px] ring-inset ring-fuchsia-600 animate-pulse z-20' : ''}`}>
           <img 
-            src={`/${charId}.png`} 
+            src={char.imageUrl || `/${charId}.png`} 
             alt={char.name || 'Unknown'} 
             className={`w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105 ${isUnconscious ? 'grayscale' : ''}`} 
-            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://via.placeholder.com/800x400?text=No+Image'; }} 
+            onError={(e) => { 
+               e.currentTarget.onerror = null; 
+               e.currentTarget.src = '/icon.png'; 
+            }} 
           />
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent pointer-events-none z-10"></div>

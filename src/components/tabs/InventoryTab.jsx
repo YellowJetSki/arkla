@@ -144,6 +144,19 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
     });
   };
 
+  const promptDelete = (item, idx) => {
+    showDialog({
+      title: 'Delete Item?',
+      message: `Are you sure you want to permanently remove ${item.name} from your inventory?`,
+      type: 'confirm',
+      onConfirm: async () => {
+        await deleteItem(idx);
+        showDialog({ isOpen: false });
+      },
+      onCancel: () => showDialog({ isOpen: false })
+    });
+  };
+
   const handleConsume = (item, idx) => {
     const realIndex = inventoryArray.findIndex(i => 
       (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
@@ -202,49 +215,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           console.error("Failed to sync consumable HP to map:", error);
         }
 
-        showDialog({ isOpen: false });
-      },
-      onCancel: () => showDialog({ isOpen: false })
-    });
-  };
-
-  const handleShareToParty = async (item, idx) => {
-    const realIndex = inventoryArray.findIndex(i => 
-      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
-    );
-    if (realIndex === -1) return;
-
-    showDialog({
-      title: 'Share with Party?',
-      message: `Send ${item.name} to the Shared Party Loot? It will be removed from your personal inventory.`,
-      type: 'confirm',
-      onConfirm: async () => {
-        await runInventoryTransaction((inv) => {
-          if (!inv[realIndex]) return inv;
-          inv.splice(realIndex, 1);
-          return inv;
-        });
-
-        let descText = `${item.category}\n`;
-        if (item.category === 'Weapon') descText += `Damage: ${item.damageDice} ${item.damageType}\n`;
-        if (item.category === 'Armor') descText += `AC: ${item.ac}\n`;
-        descText += item.desc;
-
-        const newItem = {
-          id: `loot_${Date.now()}`,
-          name: item.name,
-          desc: descText,
-          url: item.imageUrl || '',
-          source: char.name
-        };
-        
-        const lootRef = doc(db, 'campaign', 'shared_loot');
-        const lootSnap = await getDoc(lootRef);
-        let items = [];
-        if (lootSnap.exists()) items = lootSnap.data().items || [];
-        
-        items.push(newItem);
-        await setDoc(lootRef, { items, latestShareId: newItem.id }, { merge: true });
         showDialog({ isOpen: false });
       },
       onCancel: () => showDialog({ isOpen: false })
@@ -435,11 +405,18 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                 <div className="flex justify-between items-center p-3 sm:p-4 cursor-pointer" onClick={() => toggleItemOpen(i)}>
                   
                   <div className="flex items-center gap-3">
-                    <div className="flex flex-col items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden shrink-0">
-                       <button onClick={(e) => { e.stopPropagation(); updateQuantity(i, 1); }} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-0.5"><Plus className="w-3 h-3"/></button>
-                       <span className="text-xs font-black text-white py-1">{item.quantity}</span>
-                       <button onClick={(e) => { e.stopPropagation(); updateQuantity(i, -1); }} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-0.5"><Minus className="w-3 h-3"/></button>
-                    </div>
+                    {isDM ? (
+                      <div className="flex flex-col items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden shrink-0">
+                         <button onClick={(e) => { e.stopPropagation(); updateQuantity(i, 1); }} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-0.5"><Plus className="w-3 h-3"/></button>
+                         <span className="text-xs font-black text-white py-1">{item.quantity}</span>
+                         <button onClick={(e) => { e.stopPropagation(); updateQuantity(i, -1); }} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-0.5"><Minus className="w-3 h-3"/></button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden shrink-0 px-3 py-1.5">
+                         <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">QTY</span>
+                         <span className="text-sm font-black text-white">{item.quantity}</span>
+                      </div>
+                    )}
                     <div>
                       <span className={`font-black text-sm md:text-base block ${openItems[i] ? activeTheme.text : 'text-slate-200'}`}>{item.name}</span>
                       <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">{item.category}</span>
@@ -447,18 +424,9 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleShareToParty(item, i); }}
-                      className="bg-slate-800 border border-slate-700 p-2 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors text-slate-400 shadow-sm"
-                      title="Share to Party Loot"
-                    >
-                      <Send className="w-4 h-4" />
+                    <button onClick={(e) => { e.stopPropagation(); promptDelete(item, i); }} className="bg-slate-800 border border-slate-700 p-2 rounded-lg hover:bg-red-600 hover:text-white transition-colors text-slate-400 shadow-sm" title="Delete Item">
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                    {isDM && (
-                      <button onClick={(e) => { e.stopPropagation(); deleteItem(i); }} className="bg-slate-800 border border-slate-700 p-2 rounded-lg hover:bg-red-600 hover:text-white transition-colors text-slate-400 shadow-sm">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
                     <div className="text-slate-500 bg-slate-950 p-1 rounded border border-slate-800 ml-1">
                       {openItems[i] ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
                     </div>

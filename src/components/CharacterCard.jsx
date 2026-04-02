@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
@@ -269,7 +269,21 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     await updateDoc(doc(db, 'characters', currentUser.charId), updates);
   };
 
-  const restoreCharacter = async () => {};
+  const restoreCharacter = async (importedData) => {
+    try {
+      const dataToSave = { ...importedData, id: currentUser.charId };
+      await setDoc(doc(db, 'characters', currentUser.charId), dataToSave);
+      setSaveToast('Character Restored from Backup!');
+      setTimeout(() => setSaveToast(''), 2500);
+    } catch (err) {
+      console.error("Failed to restore character:", err);
+      showDialog({
+        title: 'Restore Failed',
+        message: 'There was an error restoring your character data to the cloud.',
+        type: 'alert'
+      });
+    }
+  };
 
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
   if (!char) return <CardWrapper><GlobalLoader /></CardWrapper>;
@@ -349,7 +363,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           
           {isDM ? (
             <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-4 sticky top-0 bg-slate-900 z-40 pt-2">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2"><User className="w-6 h-6 text-indigo-400" /> {char.name}'s Sheet (DM Mode)</h2>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2"><User className="w-6 h-6 text-indigo-400" /> {(char.name || 'Unknown')}'s Sheet (DM Mode)</h2>
               <div className="flex items-center gap-2">
                 <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center gap-2 transition-colors px-3 py-1.5 rounded-lg border text-sm font-bold shadow-sm ${isEditMode ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'text-indigo-400 bg-indigo-900/30 border-indigo-500/30 hover:bg-indigo-600 hover:text-white'}`}>
                   <Edit3 className="w-4 h-4" /> {isEditMode ? 'Exit Edit Mode' : 'Edit Live Sheet'}
