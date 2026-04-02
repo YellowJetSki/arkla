@@ -49,7 +49,7 @@ const TokenImage = ({ token, isEnemy }) => {
   const formattedName = token.name ? token.name.toLowerCase().split(' ')[0] : 'unknown';
   const imgSrc = fallbackStep === 0 ? `/${formattedName}_bm.png` : token.img;
 
-  return <img src={imgSrc} alt={token.name} className="w-full h-full rounded-full object-cover bg-slate-800 border-2 border-transparent relative" onError={handleError} />;
+  return <img src={imgSrc} alt={token.name || 'Token'} className="w-full h-full rounded-full object-cover bg-slate-800 border-2 border-transparent relative" onError={handleError} />;
 };
 
 export default function MapGrid({ 
@@ -253,7 +253,7 @@ export default function MapGrid({
           </div>
           <div className="flex flex-col pr-4">
             <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-0.5">Current Turn</span>
-            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none">{activeToken.name}</h1>
+            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none">{activeToken.name || 'Unknown'}</h1>
           </div>
         </div>
       )}
@@ -484,7 +484,7 @@ export default function MapGrid({
 
                   {isDM && !isDisplayMode && currentCellSize >= 30 && (
                     <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-700 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-40">
-                      {token.name.substring(0, 8)}
+                      {(token.name || 'Unknown').substring(0, 8)}
                     </div>
                   )}
 
