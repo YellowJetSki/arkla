@@ -281,52 +281,19 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           const current = currency[transactionType] || 0;
           transaction.update(charRef, { [`currency.${transactionType}`]: current + amount });
         } else {
-          let currentGold = currency.assarions || 0;
-          let currentSilver = currency.quadrans || 0;
-          let currentCopper = currency.leptons || 0;
+          let currentCoin = currency[transactionType] || 0;
 
-          let handledDirectly = false;
-
-          if (transactionType === 'assarions' && currentGold >= amount) {
-            currentGold -= amount;
-            handledDirectly = true;
-          } else if (transactionType === 'quadrans' && currentSilver >= amount) {
-            currentSilver -= amount;
-            handledDirectly = true;
-          } else if (transactionType === 'leptons' && currentCopper >= amount) {
-            currentCopper -= amount;
-            handledDirectly = true;
+          if (currentCoin >= amount) {
+            transaction.update(charRef, { [`currency.${transactionType}`]: currentCoin - amount });
+          } else {
+             return Promise.reject("Not enough funds");
           }
-
-          if (!handledDirectly) {
-            let costInCopper = 0;
-            if (transactionType === 'assarions') costInCopper = amount * 100;
-            if (transactionType === 'quadrans') costInCopper = amount * 10;
-            if (transactionType === 'leptons') costInCopper = amount;
-
-            const totalCopper = (currentGold * 100) + (currentSilver * 10) + currentCopper;
-
-            if (totalCopper < costInCopper) {
-              return Promise.reject("Not enough funds");
-            }
-
-            const remainingCopperTotal = totalCopper - costInCopper;
-            currentGold = Math.floor(remainingCopperTotal / 100);
-            currentSilver = Math.floor((remainingCopperTotal % 100) / 10);
-            currentCopper = remainingCopperTotal % 10;
-          }
-
-          transaction.update(charRef, {
-            'currency.assarions': currentGold,
-            'currency.quadrans': currentSilver,
-            'currency.leptons': currentCopper
-          });
         }
       });
       setTransactionAmount('');
     } catch (error) {
        if (error === "Not enough funds") {
-         showDialog({ title: 'Insufficient Funds', message: 'Not enough wealth.', type: 'alert', onConfirm: () => showDialog({ isOpen: false }) });
+         showDialog({ title: 'Insufficient Funds', message: `You do not have enough ${transactionType}.`, type: 'alert', onConfirm: () => showDialog({ isOpen: false }) });
        }
     }
   };
@@ -575,7 +542,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
 
         <div className="space-y-4">
           <div className="bg-slate-900 p-4 rounded-xl border border-yellow-900/30 shadow-sm">
-            <span className="text-yellow-500/50 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Assarions (Gold)</span>
+            <span className="text-yellow-500/50 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Assarions</span>
             <div className="flex items-center justify-between gap-3">
               <button onClick={() => adjustCurrency('assarions', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
               <input 
@@ -592,7 +559,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           </div>
 
           <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-sm">
-            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Quadrans (Silver)</span>
+            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Quadrans</span>
             <div className="flex items-center justify-between gap-3">
               <button onClick={() => adjustCurrency('quadrans', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
               <input 
@@ -609,7 +576,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           </div>
 
           <div className="bg-slate-900 p-4 rounded-xl border border-amber-900/30 shadow-sm">
-            <span className="text-amber-700 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Leptons (Copper)</span>
+            <span className="text-amber-700 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Leptons</span>
             <div className="flex items-center justify-between gap-3">
               <button onClick={() => adjustCurrency('leptons', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
               <input 
