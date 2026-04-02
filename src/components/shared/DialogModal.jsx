@@ -25,45 +25,44 @@ export default function DialogModal({ isOpen, title, message, type = 'alert', in
     }
   };
 
-  // Upgraded theme logic for high-fantasy immersion
   const isConfirm = type === 'confirm';
+  const isPrompt = type === 'prompt';
   
-  const headerBorderColor = isConfirm ? 'border-amber-500/30 bg-amber-900/20' : 'border-indigo-500/30 bg-indigo-900/20';
-  const textColor = isConfirm ? 'text-amber-400' : 'text-indigo-400';
+  // Theme logic for high-contrast graphic novel UI
+  const headerBgColor = isConfirm ? 'bg-amber-500' : isPrompt ? 'bg-indigo-500' : 'bg-slate-300';
+  const headerTextColor = 'text-slate-950';
   const btnColor = isConfirm 
-    ? 'bg-amber-600 hover:bg-amber-500 shadow-[0_0_15px_rgba(217,119,6,0.4)]' 
-    : 'bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.4)]';
+    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950' 
+    : isPrompt ? 'bg-indigo-500 hover:bg-indigo-400 text-slate-950' 
+    : 'bg-slate-300 hover:bg-white text-slate-950';
+  
   const Icon = isConfirm ? AlertTriangle : Info;
-  const glowColor = isConfirm ? 'bg-amber-500/10' : 'bg-indigo-500/10';
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
       
-      {/* Ambient background glow based on alert type */}
-      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] ${glowColor} blur-[100px] rounded-full pointer-events-none`}></div>
-
-      <div className="bg-slate-900/80 backdrop-blur-2xl border border-slate-700/80 rounded-3xl w-full max-w-sm shadow-[0_0_60px_rgba(0,0,0,0.6)] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden relative z-10">
+      <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl w-full max-w-sm shadow-[8px_8px_0px_rgba(0,0,0,1)] flex flex-col animate-in zoom-in-95 duration-300 overflow-hidden relative z-10">
         
-        <div className={`p-5 border-b flex items-center justify-between ${headerBorderColor}`}>
+        <div className={`p-4 border-b-[3px] border-slate-950 flex items-center justify-between ${headerBgColor}`}>
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl bg-slate-950/50 shadow-inner ${textColor}`}>
-              <Icon className="w-5 h-5" />
-            </div>
-            <h3 className={`text-lg font-black tracking-wide ${textColor} drop-shadow-md`}>
+            <Icon className={`w-6 h-6 ${headerTextColor}`} />
+            <h3 className={`text-lg font-black uppercase tracking-widest ${headerTextColor}`}>
               {title}
             </h3>
           </div>
-          <button onClick={onCancel} className="text-slate-400 hover:text-white hover:bg-slate-800 p-2 rounded-xl transition-all">
-            <X className="w-5 h-5" />
-          </button>
+          {onCancel && (
+            <button onClick={onCancel} className="text-slate-950 bg-black/10 hover:bg-black/20 p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,0.5)] active:translate-y-[2px] active:shadow-none transition-all">
+              <X className="w-4 h-4 font-black" />
+            </button>
+          )}
         </div>
 
-        <div className="p-6 text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-medium">
+        <div className="p-6 text-slate-300 text-sm md:text-base font-bold leading-relaxed whitespace-pre-wrap">
           {message}
           
           {/* Prompt Input Field */}
           {type === 'prompt' && (
-            <div className="mt-5 relative group">
+            <div className="mt-6 relative">
               <input 
                 ref={inputRef}
                 type="text" 
@@ -72,27 +71,26 @@ export default function DialogModal({ isOpen, title, message, type = 'alert', in
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
                 placeholder={inputPlaceholder}
-                className="w-full bg-slate-950/80 border border-slate-600 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-indigo-400 font-bold shadow-inner relative z-10 transition-colors"
+                className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-indigo-500 font-black shadow-inner transition-colors"
               />
-              <div className="absolute inset-0 rounded-xl bg-indigo-500/20 blur-md opacity-0 group-focus-within:opacity-100 transition-opacity duration-500 z-0"></div>
             </div>
           )}
         </div>
 
-        <div className="p-5 bg-slate-950/50 flex gap-3 justify-end border-t border-slate-800">
+        <div className="p-5 bg-slate-950 flex gap-3 justify-end border-t-2 border-slate-900">
           {(type === 'confirm' || type === 'prompt') && (
             <button 
               onClick={onCancel} 
-              className="px-5 py-2.5 rounded-xl font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-colors border border-transparent hover:border-slate-700"
+              className="px-5 py-3 rounded-xl font-black text-slate-400 uppercase tracking-widest text-[10px] md:text-xs hover:bg-slate-900 hover:text-white transition-colors border-2 border-slate-800"
             >
               Cancel
             </button>
           )}
           <button 
             onClick={handleConfirm} 
-            className={`px-8 py-2.5 rounded-xl font-black text-white transition-all uppercase tracking-widest text-xs ${btnColor}`}
+            className={`px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs transition-all border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] ${btnColor}`}
           >
-            {type === 'confirm' ? 'Confirm' : 'Accept'}
+            {type === 'confirm' ? 'Confirm' : type === 'prompt' ? 'Submit' : 'Dismiss'}
           </button>
         </div>
 
