@@ -17,10 +17,17 @@ export default function OnboardingWizard({ char, onComplete }) {
   const firstName = (char.name || 'Traveler').split(' ')[0];
   const welcomeText = `Welcome, ${firstName}. Your legacy begins now.`;
 
-  // Removed skills/spells steps, focusing purely on theme and UI tutorial
   const steps = ['theme', 'interface', 'navigation'];
   const currentStep = steps[stepIndex];
   const activeTheme = THEMES[selectedTheme];
+
+  // Lock the body from scrolling underneath the modal
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
 
   useEffect(() => {
     if (currentStep === 'theme') {
@@ -46,9 +53,9 @@ export default function OnboardingWizard({ char, onComplete }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-2xl h-[100dvh] overflow-hidden animate-in fade-in duration-700">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950 h-[100dvh] overflow-hidden animate-in fade-in duration-700">
       
-      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] ${activeTheme.bg} opacity-5 blur-[150px] rounded-full pointer-events-none transition-colors duration-1000`}></div>
+      <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] ${activeTheme.bg} opacity-10 blur-[150px] rounded-full pointer-events-none transition-colors duration-1000`}></div>
 
       <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-3xl w-full max-w-md shadow-2xl flex flex-col relative overflow-hidden transition-all duration-500 max-h-[90dvh]">
         

@@ -1,7 +1,11 @@
-import { Shield, Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, Info, X, Droplets, Droplet, Backpack } from 'lucide-react';
+import { useState } from 'react';
+import { Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, X, Droplets, Droplet, Backpack, ShieldPlus, Zap } from 'lucide-react';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { getModifier, parseAndScaleAttack, getConditionMechanics } from '../../services/arklaEngine';
 import VitalStats from '../shared/VitalStats';
 import { CONDITIONS_LIST, CONDITION_EFFECTS } from '../../data/campaignData';
+import TempBuffsModal from '../TempBuffsModal';
 
 export default function CombatTab({ 
   char, 
@@ -15,6 +19,7 @@ export default function CombatTab({
   handleResourceToggle,
   showDialog
 }) {
+  const [showBuffsModal, setShowBuffsModal] = useState(false);
 
   const mechanics = getConditionMechanics(activeConditions);
 
@@ -22,9 +27,11 @@ export default function CombatTab({
   const isEncumbered = (char.inventory || '').length > 500 && char.stats?.STR < 15;
   if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
 
-  // Dynamic Attack Sourcing: Merging char.attacks (Custom Actions) + inventory (Weapons)
+  const tempBuffs = char.tempBuffs || [];
+  const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
+  const displayAc = (char.ac || 10) + acBuffTotal;
+
   const inventoryWeapons = (char.inventory || []).filter(item => item.category === 'Weapon').map(w => {
-    // Safely extract properties if they are a string or an array from DMForge
     let propsStr = '';
     if (Array.isArray(w.properties)) {
       propsStr = w.properties.map(p => p.name).join(', ');
@@ -44,8 +51,26 @@ export default function CombatTab({
   const allAttacks = [...(char.attacks || []), ...inventoryWeapons];
   const resources = char.resources || [];
 
+  // Parse Class/Species Features for Combat Keywords to generate Quick Ref
+  const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
+  const combatFeatures = (char.features || []).filter(f => {
+      const text = `${f.name} ${f.desc}`.toLowerCase();
+      return combatKeywords.some(kw => text.includes(kw));
+  });
+
   return (
     <div className="space-y-6">
+      
+      {showBuffsModal && (
+        <TempBuffsModal 
+          charId={charId} 
+          tempBuffs={tempBuffs} 
+          isDM={isDM} 
+          activeTheme={activeTheme} 
+          onClose={() => setShowBuffsModal(false)} 
+        />
+      )}
+
       <VitalStats char={char} charId={charId} isDM={isDM} activeTheme={activeTheme} />
 
       {combatWarnings.length > 0 && (
@@ -81,7 +106,9 @@ export default function CombatTab({
         </div>
       )}
 
+      {/* CORE STAT BLOCKS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        
         <div className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl p-4 flex flex-col items-center justify-center relative overflow-hidden transition-colors ${mechanics.attackDisadvantage ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : mechanics.attackAdvantage ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'border-slate-700/80'}`}>
           <div className={`absolute top-0 w-full h-1 ${mechanics.attackDisadvantage ? 'bg-red-500' : mechanics.attackAdvantage ? 'bg-emerald-500' : 'bg-slate-700'}`}></div>
           <Target className={`w-5 h-5 mb-2 ${mechanics.attackDisadvantage ? 'text-red-400' : mechanics.attackAdvantage ? 'text-emerald-400' : 'text-slate-400'}`} />
@@ -101,19 +128,25 @@ export default function CombatTab({
           </div>
         </div>
         
-        <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 flex flex-col items-center justify-center relative">
-          <div className="absolute top-0 w-full h-1 bg-amber-500"></div>
-          <Shield className="w-5 h-5 text-amber-400 mb-2" />
+        <button onClick={() => setShowBuffsModal(true)} className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl p-4 flex flex-col items-center justify-center relative w-full transition-all hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-white ${acBuffTotal > 0 ? 'border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : acBuffTotal < 0 ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border-slate-700/80 hover:border-slate-500'}`}>
+          <div className={`absolute top-0 w-full h-1 ${acBuffTotal > 0 ? 'bg-emerald-500' : acBuffTotal < 0 ? 'bg-red-500' : 'bg-amber-500'}`}></div>
+          <ShieldPlus className={`w-5 h-5 mb-2 ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-amber-400'}`} />
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Armor Class</span>
-          <span className="text-2xl font-black text-white mt-1">{char.ac}</span>
-        </div>
+          <div className="flex items-baseline gap-1 mt-1">
+             <span className={`text-2xl font-black ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-white'}`}>{displayAc}</span>
+          </div>
+          <div className="absolute top-2 right-2 bg-slate-950/80 p-1 rounded border border-slate-700 shadow-inner">
+             <Plus className="w-3 h-3 text-slate-400" />
+          </div>
+        </button>
         
         <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-4 flex flex-col items-center justify-center relative">
-          <div className="absolute top-0 w-full h-1 bg-emerald-500"></div>
-          <Activity className="w-5 h-5 text-emerald-400 mb-2" />
+          <div className="absolute top-0 w-full h-1 bg-fuchsia-500"></div>
+          <Activity className="w-5 h-5 text-fuchsia-400 mb-2" />
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Initiative</span>
           <span className="text-2xl font-black text-white mt-1">{char.initiative !== '--' ? char.initiative : (getModifier(char.stats?.DEX || 10) >= 0 ? `+${getModifier(char.stats?.DEX || 10)}` : getModifier(char.stats?.DEX || 10))}</span>
         </div>
+
       </div>
 
       {resources.length > 0 && (
@@ -196,6 +229,22 @@ export default function CombatTab({
           )}
         </div>
       </div>
+
+      {combatFeatures.length > 0 && (
+        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/80 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+          <h3 className={`text-sm font-black ${activeTheme.text} flex items-center gap-2 uppercase tracking-widest drop-shadow-sm mb-4 border-b border-slate-700 pb-2 relative z-10`}>
+            <Zap className="w-4 h-4" /> Combat Traits Quick Ref
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+            {combatFeatures.map((f, i) => (
+              <div key={i} className="bg-slate-900/80 border border-slate-700/80 rounded-xl p-3 shadow-inner">
+                 <span className="font-black text-white text-xs uppercase tracking-wider block mb-1">{f.name}</span>
+                 <p className="text-[10px] text-slate-400 leading-relaxed line-clamp-4 hover:line-clamp-none transition-all">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/80 rounded-2xl p-5 shadow-xl">
         <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">

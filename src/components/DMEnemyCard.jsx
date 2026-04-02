@@ -18,7 +18,6 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
   const updateHp = async (amount) => {
     const newHp = Math.max(0, Math.min(enemy.hp, enemy.currentHp + amount));
     
-    // INSTANT DUAL-SYNC
     const batch = writeBatch(db);
     batch.update(doc(db, 'active_enemies', enemy.id), { currentHp: newHp });
     batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${enemy.id}.hp`]: newHp });
@@ -47,19 +46,19 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
   const killEnemy = async () => {
     const batch = writeBatch(db);
     batch.delete(doc(db, 'active_enemies', enemy.id));
-    batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${enemy.id}`]: null }); // Deletes token
+    // WE NO LONGER DELETE THE TOKEN HERE. IT STAYS ON THE BOARD AS A CORPSE.
     await batch.commit();
   };
 
   const handleDelete = () => {
     setDialog({
       isOpen: true,
-      title: 'Remove Threat',
-      message: `Are you sure you want to remove ${enemy.name} from the active board?`,
+      title: 'Clear Threat Card',
+      message: `Remove ${enemy.name} from the active threats panel? (Their corpse will remain on the battlefield).`,
       type: 'confirm',
       onConfirm: async () => {
         try {
-          await updateHp(-9999); // Instantly drop HP to 0 so DMs can see it die
+          await updateHp(-9999); // Instantly drop HP to 0 so the board sees it die
           setTimeout(() => { killEnemy(); }, 500);
         } catch (err) {
           console.error("Enemy Deletion Sync Failed:", err);
@@ -128,7 +127,7 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
           <button 
             onClick={handleDelete} 
             className="absolute top-3 right-3 p-2 bg-red-900/20 hover:bg-red-900/50 text-red-400 border border-red-900/30 hover:border-red-500/50 rounded-lg transition-colors z-10" 
-            title="Remove Enemy"
+            title="Clear Threat (Leave Corpse)"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -269,60 +268,60 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
             </div>
           )}
         </div>
+
+        {isExpanded && (
+          <div className="p-3 border-t border-slate-800 bg-slate-950/50 space-y-4 animate-in slide-in-from-top-2 fade-in">
+            
+            <div className="grid grid-cols-6 gap-1">
+              {Object.entries(enemy.stats || {}).map(([stat, val]) => (
+                <div key={stat} className="bg-slate-900 border border-slate-800 rounded p-1 flex flex-col items-center">
+                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{stat}</span>
+                  <span className="text-xs font-black text-white">{val}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-1.5 text-xs text-slate-300">
+              {enemy.speed && <p><strong className="text-sky-400">Speed</strong> {enemy.speed}</p>}
+              {enemy.saves && <p><strong className="text-slate-400">Saves</strong> {enemy.saves}</p>}
+              {enemy.skills && <p><strong className="text-slate-400">Skills</strong> {enemy.skills}</p>}
+              {enemy.resistances && <p><strong className="text-slate-400">Resistances</strong> {enemy.resistances}</p>}
+              {enemy.immunities && <p><strong className="text-slate-400">Immunities</strong> {enemy.immunities}</p>}
+              {enemy.senses && <p><strong className="text-slate-400">Senses</strong> {enemy.senses}</p>}
+            </div>
+
+            <div className="space-y-3 pt-3 border-t border-slate-800">
+              {enemy.features && enemy.features.length > 0 && (
+                <div>
+                  <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Traits</h5>
+                  {enemy.features.map((feat, i) => (
+                    <p key={i} className="text-xs text-slate-300 mb-1 leading-relaxed"><strong className="text-white">{feat.name}.</strong> {feat.desc}</p>
+                  ))}
+                </div>
+              )}
+              
+              {enemy.actions && enemy.actions.length > 0 && (
+                <div>
+                  <h5 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Swords className="w-3 h-3"/> Actions</h5>
+                  {enemy.actions.map((act, i) => (
+                    <p key={i} className="text-xs text-slate-300 mb-1.5 leading-relaxed"><strong className="text-white">{act.name}.</strong> {act.desc}</p>
+                  ))}
+                </div>
+              )}
+
+              {enemy.parsedActions && enemy.parsedActions.length > 0 && (
+                <div>
+                  <h5 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Swords className="w-3 h-3"/> Actions</h5>
+                  {enemy.parsedActions.map((act, i) => (
+                    <p key={i} className="text-xs text-slate-300 mb-1.5 leading-relaxed whitespace-pre-wrap"><strong className="text-white block mb-0.5">{act.name}.</strong>{act.desc}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
       </div>
-
-      {isExpanded && (
-        <div className="p-3 border-t border-slate-800 bg-slate-950/50 space-y-4 animate-in slide-in-from-top-2 fade-in">
-           
-           <div className="grid grid-cols-6 gap-1">
-             {Object.entries(enemy.stats || {}).map(([stat, val]) => (
-               <div key={stat} className="bg-slate-900 border border-slate-800 rounded p-1 flex flex-col items-center">
-                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{stat}</span>
-                 <span className="text-xs font-black text-white">{val}</span>
-               </div>
-             ))}
-           </div>
-
-           <div className="space-y-1.5 text-xs text-slate-300">
-             {enemy.speed && <p><strong className="text-sky-400">Speed</strong> {enemy.speed}</p>}
-             {enemy.saves && <p><strong className="text-slate-400">Saves</strong> {enemy.saves}</p>}
-             {enemy.skills && <p><strong className="text-slate-400">Skills</strong> {enemy.skills}</p>}
-             {enemy.resistances && <p><strong className="text-slate-400">Resistances</strong> {enemy.resistances}</p>}
-             {enemy.immunities && <p><strong className="text-slate-400">Immunities</strong> {enemy.immunities}</p>}
-             {enemy.senses && <p><strong className="text-slate-400">Senses</strong> {enemy.senses}</p>}
-           </div>
-
-           <div className="space-y-3 pt-3 border-t border-slate-800">
-             {enemy.features && enemy.features.length > 0 && (
-               <div>
-                 <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Traits</h5>
-                 {enemy.features.map((feat, i) => (
-                   <p key={i} className="text-xs text-slate-300 mb-1 leading-relaxed"><strong className="text-white">{feat.name}.</strong> {feat.desc}</p>
-                 ))}
-               </div>
-             )}
-             
-             {enemy.actions && enemy.actions.length > 0 && (
-               <div>
-                 <h5 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Swords className="w-3 h-3"/> Actions</h5>
-                 {enemy.actions.map((act, i) => (
-                   <p key={i} className="text-xs text-slate-300 mb-1.5 leading-relaxed"><strong className="text-white">{act.name}.</strong> {act.desc}</p>
-                 ))}
-               </div>
-             )}
-
-             {enemy.parsedActions && enemy.parsedActions.length > 0 && (
-               <div>
-                 <h5 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Swords className="w-3 h-3"/> Actions</h5>
-                 {enemy.parsedActions.map((act, i) => (
-                   <p key={i} className="text-xs text-slate-300 mb-1.5 leading-relaxed whitespace-pre-wrap"><strong className="text-white block mb-0.5">{act.name}.</strong>{act.desc}</p>
-                 ))}
-               </div>
-             )}
-           </div>
-
-        </div>
-      )}
     </>
   );
 }

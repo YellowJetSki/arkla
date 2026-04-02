@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, updateDoc, getDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { X, Backpack, Send, PackagePlus, Hammer, Search, Plus, Sword, Shield, Image as ImageIcon, Users } from 'lucide-react';
+import { X, Backpack, Send, PackagePlus, Hammer, Search, Plus, Sword, Shield, Image as ImageIcon, Users, Crosshair } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../services/srdApi';
 
@@ -9,16 +9,13 @@ export default function DMItemManager({ onClose, activePlayers }) {
   const [stashedItems, setStashedItems] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState('');
   
-  // NEW: Secure mapping of player IDs to their actual Names
   const [playerMap, setPlayerMap] = useState({});
   
-  // Unified Forge Form State
   const [newItem, setNewItem] = useState({ 
     name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', 
-    properties: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '', quantity: 1 
+    properties: '', range: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '', quantity: 1 
   });
   
-  // SRD Autocomplete State
   const [srdEquipmentList, setSrdEquipmentList] = useState([]);
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
@@ -37,7 +34,6 @@ export default function DMItemManager({ onClose, activePlayers }) {
       }
     };
     
-    // Fetch actual names for the dropdown and filter out ghost IDs
     const fetchPlayers = async () => {
       const map = {};
       for (const id of activePlayers) {
@@ -66,7 +62,6 @@ export default function DMItemManager({ onClose, activePlayers }) {
       
       setFilteredEquip(srdEquipmentList.filter(i => {
         const itemName = i.name.toLowerCase();
-        // Magic alias check!
         if (val.toLowerCase().includes('health potion') && itemName.includes('potion of healing')) return true;
         return searchTerms.every(term => itemName.includes(term));
       }));
@@ -88,6 +83,7 @@ export default function DMItemManager({ onClose, activePlayers }) {
         damageDice: details.damageDice || '',
         damageType: details.damageType || 'Slashing',
         properties: details.properties || '',
+        range: details.range || '',
         ac: details.ac || 14
       }));
     }
@@ -107,13 +103,14 @@ export default function DMItemManager({ onClose, activePlayers }) {
        damageDice: newItem.category === 'Weapon' ? newItem.damageDice : null,
        damageType: newItem.category === 'Weapon' ? newItem.damageType : null,
        properties: newItem.category === 'Weapon' ? newItem.properties : null,
+       range: newItem.category === 'Weapon' ? newItem.range : null,
        ac: newItem.category === 'Armor' ? Number(newItem.ac) : null,
        hpRecovery: newItem.category === 'Consumable' || newItem.category === 'Potion' ? newItem.hpRecovery : null
     };
     
     await saveStashToDb([structuredItem, ...stashedItems]);
     
-    setNewItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '', quantity: 1 });
+    setNewItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '', quantity: 1 });
     setDialog({ isOpen: true, title: 'Item Forged', message: `${structuredItem.name} has been added to your Vault.`, type: 'alert' });
   };
 
@@ -259,7 +256,7 @@ export default function DMItemManager({ onClose, activePlayers }) {
                 </div>
 
                 {newItem.category === 'Weapon' && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Sword className="w-3 h-3 inline"/> Damage</label>
                       <input 
@@ -278,6 +275,16 @@ export default function DMItemManager({ onClose, activePlayers }) {
                         onChange={e => setNewItem({...newItem, damageType: e.target.value})} 
                         className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" 
                         placeholder="Slashing" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Crosshair className="w-3 h-3 inline"/> Range</label>
+                      <input 
+                        type="text" 
+                        value={newItem.range || ''} 
+                        onChange={e => setNewItem({...newItem, range: e.target.value})} 
+                        className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" 
+                        placeholder="5 ft" 
                       />
                     </div>
                     <div className="col-span-2 sm:col-span-1">
@@ -398,6 +405,7 @@ export default function DMItemManager({ onClose, activePlayers }) {
                       
                       <div className="flex flex-wrap gap-1 mb-3">
                         {item.damageDice && <span className="bg-slate-950 border border-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded shadow-inner">Dmg: {item.damageDice}</span>}
+                        {item.range && <span className="bg-slate-950 border border-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded shadow-inner">Rng: {item.range}</span>}
                         {item.ac && <span className="bg-slate-950 border border-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded shadow-inner">AC: {item.ac}</span>}
                         {item.hpRecovery && <span className="bg-slate-950 border border-slate-800 text-emerald-300 text-[10px] px-1.5 py-0.5 rounded shadow-inner">Heal: {item.hpRecovery}</span>}
                       </div>

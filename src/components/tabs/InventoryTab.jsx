@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, runTransaction, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Image as ImageIcon } from 'lucide-react';
+import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon, Filter } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
+
+const INVENTORY_FILTERS = ['All', 'Weapon', 'Armor', 'Consumable', 'Potion', 'Adventuring Gear', 'Wondrous Item'];
 
 export default function InventoryTab({ char, charId, isDM, updateField, activeTheme, showDialog }) {
   const [isForgingItem, setIsForgingItem] = useState(false);
   const [openItems, setOpenItems] = useState({}); 
+  const [activeFilter, setActiveFilter] = useState('All');
   
   const [customItem, setCustomItem] = useState({ 
-    name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' 
+    name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' 
   });
   
   const [transactionAmount, setTransactionAmount] = useState('');
@@ -31,6 +34,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   }, []);
 
   const inventoryArray = Array.isArray(char.inventory) ? char.inventory : [];
+  const filteredInventoryArray = inventoryArray.filter(item => activeFilter === 'All' || item.category === activeFilter);
 
   const runInventoryTransaction = async (mutationFn) => {
     try {
@@ -76,6 +80,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         damageDice: details.damageDice || '',
         damageType: details.damageType || 'Slashing',
         properties: details.properties || '',
+        range: details.range || '',
         ac: details.ac || 14
       }));
     }
@@ -95,6 +100,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
        damageDice: customItem.category === 'Weapon' ? customItem.damageDice : null,
        damageType: customItem.category === 'Weapon' ? customItem.damageType : null,
        properties: customItem.category === 'Weapon' ? customItem.properties : null,
+       range: customItem.category === 'Weapon' ? customItem.range : null,
        ac: customItem.category === 'Armor' ? Number(customItem.ac) : null,
        hpRecovery: customItem.category === 'Consumable' || customItem.category === 'Potion' ? customItem.hpRecovery : null
     };
@@ -103,30 +109,47 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
       return [...inv, newItem];
     });
     
-    setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' });
+    setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' });
     setIsForgingItem(false);
   };
 
   const updateQuantity = async (idx, delta) => {
+    const item = filteredInventoryArray[idx];
+    const realIndex = inventoryArray.findIndex(i => 
+      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
+    );
+    if (realIndex === -1) return;
+
     await runInventoryTransaction((inv) => {
-      if (!inv[idx]) return inv;
-      inv[idx].quantity += delta;
-      if (inv[idx].quantity <= 0) {
-        inv.splice(idx, 1);
+      if (!inv[realIndex]) return inv;
+      inv[realIndex].quantity += delta;
+      if (inv[realIndex].quantity <= 0) {
+        inv.splice(realIndex, 1);
       }
       return inv;
     });
   };
 
   const deleteItem = async (idx) => {
+    const item = filteredInventoryArray[idx];
+    const realIndex = inventoryArray.findIndex(i => 
+      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
+    );
+    if (realIndex === -1) return;
+
     await runInventoryTransaction((inv) => {
-      if (!inv[idx]) return inv;
-      inv.splice(idx, 1);
+      if (!inv[realIndex]) return inv;
+      inv.splice(realIndex, 1);
       return inv;
     });
   };
 
-  const handleConsume = (item, index) => {
+  const handleConsume = (item, idx) => {
+    const realIndex = inventoryArray.findIndex(i => 
+      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
+    );
+    if (realIndex === -1) return;
+
     const isDice = (item.hpRecovery || '').includes('d');
     const promptMsg = isDice 
       ? `Roll your ${item.hpRecovery} and enter the total HP regained below. This will consume 1x ${item.name}.`
@@ -144,38 +167,61 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           return; 
         }
 
+        // 1. Remove the item from inventory
         await runInventoryTransaction((inv) => {
-          if (!inv[index]) return inv;
-          inv[index].quantity -= 1;
-          if (inv[index].quantity <= 0) {
-             inv.splice(index, 1);
+          if (!inv[realIndex]) return inv;
+          inv[realIndex].quantity -= 1;
+          if (inv[realIndex].quantity <= 0) {
+             inv.splice(realIndex, 1);
           }
           return inv;
         });
 
-        await runTransaction(db, async (t) => {
+        // 2. Dual-Sync the HP to both the Character Sheet and the Battlemap
+        try {
+          const batch = writeBatch(db);
           const charRef = doc(db, 'characters', charId);
-          const snap = await t.get(charRef);
-          if (!snap.exists()) return;
-          const currentHp = snap.data().hp || 0;
-          const maxHp = snap.data().maxHp || 10;
-          t.update(charRef, { hp: Math.min(maxHp, currentHp + healAmount) });
-        });
+          const mapRef = doc(db, 'campaign', 'battlemap');
+
+          const charSnap = await getDoc(charRef);
+          if (charSnap.exists()) {
+            const currentHp = charSnap.data().hp || 0;
+            const maxHp = charSnap.data().maxHp || 10;
+            const newHp = Math.min(maxHp, currentHp + healAmount);
+
+            batch.update(charRef, { hp: newHp });
+
+            const mapSnap = await getDoc(mapRef);
+            if (mapSnap.exists() && mapSnap.data().tokens && mapSnap.data().tokens[charId]) {
+              batch.update(mapRef, { [`tokens.${charId}.hp`]: newHp });
+            }
+
+            await batch.commit();
+          }
+        } catch (error) {
+          console.error("Failed to sync consumable HP to map:", error);
+        }
+
         showDialog({ isOpen: false });
       },
       onCancel: () => showDialog({ isOpen: false })
     });
   };
 
-  const handleShareToParty = async (item, index) => {
+  const handleShareToParty = async (item, idx) => {
+    const realIndex = inventoryArray.findIndex(i => 
+      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
+    );
+    if (realIndex === -1) return;
+
     showDialog({
       title: 'Share with Party?',
       message: `Send ${item.name} to the Shared Party Loot? It will be removed from your personal inventory.`,
       type: 'confirm',
       onConfirm: async () => {
         await runInventoryTransaction((inv) => {
-          if (!inv[index]) return inv;
-          inv.splice(index, 1);
+          if (!inv[realIndex]) return inv;
+          inv.splice(realIndex, 1);
           return inv;
         });
 
@@ -235,33 +281,19 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           const current = currency[transactionType] || 0;
           transaction.update(charRef, { [`currency.${transactionType}`]: current + amount });
         } else {
-          const currentGold = currency.assarions || 0;
-          const currentSilver = currency.quadrans || 0;
-          const currentCopper = currency.leptons || 0;
+          let currentCoin = currency[transactionType] || 0;
 
-          let costInCopper = 0;
-          if (transactionType === 'assarions') costInCopper = amount * 100;
-          if (transactionType === 'quadrans') costInCopper = amount * 10;
-          if (transactionType === 'leptons') costInCopper = amount;
-
-          const totalCopper = (currentGold * 100) + (currentSilver * 10) + currentCopper;
-
-          if (totalCopper < costInCopper) {
-            return Promise.reject("Not enough funds");
+          if (currentCoin >= amount) {
+            transaction.update(charRef, { [`currency.${transactionType}`]: currentCoin - amount });
+          } else {
+             return Promise.reject("Not enough funds");
           }
-
-          const remainingCopperTotal = totalCopper - costInCopper;
-          transaction.update(charRef, {
-            'currency.assarions': Math.floor(remainingCopperTotal / 100),
-            'currency.quadrans': Math.floor((remainingCopperTotal % 100) / 10),
-            'currency.leptons': remainingCopperTotal % 10
-          });
         }
       });
       setTransactionAmount('');
     } catch (error) {
        if (error === "Not enough funds") {
-         showDialog({ title: 'Insufficient Funds', message: 'Not enough wealth.', type: 'alert', onConfirm: () => showDialog({ isOpen: false }) });
+         showDialog({ title: 'Insufficient Funds', message: `You do not have enough ${transactionType}.`, type: 'alert', onConfirm: () => showDialog({ isOpen: false }) });
        }
     }
   };
@@ -282,6 +314,21 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
             </button>
           )}
         </div>
+
+        {inventoryArray.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-3 mb-2 relative z-10">
+            <Filter className="w-4 h-4 text-slate-500 shrink-0 my-auto mr-2" />
+            {INVENTORY_FILTERS.map(filter => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border shadow-sm ${activeFilter === filter ? `${activeTheme.bg} text-white ${activeTheme.activeBorder} shadow-[0_0_10px_rgba(255,255,255,0.1)]` : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-white'}`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        )}
         
         {isDM && isForgingItem && (
           <form onSubmit={handleForgeCustomItem} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-indigo-500/30 mb-6 animate-in fade-in slide-in-from-top-2 space-y-4 shadow-inner relative z-10">
@@ -328,20 +375,24 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
               </div>
 
               {customItem.category === 'Weapon' && (
-                <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800 sm:col-span-2">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Damage Dice</label>
-                    <input type="text" required value={customItem.damageDice} onChange={e => setCustomItem({...customItem, damageDice: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 1d10" />
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Sword className="w-3 h-3 inline"/> Damage</label>
+                    <input type="text" value={customItem.damageDice} onChange={e => setCustomItem({...customItem, damageDice: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="1d8" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Damage Type</label>
-                    <input type="text" required value={customItem.damageType} onChange={e => setCustomItem({...customItem, damageType: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. Fire" />
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Type</label>
+                    <input type="text" value={customItem.damageType} onChange={e => setCustomItem({...customItem, damageType: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="Slashing" />
                   </div>
-                  <div className="sm:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Properties (Comma Separated)</label>
-                    <input type="text" value={customItem.properties} onChange={e => setCustomItem({...customItem, properties: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. Finesse, Light" />
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Crosshair className="w-3 h-3 inline"/> Range</label>
+                    <input type="text" value={customItem.range || ''} onChange={e => setCustomItem({...customItem, range: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="5 ft" />
                   </div>
-                </>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Properties</label>
+                    <input type="text" value={customItem.properties} onChange={e => setCustomItem({...customItem, properties: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="Finesse, Light" />
+                  </div>
+                </div>
               )}
 
               {(customItem.category === 'Consumable' || customItem.category === 'Potion') && (
@@ -376,10 +427,10 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         )}
 
         <div className="space-y-4 relative z-10">
-          {inventoryArray.length === 0 ? (
-             <p className="text-slate-500 italic p-6 text-center bg-slate-900/50 rounded-xl border border-slate-800 border-dashed">Your bags are empty.</p>
+          {filteredInventoryArray.length === 0 ? (
+             <p className="text-slate-500 italic p-6 text-center bg-slate-900/50 rounded-xl border border-slate-800 border-dashed">No items found.</p>
           ) : (
-            inventoryArray.map((item, i) => (
+            filteredInventoryArray.map((item, i) => (
               <div key={item.id || i} className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl overflow-hidden transition-colors shadow-sm ${openItems[i] ? `${activeTheme.activeBorder} shadow-[0_0_15px_rgba(255,255,255,0.05)]` : 'border-slate-700/80 hover:border-slate-500'}`}>
                 <div className="flex justify-between items-center p-3 sm:p-4 cursor-pointer" onClick={() => toggleItemOpen(i)}>
                   
@@ -426,6 +477,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                         {item.category === 'Weapon' && (
                           <div className="flex flex-wrap gap-2 mb-3">
                             <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Damage: <span className="text-white">{item.damageDice || (item.damage?.damage_dice)} {item.damageType || (item.damage?.damage_type?.name)}</span></span>
+                            {item.range && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Range: <span className="text-white">{item.range}</span></span>}
                             {(item.properties && Array.isArray(item.properties) && item.properties.length > 0) && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties.map(p => p.name).join(', ')}</span></span>}
                             {(item.properties && typeof item.properties === 'string') && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties}</span></span>}
                           </div>
@@ -490,7 +542,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
 
         <div className="space-y-4">
           <div className="bg-slate-900 p-4 rounded-xl border border-yellow-900/30 shadow-sm">
-            <span className="text-yellow-500/50 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Assarions (Gold)</span>
+            <span className="text-yellow-500/50 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Assarions</span>
             <div className="flex items-center justify-between gap-3">
               <button onClick={() => adjustCurrency('assarions', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
               <input 
@@ -507,7 +559,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           </div>
 
           <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-sm">
-            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Quadrans (Silver)</span>
+            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Quadrans</span>
             <div className="flex items-center justify-between gap-3">
               <button onClick={() => adjustCurrency('quadrans', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
               <input 
@@ -524,7 +576,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           </div>
 
           <div className="bg-slate-900 p-4 rounded-xl border border-amber-900/30 shadow-sm">
-            <span className="text-amber-700 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Leptons (Copper)</span>
+            <span className="text-amber-700 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Leptons</span>
             <div className="flex items-center justify-between gap-3">
               <button onClick={() => adjustCurrency('leptons', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
               <input 

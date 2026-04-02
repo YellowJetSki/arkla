@@ -57,15 +57,41 @@ export const fetchEquipmentDetails = async (urlOrIndex) => {
        dDice += ` (${data.two_handed_damage.damage_dice})`;
     }
 
+    let rangeStr = '';
+    if (data.range) {
+       rangeStr = data.range.normal ? `${data.range.normal} ft` : '';
+       if (data.range.long) rangeStr += ` / ${data.range.long} ft`;
+    }
+
+    let descText = '';
+    if (data.desc && Array.isArray(data.desc)) {
+      // 1. Strip out pure Markdown table formatting if the API leaks it
+      let cleanDesc = data.desc.filter(p => !p.includes('|---') && !p.startsWith('| '));
+      
+      // 2. Strip out literal book references
+      cleanDesc = cleanDesc.filter(p => !/(refer to|see the|roll on).*table/i.test(p));
+
+      descText = cleanDesc.join('\n\n').trim();
+    }
+
+    // 3. Smart Muting: Standard weapons/armor have useless descriptions ("See weapons table").
+    // We already display their mechanics in the UI, so we wipe the text.
+    // We ONLY keep descriptions for Magic Items (which have a URL rather than an index in this check) or Wondrous gear.
+    if ((category === 'Weapon' || category === 'Armor') && !urlOrIndex.includes('magic-items')) {
+       descText = '';
+    }
+
     const result = {
       name: data.name,
       category,
       damageDice: dDice,
       damageType: data.damage?.damage_type?.name || '',
       properties: data.properties?.map(p => p.name).join(', ') || '',
+      range: rangeStr,
       ac: data.armor_class?.base || 14,
-      desc: data.desc?.join('\n') || ''
+      desc: descText
     };
+    
     equipmentDetailsCache.set(urlOrIndex, result);
     return result;
   } catch (e) { return null; }

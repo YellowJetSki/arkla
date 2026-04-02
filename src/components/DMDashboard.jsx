@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2 } from 'lucide-react';
+import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import InitiativeTracker from './InitiativeTracker';
 import DMEncounterManager from './DMEncounterManager';
@@ -27,6 +27,9 @@ export default function DMDashboard({ onLogout }) {
   const [activeManager, setActiveManager] = useState(null); 
   const [isBattleMode, setIsBattleMode] = useState(false); 
   
+  const [showPartyPanel, setShowPartyPanel] = useState(true);
+  const [showThreatsPanel, setShowThreatsPanel] = useState(true);
+
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [isForgingEnemy, setIsForgingEnemy] = useState(false);
   const [isForgingSpell, setIsForgingSpell] = useState(false);
@@ -53,6 +56,11 @@ export default function DMDashboard({ onLogout }) {
   };
 
   useEffect(() => {
+    if (window.innerWidth < 1024) {
+      setShowPartyPanel(false);
+      setShowThreatsPanel(false);
+    }
+
     const sessionRef = doc(db, 'campaign', 'main_session');
     const unsubscribeSession = onSnapshot(sessionRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -214,7 +222,7 @@ export default function DMDashboard({ onLogout }) {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-slate-950 overflow-hidden text-slate-300 font-sans">
+    <div className="flex flex-col h-[100dvh] bg-slate-950 overflow-hidden text-slate-300 font-sans relative">
       
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
@@ -246,8 +254,7 @@ export default function DMDashboard({ onLogout }) {
         </div>
       )}
 
-      {/* HEADER COMMAND NAV */}
-      <header className="h-14 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between px-4 shrink-0 z-20">
+      <header className="h-14 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-sm">
         <div className="flex items-center gap-4">
           <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2">
             <ShieldAlert className="w-5 h-5"/> Arkla DM
@@ -272,18 +279,33 @@ export default function DMDashboard({ onLogout }) {
         </div>
       </header>
 
-      {/* THREE-PANE VTT LAYOUT */}
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative z-10">
+      <main className="flex-1 flex overflow-hidden relative z-10 bg-slate-950">
         
-        {/* LEFT PANEL: THE PARTY */}
-        <DMPartyPanel 
-          unlockedCharacters={unlockedCharacters} 
-          setIsBuildingCharacter={setIsBuildingCharacter} 
-        />
+        {/* LEFT FLOATING PANEL: THE PARTY */}
+        <div className={`relative h-full transition-[width] duration-300 shrink-0 z-30 ${showPartyPanel ? 'w-80 lg:w-96' : 'w-0'}`}>
+          <div className={`absolute top-0 right-0 w-80 lg:w-96 h-full bg-slate-950 border-r border-slate-800 transition-transform duration-300 ${showPartyPanel ? 'translate-x-0 shadow-2xl' : '-translate-x-full shadow-none'}`}>
+            <DMPartyPanel 
+              unlockedCharacters={unlockedCharacters} 
+              setIsBuildingCharacter={setIsBuildingCharacter} 
+            />
+          </div>
+          <button 
+            onClick={() => setShowPartyPanel(!showPartyPanel)} 
+            className={`absolute top-1/2 -translate-y-1/2 w-8 h-24 bg-slate-800 hover:bg-slate-700 border border-l-0 border-slate-700 rounded-r-xl flex items-center justify-center text-slate-400 hover:text-white shadow-lg transition-all duration-300 z-40 ${showPartyPanel ? 'right-0 translate-x-full' : 'left-0'}`}
+          >
+             {showPartyPanel ? <ChevronLeft className="w-5 h-5"/> : <ChevronRight className="w-5 h-5"/>}
+          </button>
+        </div>
 
-        {/* CENTER PANEL: THE BOARD */}
-        <section className="flex-1 flex flex-col min-w-0 bg-slate-950 relative border-b lg:border-b-0 lg:border-r border-slate-800 h-[60vh] lg:h-full">
-          <div className="shrink-0 bg-slate-900/80 border-b border-slate-800 max-h-[35vh] overflow-y-auto custom-scrollbar relative z-10">
+        {/* CENTER PANEL: THE BOARD & COLLAPSIBLE INITIATIVE */}
+        <section className="flex-1 flex flex-col min-w-0 h-full relative z-10 bg-slate-950 overflow-hidden">
+          
+          <div className="flex-1 relative overflow-hidden flex flex-col z-0">
+            {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>}
+            <DMBattleMap />
+          </div>
+
+          <div className="shrink-0 relative z-20 w-full">
             <InitiativeTracker 
               unlockedCharacters={unlockedCharacters} 
               activeEnemies={activeEnemies} 
@@ -292,25 +314,33 @@ export default function DMDashboard({ onLogout }) {
               onExitBattle={() => setIsBattleMode(false)}
             />
           </div>
-          <div className="flex-1 relative overflow-hidden flex flex-col">
-            {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>}
-            <DMBattleMap />
-          </div>
+
         </section>
 
-        {/* RIGHT PANEL: THREATS */}
-        <DMThreatsPanel 
-          activeEnemies={activeEnemies}
-          selectedEnemies={selectedEnemies}
-          setActiveManager={setActiveManager}
-          setIsForgingSpell={setIsForgingSpell}
-          setIsForgingEnemy={setIsForgingEnemy}
-          selectAllEnemies={selectAllEnemies}
-          massMathAmount={massMathAmount}
-          setMassMathAmount={setMassMathAmount}
-          handleMassMath={handleMassMath}
-          toggleEnemySelection={toggleEnemySelection}
-        />
+        {/* RIGHT FLOATING PANEL: THREATS */}
+        <div className={`relative h-full transition-[width] duration-300 shrink-0 z-30 ${showThreatsPanel ? 'w-80 lg:w-[400px]' : 'w-0'}`}>
+          <div className={`absolute top-0 left-0 w-80 lg:w-[400px] h-full bg-slate-950 border-l border-slate-800 transition-transform duration-300 ${showThreatsPanel ? 'translate-x-0 shadow-2xl' : 'translate-x-full shadow-none'}`}>
+            <DMThreatsPanel 
+              activeEnemies={activeEnemies}
+              selectedEnemies={selectedEnemies}
+              setActiveManager={setActiveManager}
+              setIsForgingSpell={setIsForgingSpell}
+              setIsForgingEnemy={setIsForgingEnemy}
+              selectAllEnemies={selectAllEnemies}
+              massMathAmount={massMathAmount}
+              setMassMathAmount={setMassMathAmount}
+              handleMassMath={handleMassMath}
+              toggleEnemySelection={toggleEnemySelection}
+            />
+          </div>
+          <button 
+            onClick={() => setShowThreatsPanel(!showThreatsPanel)} 
+            className={`absolute top-1/2 -translate-y-1/2 w-8 h-24 bg-slate-800 hover:bg-slate-700 border border-r-0 border-slate-700 rounded-l-xl flex items-center justify-center text-slate-400 hover:text-white shadow-lg transition-all duration-300 z-40 ${showThreatsPanel ? 'left-0 -translate-x-full' : 'right-0'}`}
+          >
+             {showThreatsPanel ? <ChevronRight className="w-5 h-5"/> : <ChevronLeft className="w-5 h-5"/>}
+          </button>
+        </div>
+
       </main>
     </div>
   );
