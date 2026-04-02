@@ -40,8 +40,8 @@ const TokenImage = ({ token, isEnemy }) => {
 
   if (fallbackStep === 2) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-slate-800 rounded-full border-2 border-transparent relative">
-        <User className={`w-4 h-4 md:w-5 md:h-5 ${isEnemy ? 'text-red-400' : 'text-indigo-400'} ${token.size > 1 ? 'scale-150' : ''}`} />
+      <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-full border-[3px] border-slate-950 shadow-inner relative">
+        <User className={`w-4 h-4 md:w-5 md:h-5 ${isEnemy ? 'text-red-500' : 'text-indigo-400'} ${token.size > 1 ? 'scale-150' : ''}`} />
       </div>
     );
   }
@@ -49,7 +49,7 @@ const TokenImage = ({ token, isEnemy }) => {
   const formattedName = token.name ? token.name.toLowerCase().split(' ')[0] : 'unknown';
   const imgSrc = fallbackStep === 0 ? `/${formattedName}_bm.png` : token.img;
 
-  return <img src={imgSrc} alt={token.name || 'Token'} className="w-full h-full rounded-full object-cover bg-slate-800 border-2 border-transparent relative" onError={handleError} />;
+  return <img src={imgSrc} alt={token.name} className="w-full h-full rounded-full object-cover bg-slate-900 border-[3px] border-slate-950 shadow-inner relative" onError={handleError} />;
 };
 
 export default function MapGrid({ 
@@ -84,6 +84,7 @@ export default function MapGrid({
   const [dragMeasure, setDragMeasure] = useState(null);
   
   const [isPanning, setIsPanning] = useState(false);
+  const hasPanned = useRef(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
   const [initialPinchDist, setInitialPinchDist] = useState(null);
   const [initialPinchZoom, setInitialPinchZoom] = useState(null);
@@ -141,6 +142,7 @@ export default function MapGrid({
 
   const handleMapMouseDown = (e) => {
     if (isDisplayMode || isDrawingMode) return;
+    hasPanned.current = false;
     setIsPanning(true);
     setPanStart({
       x: e.clientX,
@@ -152,6 +154,7 @@ export default function MapGrid({
 
   const handleMapMouseMove = (e) => {
     if (!isPanning || !scrollRef.current) return;
+    hasPanned.current = true;
     const dx = e.clientX - panStart.x;
     const dy = e.clientY - panStart.y;
     scrollRef.current.scrollLeft = panStart.scrollLeft - dx;
@@ -170,6 +173,7 @@ export default function MapGrid({
 
   const handleTouchStart = (e) => {
     if (isDisplayMode) return;
+    hasPanned.current = false;
     
     if (e.touches.length === 2) {
       setIsPanning(false);
@@ -191,12 +195,13 @@ export default function MapGrid({
 
     if (e.touches.length === 2 && initialPinchDist) {
       if (e.cancelable) e.preventDefault(); 
-      
+      hasPanned.current = true;
       const currentDist = getPinchDistance(e.touches);
       const scale = currentDist / initialPinchDist;
       const newZoom = Math.min(Math.max(initialPinchZoom * scale, 0.5), 3);
       setZoom(newZoom);
     } else if (e.touches.length === 1 && isPanning) {
+      hasPanned.current = true;
       const dx = e.touches[0].clientX - panStart.x;
       const dy = e.touches[0].clientY - panStart.y;
       scrollRef.current.scrollLeft = panStart.scrollLeft - dx;
@@ -235,14 +240,14 @@ export default function MapGrid({
   }
 
   return (
-    <div className={`relative w-full flex flex-col overflow-hidden ${isDisplayMode ? 'h-[100dvh] rounded-none border-0 bg-black' : 'h-[75vh] md:max-h-[70vh] rounded-xl border border-slate-700 bg-slate-950 shadow-inner'}`}>
+    <div className={`relative w-full flex flex-col overflow-hidden h-full ${isDisplayMode ? 'rounded-none border-0 bg-black' : 'rounded-2xl border-[3px] border-slate-950 bg-slate-900 shadow-[6px_6px_0px_rgba(0,0,0,1)]'}`}>
       
       {!isDisplayMode && (
-        <div className="absolute top-4 right-4 z-[90] flex flex-col gap-2 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-lg border border-slate-700 shadow-lg">
-          <button onClick={() => setZoom(prev => Math.min(prev + 0.25, 3))} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Zoom In"><ZoomIn className="w-5 h-5"/></button>
-          <button onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
-          <div className="w-full h-px bg-slate-700 my-0.5"></div>
-          <button onClick={() => centerOnToken(selectedTokenId || mapData?.activeTokenId)} className="p-1.5 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-900/50 rounded transition-colors" title="Center on Active Turn/Me"><Target className="w-5 h-5"/></button>
+        <div className="absolute top-4 right-4 z-[90] flex flex-col gap-2 bg-slate-900 border-2 border-slate-950 p-2 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+          <button onClick={() => setZoom(prev => Math.min(prev + 0.25, 3))} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700" title="Zoom In"><ZoomIn className="w-5 h-5"/></button>
+          <button onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700" title="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
+          <div className="w-full h-0.5 bg-slate-950 my-0.5"></div>
+          <button onClick={() => centerOnToken(selectedTokenId || mapData?.activeTokenId)} className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-indigo-900/50" title="Center on Active Turn/Me"><Target className="w-5 h-5"/></button>
         </div>
       )}
 
@@ -253,7 +258,7 @@ export default function MapGrid({
           </div>
           <div className="flex flex-col pr-4">
             <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-0.5">Current Turn</span>
-            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none">{activeToken.name || 'Unknown'}</h1>
+            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">{activeToken.name}</h1>
           </div>
         </div>
       )}
@@ -298,7 +303,7 @@ export default function MapGrid({
           <div className={`absolute inset-0 grid z-20 ${isDrawingMode ? 'pointer-events-none' : ''}`} style={{ gridTemplateColumns: `repeat(${cols}, ${currentCellSize}px)`, gridTemplateRows: `repeat(${rows}, ${currentCellSize}px)` }}>
             {Array.from({ length: cols * rows }).map((_, i) => {
               const tile = { x: i % cols, y: Math.floor(i / cols) };
-              let tileClass = isDisplayMode ? '' : 'hover:bg-white/10'; 
+              let tileClass = isDisplayMode ? '' : 'hover:bg-white/20'; 
 
               if (!isDisplayMode && showMovementRangeFor) {
                   const tSize = showMovementRangeFor.size || 1;
@@ -308,9 +313,9 @@ export default function MapGrid({
                   const speed = showMovementRangeFor.speed || 30;
 
                   if (dist > 0 && dist <= speed) {
-                     tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.4),_transparent)] border border-emerald-400/30 hover:bg-emerald-400/50';
+                     tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.5),_transparent)] border border-emerald-400/50 hover:bg-emerald-400/70';
                   } else if (dist > speed && dist <= speed * 2) {
-                     tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.4),_transparent)] border border-amber-400/30 hover:bg-amber-400/50';
+                     tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.5),_transparent)] border border-amber-400/50 hover:bg-amber-400/70';
                   }
               }
 
@@ -322,12 +327,18 @@ export default function MapGrid({
                     if(isDrawingMode) e.stopPropagation(); 
                   }}
                   onClick={(e) => { 
-                    if(isPanning) return; 
+                    if(isPanning || hasPanned.current) return; 
                     if(!isDisplayMode && onTileClick) onTileClick(tile.x, tile.y); 
+                  }}
+                  onDragEnter={(e) => {
+                    if(isDisplayMode) return;
+                    e.preventDefault();
+                    e.stopPropagation();
                   }}
                   onDragOver={(e) => { 
                     if(isDisplayMode) return;
                     e.preventDefault(); 
+                    e.stopPropagation();
                     e.dataTransfer.dropEffect = "move";
                     if (dragMeasure?.isMeasuring) {
                       const dist = Math.max(Math.abs(tile.x - dragMeasure.startX), Math.abs(tile.y - dragMeasure.startY)) * 5;
@@ -337,6 +348,7 @@ export default function MapGrid({
                   onDrop={(e) => {
                     if(isDisplayMode) return;
                     e.preventDefault();
+                    e.stopPropagation();
                     setDragMeasure(null);
                     const dragId = e.dataTransfer.getData('tokenId');
                     if (dragId && onTokenDrop) onTokenDrop(dragId, tile.x, tile.y);
@@ -349,7 +361,7 @@ export default function MapGrid({
 
           {dragMeasure && dragMeasure.isMeasuring && !isDisplayMode && (
              <div className="absolute z-[80] pointer-events-none" style={{ left: dragMeasure.currentX * currentCellSize + currentCellSize/2, top: dragMeasure.currentY * currentCellSize - 30 }}>
-               <div className={`px-2 py-1 rounded shadow-lg font-black text-xs whitespace-nowrap ${dragMeasure.distance > dragMeasure.speed ? 'bg-red-600 text-white' : 'bg-slate-800 text-emerald-400'}`}>
+               <div className={`px-3 py-1.5 rounded-lg border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] font-black text-xs whitespace-nowrap uppercase tracking-widest ${dragMeasure.distance > dragMeasure.speed ? 'bg-red-500 text-slate-950' : 'bg-slate-900 text-emerald-400'}`}>
                  {dragMeasure.distance} ft
                </div>
              </div>
@@ -415,103 +427,117 @@ export default function MapGrid({
                   
                   {token.aura > 0 && !isDead && (
                     <div 
-                      className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-dashed pointer-events-none z-0 transition-all duration-500
-                        ${isEnemy ? 'border-red-500/50 bg-red-500/10' : 'border-indigo-400/50 bg-indigo-400/10'} 
+                      className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-[4px] border-dashed pointer-events-none z-0 transition-all duration-500
+                        ${isEnemy ? 'border-red-500/80 bg-red-500/20' : 'border-indigo-400/80 bg-indigo-400/20'} 
                         ${isDisplayMode ? 'animate-[spin_20s_linear_infinite]' : 'animate-[spin_30s_linear_infinite]'}`}
                       style={{ width: currentCellSize * (tSize + (token.aura / 5) * 2), height: currentCellSize * (tSize + (token.aura / 5) * 2) }}
                     />
                   )}
 
-                  <div className={`relative w-[75%] h-[75%] rounded-full shadow-lg transition-all z-10
-                    ${isSelected && !isDisplayMode ? 'ring-2 md:ring-4 ring-white scale-105 z-40' : ''} 
-                    ${isActiveTurn ? (isDisplayMode ? 'ring-[4px] ring-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.8)] scale-105 z-50' : 'ring-[3px] md:ring-[6px] ring-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)] animate-pulse z-50') : ''} 
+                  <div className={`relative w-[80%] h-[80%] rounded-full shadow-[4px_4px_0px_rgba(0,0,0,0.5)] transition-all z-10
+                    ${isSelected && !isDisplayMode ? 'ring-[4px] ring-white scale-105 z-40' : ''} 
+                    ${isActiveTurn ? (isDisplayMode ? 'ring-[6px] ring-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.8)] scale-105 z-50' : 'ring-[4px] md:ring-[6px] ring-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.6)] animate-pulse z-50') : ''} 
                     ${isDead ? 'grayscale-[0.9] opacity-60' : ''}
-                    ${isBloodied && !isActiveTurn ? 'ring-[3px] ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.8)]' : ''}
-                    ${isEnemy && !isBloodied && !isActiveTurn && !isDead ? 'bg-red-950/80 shadow-red-900/50' : ''}
-                    ${!isEnemy && !isBloodied && !isActiveTurn && !isDead ? 'bg-indigo-950/80 shadow-indigo-900/50' : ''}
+                    ${isBloodied && !isActiveTurn ? 'ring-[4px] ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.8)]' : ''}
+                    ${isEnemy && !isBloodied && !isActiveTurn && !isDead ? 'ring-[3px] ring-slate-950 bg-red-950 shadow-[0_0_15px_rgba(220,38,38,0.5)]' : ''}
+                    ${!isEnemy && !isBloodied && !isActiveTurn && !isDead ? 'ring-[3px] ring-slate-950 bg-indigo-950 shadow-[0_0_15px_rgba(99,102,241,0.5)]' : ''}
                   `}>
                     
                     {token.elevation > 0 && !isDead && (
-                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-sky-900/90 border border-sky-400 text-sky-100 text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-lg z-50 whitespace-nowrap pointer-events-none">
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-sky-500 border-2 border-slate-950 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-[2px_2px_0px_rgba(0,0,0,1)] z-50 whitespace-nowrap pointer-events-none">
                         +{token.elevation}ft
                       </div>
                     )}
 
                     {token.isConcentrating && !isDead && (
-                      <div className="absolute -top-1 -left-3 bg-amber-600 rounded-full p-0.5 shadow-md border border-amber-300 z-50 pointer-events-none animate-pulse">
-                        <BrainCircuit className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'} text-white`} />
+                      <div className="absolute -top-2 -left-2 bg-amber-400 rounded-full p-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] border-2 border-slate-950 z-50 pointer-events-none animate-pulse">
+                        <BrainCircuit className={`${isDisplayMode ? 'w-6 h-6' : 'w-4 h-4'} text-slate-950`} />
                       </div>
                     )}
 
                     <TokenImage token={token} isEnemy={isEnemy} />
 
                     {isDead && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-red-950/60 rounded-full z-40 pointer-events-none">
-                         <Skull className="w-1/2 h-1/2 text-red-500 drop-shadow-md" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-red-950/80 rounded-full z-40 pointer-events-none">
+                         <Skull className="w-2/3 h-2/3 text-red-500 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]" />
                       </div>
                     )}
 
                     {(tTempHp > 0) && !isDead && (
-                      <div className="absolute inset-0 rounded-full ring-[3px] ring-inset ring-blue-500 shadow-[inset_0_0_15px_rgba(59,130,246,0.8)] z-30 pointer-events-none animate-pulse"></div>
+                      <div className="absolute inset-0 rounded-full ring-[4px] ring-inset ring-indigo-400 shadow-[inset_0_0_20px_rgba(129,140,248,0.8)] z-30 pointer-events-none animate-pulse"></div>
                     )}
 
                     {(token.conditions?.length > 0) && !isDead && (
-                      <div className={`absolute ${isDisplayMode ? '-top-3 -right-5 gap-2' : '-top-1 -right-3 gap-1'} flex flex-wrap-reverse justify-end w-16 z-50 pointer-events-none`}>
+                      <div className={`absolute ${isDisplayMode ? '-top-3 -right-5 gap-2' : '-top-2 -right-3 gap-1'} flex flex-wrap-reverse justify-end w-20 z-50 pointer-events-none`}>
                         {token.conditions.map(cond => {
                           const config = CONDITION_ICONS[cond];
-                          if (!config) return <div key={cond} className={`bg-fuchsia-600 rounded-full ${isDisplayMode ? 'p-1 border-2' : 'p-0.5 border'} shadow border-fuchsia-300`}><AlertCircle className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'} text-white`} /></div>;
+                          if (!config) return <div key={cond} className={`bg-fuchsia-500 rounded-full ${isDisplayMode ? 'p-1 border-2' : 'p-1 border-2'} shadow-[2px_2px_0px_rgba(0,0,0,1)] border-slate-950`}><AlertCircle className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'} text-slate-950`} /></div>;
                           const Icon = config.icon;
-                          return <div key={cond} className={`rounded-full ${isDisplayMode ? 'p-1 border-2' : 'p-0.5 border'} shadow-md ${config.color}`} title={cond}><Icon className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'}`} /></div>;
+                          return <div key={cond} className={`rounded-full ${isDisplayMode ? 'p-1 border-2' : 'p-1 border-2'} shadow-[2px_2px_0px_rgba(0,0,0,1)] border-slate-950 ${config.color}`} title={cond}><Icon className={`${isDisplayMode ? 'w-5 h-5' : 'w-3 h-3'}`} /></div>;
                         })}
                       </div>
                     )}
                     
                     {token.isHidden && isDM && (
-                      <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-amber-500 text-amber-950 rounded-full p-0.5 shadow-lg border border-amber-300 z-50">
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-900 text-amber-500 rounded-full p-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] border-2 border-slate-950 z-50">
                         <EyeOff className="w-3 h-3 md:w-4 md:h-4" />
                       </div>
                     )}
                   </div>
 
                   {isDM && !isDisplayMode && tHp !== undefined && !isDead && (
-                    <div className="absolute -bottom-2 left-[10%] w-[80%] h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 z-50 shadow-sm pointer-events-none">
+                    <div className="absolute -bottom-2 left-[5%] w-[90%] h-2 bg-slate-950 rounded-full overflow-hidden border-2 border-slate-950 z-50 shadow-[2px_2px_0px_rgba(0,0,0,1)] pointer-events-none">
                        {(tTempHp > 0) && (
-                         <div className="absolute top-0 left-0 h-full bg-blue-500 z-20 shadow-[0_0_5px_rgba(59,130,246,0.8)]" style={{ width: `${Math.min(100, (tTempHp / (tMaxHp || 1)) * 100)}%` }} />
+                         <div className="absolute top-0 left-0 h-full bg-indigo-500 z-20 shadow-[0_0_5px_rgba(99,102,241,0.8)]" style={{ width: `${Math.min(100, (tTempHp / (tMaxHp || 1)) * 100)}%` }} />
                        )}
                        <div className={`absolute top-0 left-0 h-full z-10 transition-all ${tHp / (tMaxHp || 1) > 0.5 ? 'bg-emerald-500' : tHp / (tMaxHp || 1) > 0.2 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.max(0, Math.min(100, (tHp / (tMaxHp || 1)) * 100))}%` }} />
                     </div>
                   )}
 
                   {isDM && !isDisplayMode && currentCellSize >= 30 && (
-                    <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-slate-700 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-40">
-                      {(token.name || 'Unknown').substring(0, 8)}
+                    <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 bg-slate-900 border-2 border-slate-950 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] whitespace-nowrap pointer-events-none z-40">
+                      {(token.name || 'Unknown').substring(0, 10)}
                     </div>
                   )}
 
-                  {isSelected && isDM && !isDisplayMode && (
-                    <TokenContextMenu 
-                      token={token}
-                      activePlayers={activePlayers}
-                      activeEnemies={activeEnemies}
-                      showMovementRangeFor={showMovementRangeFor}
-                      onUpdateHpLive={onUpdateHpLive}
-                      onDeselect={onDeselect}
-                      onToggleSize={onToggleSize}
-                      onToggleAura={onToggleAura}
-                      onToggleElevation={onToggleElevation}
-                      onToggleConcentration={onToggleConcentration}
-                      onToggleRuler={onToggleRuler}
-                      onToggleHidden={onToggleHidden}
-                      onUpdateImage={onUpdateImage}
-                      onRemoveToken={onRemoveToken}
-                      onToggleCondition={onToggleCondition}
-                    />
-                  )}
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* CONTEXT MENU OUTSIDE DRAGGABLE DIV */}
+        <div className="absolute inset-0 pointer-events-none z-[60]">
+          {selectedTokenId && tokens[selectedTokenId] && !isDisplayMode && isDM && (
+             <div 
+               className="absolute pointer-events-none transition-transform duration-700 ease-in-out"
+               style={{ 
+                 width: currentCellSize * (tokens[selectedTokenId].size || 1),
+                 height: currentCellSize * (tokens[selectedTokenId].size || 1),
+                 transform: `translate(${tokens[selectedTokenId].x * currentCellSize}px, ${tokens[selectedTokenId].y * currentCellSize}px)` 
+               }}
+             >
+                <TokenContextMenu 
+                  token={tokens[selectedTokenId]}
+                  activePlayers={activePlayers}
+                  activeEnemies={activeEnemies}
+                  showMovementRangeFor={showMovementRangeFor}
+                  onUpdateHpLive={onUpdateHpLive}
+                  onDeselect={onDeselect}
+                  onToggleSize={onToggleSize}
+                  onToggleAura={onToggleAura}
+                  onToggleElevation={onToggleElevation}
+                  onToggleConcentration={onToggleConcentration}
+                  onToggleRuler={onToggleRuler}
+                  onToggleHidden={onToggleHidden}
+                  onUpdateImage={onUpdateImage}
+                  onRemoveToken={onRemoveToken}
+                  onToggleCondition={onToggleCondition}
+                />
+             </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

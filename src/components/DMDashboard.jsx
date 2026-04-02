@@ -227,7 +227,7 @@ export default function DMDashboard({ onLogout }) {
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-slate-800 text-indigo-400 px-4 py-3 rounded-xl shadow-[0_0_30px_rgba(99,102,241,0.3)] border border-indigo-500/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2 cursor-pointer">
+        <div className="fixed top-16 right-6 bg-slate-900 border-[3px] border-slate-950 text-indigo-400 px-4 py-3 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] z-[99999] animate-in slide-in-from-top-5 fade-in duration-300 font-black uppercase tracking-widest text-xs flex items-center gap-2 cursor-pointer">
           <Sparkles className="w-4 h-4" /> {toast}
         </div>
       )}
@@ -243,47 +243,47 @@ export default function DMDashboard({ onLogout }) {
       {activeManager === 'xp' && <DMXPManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
 
       {showScratchpad && (
-        <div className="fixed bottom-6 right-6 w-80 h-80 bg-[#fdf6e3] rounded-xl shadow-2xl z-[9999] border border-amber-300/50 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
-          <div className="bg-amber-200/80 backdrop-blur-sm px-4 py-3 flex justify-between items-center border-b border-amber-300/50 shadow-sm shrink-0">
-            <span className="text-amber-900 font-black text-xs flex items-center gap-2 tracking-widest uppercase"><PenTool className="w-4 h-4"/> DM Scratchpad</span>
-            <button onClick={() => setShowScratchpad(false)} className="text-amber-700 hover:text-red-600 hover:bg-amber-300/50 p-1 rounded transition-colors"><X className="w-4 h-4"/></button>
+        <div className="fixed bottom-6 right-6 w-80 h-80 bg-amber-50 rounded-xl shadow-[8px_8px_0px_rgba(0,0,0,1)] z-[9999] border-[3px] border-slate-950 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
+          <div className="bg-amber-400 px-4 py-3 flex justify-between items-center border-b-[3px] border-slate-950 shrink-0">
+            <span className="text-slate-950 font-black text-xs flex items-center gap-2 tracking-widest uppercase"><PenTool className="w-4 h-4"/> DM Scratchpad</span>
+            <button onClick={() => setShowScratchpad(false)} className="text-slate-950 hover:bg-amber-300 p-1 rounded transition-colors"><X className="w-4 h-4 font-black"/></button>
           </div>
           <div className="flex-1 relative">
-            <DebouncedTextarea initialValue={scratchpad} onSave={saveScratchpad} placeholder="Jot down quick notes, hidden HP..." className="w-full h-full p-4 bg-transparent text-amber-950 text-sm focus:outline-none resize-none font-medium custom-scrollbar leading-relaxed" />
+            <DebouncedTextarea initialValue={scratchpad} onSave={saveScratchpad} placeholder="Jot down quick notes, hidden HP..." className="w-full h-full p-4 bg-transparent text-amber-950 text-sm focus:outline-none resize-none font-bold custom-scrollbar leading-relaxed" />
           </div>
         </div>
       )}
 
-      <header className="h-14 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-sm">
+      <header className="h-14 bg-slate-900 border-b-2 border-slate-950 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-[0_4px_0px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-4">
-          <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2">
+          <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
             <ShieldAlert className="w-5 h-5"/> Arkla DM
           </h1>
           <div className="hidden lg:flex items-center gap-2 border-l border-slate-700 pl-4">
-            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><Book className="w-4 h-4"/> Rules Ref</button>
-            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><Package className="w-4 h-4"/> Item Vault</button>
-            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><ImageIcon className="w-4 h-4"/> Handouts</button>
+            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Book className="w-4 h-4"/> Rules Ref</button>
+            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Package className="w-4 h-4"/> Item Vault</button>
+            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><ImageIcon className="w-4 h-4"/> Handouts</button>
             <div className="w-px h-4 bg-slate-700 mx-1"></div>
-            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-xs font-bold text-amber-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded transition-colors"><Star className="w-4 h-4"/> XP</button>
+            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Star className="w-4 h-4"/> XP</button>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-400 hover:text-amber-300 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Scratchpad"><PenTool className="w-4 h-4"/></button>
+          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-500 hover:text-amber-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Scratchpad"><PenTool className="w-4 h-4"/></button>
           <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportCampaign} />
           <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Import Campaign"><UploadCloud className="w-4 h-4"/></button>
           <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Export Campaign"><DownloadCloud className="w-4 h-4"/></button>
           <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
-          <button onClick={confirmClearConditions} className="text-fuchsia-400 hover:text-fuchsia-300 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Clear All Conditions"><Sparkles className="w-4 h-4"/></button>
-          <button onClick={confirmResetSession} className="text-red-400 hover:text-red-300 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4"/></button>
+          <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Clear All Conditions"><Sparkles className="w-4 h-4"/></button>
+          <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4"/></button>
           <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Logout"><PowerOff className="w-4 h-4"/></button>
         </div>
       </header>
 
       <main className="flex-1 flex overflow-hidden relative z-10 bg-slate-950">
         
-        {/* LEFT FLOATING PANEL: THE PARTY */}
-        <div className={`relative h-full transition-[width] duration-300 shrink-0 z-30 ${showPartyPanel ? 'w-80 lg:w-96' : 'w-0'}`}>
-          <div className={`absolute top-0 right-0 w-80 lg:w-96 h-full bg-slate-950 border-r border-slate-800 transition-transform duration-300 ${showPartyPanel ? 'translate-x-0 shadow-2xl' : '-translate-x-full shadow-none'}`}>
+        {/* LEFT FLOATING PANEL: THE PARTY - Slimmed for Laptop Optimization */}
+        <div className={`relative h-full transition-[width] duration-300 shrink-0 z-30 ${showPartyPanel ? 'w-72 lg:w-80' : 'w-0'}`}>
+          <div className={`absolute top-0 right-0 w-72 lg:w-80 h-full bg-slate-950 border-r-2 border-slate-900 transition-transform duration-300 ${showPartyPanel ? 'translate-x-0 shadow-[4px_0_15px_rgba(0,0,0,0.5)]' : '-translate-x-full shadow-none'}`}>
             <DMPartyPanel 
               unlockedCharacters={unlockedCharacters} 
               setIsBuildingCharacter={setIsBuildingCharacter} 
@@ -291,7 +291,7 @@ export default function DMDashboard({ onLogout }) {
           </div>
           <button 
             onClick={() => setShowPartyPanel(!showPartyPanel)} 
-            className={`absolute top-1/2 -translate-y-1/2 w-8 h-24 bg-slate-800 hover:bg-slate-700 border border-l-0 border-slate-700 rounded-r-xl flex items-center justify-center text-slate-400 hover:text-white shadow-lg transition-all duration-300 z-40 ${showPartyPanel ? 'right-0 translate-x-full' : 'left-0'}`}
+            className={`absolute top-1/2 -translate-y-1/2 w-8 h-24 bg-slate-900 hover:bg-slate-800 border-2 border-l-0 border-slate-950 rounded-r-xl flex items-center justify-center text-slate-400 hover:text-white shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all duration-300 z-40 ${showPartyPanel ? 'right-0 translate-x-full' : 'left-0'}`}
           >
              {showPartyPanel ? <ChevronLeft className="w-5 h-5"/> : <ChevronRight className="w-5 h-5"/>}
           </button>
@@ -300,12 +300,12 @@ export default function DMDashboard({ onLogout }) {
         {/* CENTER PANEL: THE BOARD & COLLAPSIBLE INITIATIVE */}
         <section className="flex-1 flex flex-col min-w-0 h-full relative z-10 bg-slate-950 overflow-hidden">
           
-          <div className="flex-1 relative overflow-hidden flex flex-col z-0">
+          <div className="flex-1 relative overflow-hidden flex flex-col z-0 pt-2 px-2 pb-0 md:pt-4 md:px-4">
             {isBattleMode && <div className="absolute inset-0 bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none -z-10"></div>}
             <DMBattleMap />
           </div>
 
-          <div className="shrink-0 relative z-20 w-full">
+          <div className="shrink-0 relative z-20 w-full p-2 md:p-4">
             <InitiativeTracker 
               unlockedCharacters={unlockedCharacters} 
               activeEnemies={activeEnemies} 
@@ -317,9 +317,9 @@ export default function DMDashboard({ onLogout }) {
 
         </section>
 
-        {/* RIGHT FLOATING PANEL: THREATS */}
-        <div className={`relative h-full transition-[width] duration-300 shrink-0 z-30 ${showThreatsPanel ? 'w-80 lg:w-[400px]' : 'w-0'}`}>
-          <div className={`absolute top-0 left-0 w-80 lg:w-[400px] h-full bg-slate-950 border-l border-slate-800 transition-transform duration-300 ${showThreatsPanel ? 'translate-x-0 shadow-2xl' : 'translate-x-full shadow-none'}`}>
+        {/* RIGHT FLOATING PANEL: THREATS - Slimmed for Laptop Optimization */}
+        <div className={`relative h-full transition-[width] duration-300 shrink-0 z-30 ${showThreatsPanel ? 'w-80 lg:w-[340px]' : 'w-0'}`}>
+          <div className={`absolute top-0 left-0 w-80 lg:w-[340px] h-full bg-slate-950 border-l-2 border-slate-900 transition-transform duration-300 ${showThreatsPanel ? 'translate-x-0 shadow-[-4px_0_15px_rgba(0,0,0,0.5)]' : 'translate-x-full shadow-none'}`}>
             <DMThreatsPanel 
               activeEnemies={activeEnemies}
               selectedEnemies={selectedEnemies}
@@ -335,7 +335,7 @@ export default function DMDashboard({ onLogout }) {
           </div>
           <button 
             onClick={() => setShowThreatsPanel(!showThreatsPanel)} 
-            className={`absolute top-1/2 -translate-y-1/2 w-8 h-24 bg-slate-800 hover:bg-slate-700 border border-r-0 border-slate-700 rounded-l-xl flex items-center justify-center text-slate-400 hover:text-white shadow-lg transition-all duration-300 z-40 ${showThreatsPanel ? 'left-0 -translate-x-full' : 'right-0'}`}
+            className={`absolute top-1/2 -translate-y-1/2 w-8 h-24 bg-slate-900 hover:bg-slate-800 border-2 border-r-0 border-slate-950 rounded-l-xl flex items-center justify-center text-slate-400 hover:text-white shadow-[-4px_4px_0px_rgba(0,0,0,1)] transition-all duration-300 z-40 ${showThreatsPanel ? 'left-0 -translate-x-full' : 'right-0'}`}
           >
              {showThreatsPanel ? <ChevronRight className="w-5 h-5"/> : <ChevronLeft className="w-5 h-5"/>}
           </button>
