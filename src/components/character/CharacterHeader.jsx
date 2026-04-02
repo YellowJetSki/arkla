@@ -61,7 +61,7 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent pointer-events-none z-10"></div>
         
-        <button onClick={(e) => { e.stopPropagation(); onOpenImage(); }} className="absolute bottom-3 right-4 p-1.5 bg-slate-900/50 backdrop-blur-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer"><Maximize className="w-4 h-4 text-white" /></button>
+        <button onClick={(e) => { e.stopPropagation(); onOpenImage(); }} className="absolute bottom-3 right-4 p-1.5 bg-slate-900/50 backdrop-blur-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer pointer-events-auto"><Maximize className="w-4 h-4 text-white" /></button>
         
         {isUnconscious && <div className="absolute inset-0 flex items-center justify-center bg-red-950/60 backdrop-blur-[1px] pointer-events-none z-10"><Skull className="w-12 h-12 text-white drop-shadow-md animate-pulse" /></div>}
         
@@ -114,12 +114,29 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
 
         <div className="absolute bottom-3 left-4 md:left-6 text-left pointer-events-none z-10">
           <div className="flex items-center gap-2 mb-0.5">
-            <h2 className={`text-2xl md:text-3xl font-black leading-tight drop-shadow-lg text-balance ${isUnconscious ? 'text-red-400' : 'text-white'}`}>{char.name}</h2>
+            {isEditMode ? (
+              <input 
+                type="text" 
+                defaultValue={char.name} 
+                onBlur={(e) => updateField('name', e.target.value)}
+                className={`text-2xl md:text-3xl font-black leading-tight bg-slate-900/80 border border-amber-500 rounded px-2 py-0.5 focus:outline-none w-48 pointer-events-auto shadow-xl ${isUnconscious ? 'text-red-400' : 'text-white'}`}
+              />
+            ) : (
+              <h2 className={`text-2xl md:text-3xl font-black leading-tight drop-shadow-lg text-balance ${isUnconscious ? 'text-red-400' : 'text-white'}`}>{char.name}</h2>
+            )}
             <div className="flex items-center pointer-events-auto">
               <button onClick={isDM ? toggleInspiration : undefined} className={`shrink-0 transition-all z-10 flex items-center justify-center ${isDM ? 'cursor-pointer hover:scale-110' : 'pointer-events-none'} ${char.inspiration ? 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,1)] scale-110' : (isDM ? 'text-slate-400 hover:text-yellow-400/50' : 'text-slate-600')}`}><Star className="w-5 h-5 md:w-6 md:h-6 fill-current pointer-events-none" /></button>
             </div>
           </div>
-          <p className={`${activeTheme.text} font-bold text-xs md:text-sm drop-shadow-md`}>Lvl {char.level} {char.species || char.race} {char.class.split(' ')[0]}</p>
+          {isEditMode ? (
+            <div className="flex gap-2 mt-1.5 pointer-events-auto">
+                <input type="number" defaultValue={char.level} onBlur={e => updateField('level', Number(e.target.value))} className={`w-12 bg-slate-900/80 border border-amber-500 shadow-xl rounded px-1.5 py-0.5 text-xs font-bold ${activeTheme.text} focus:outline-none`} />
+                <input type="text" defaultValue={char.species || char.race} onBlur={e => updateField('species', e.target.value)} className={`w-24 bg-slate-900/80 border border-amber-500 shadow-xl rounded px-1.5 py-0.5 text-xs font-bold ${activeTheme.text} focus:outline-none`} />
+                <input type="text" defaultValue={char.class} onBlur={e => updateField('class', e.target.value)} className={`w-28 bg-slate-900/80 border border-amber-500 shadow-xl rounded px-1.5 py-0.5 text-xs font-bold ${activeTheme.text} focus:outline-none`} />
+            </div>
+          ) : (
+            <p className={`${activeTheme.text} font-bold text-xs md:text-sm drop-shadow-md`}>Lvl {char.level} {char.species || char.race} {char.class.split(' ')[0]}</p>
+          )}
         </div>
       </div>
 

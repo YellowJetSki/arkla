@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, writeBatch, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Shield, Activity, Heart, Eye, Target, Sparkles, Plus, Minus, PawPrint, Droplets, Flame } from 'lucide-react';
-import DMEditSheet from './DMEditSheet';
+import { Shield, Heart, Eye, Target, Sparkles, Plus, Minus, Droplets, Flame, UserMinus } from 'lucide-react';
+import CharacterCard from './CharacterCard';
 
 export default function DMPlayerCard({ charId }) {
   const [char, setChar] = useState(null);
@@ -42,6 +42,23 @@ export default function DMPlayerCard({ charId }) {
     await updateDoc(doc(db, 'characters', charId), { spellSlots: updatedSlots });
   };
 
+  const handleKickAndReset = async () => {
+    if (window.confirm(`Boot ${char.name} from the active session and force them to re-do the onboarding tutorial next time they join?`)) {
+      try {
+        const batch = writeBatch(db);
+        // 1. Reset tutorial flag
+        batch.update(doc(db, 'characters', charId), { hasCompletedTutorial: false });
+        // 2. Remove them from the active session to trigger the kick screen
+        batch.update(doc(db, 'campaign', 'main_session'), {
+          unlockedCharacters: arrayRemove(charId)
+        });
+        await batch.commit();
+      } catch (e) {
+        console.error("Error kicking player: ", e);
+      }
+    }
+  };
+
   if (!char) return null;
 
   const hpPercentage = (char.hp / char.maxHp) * 100;
@@ -52,9 +69,7 @@ export default function DMPlayerCard({ charId }) {
   const activeConditions = char.conditions || [];
   const resources = char.resources || [];
   const spellSlots = char.spellSlots || {};
-  const companion = char.companion || null;
-  const isCompanionActive = companion && (!companion.isDormant || char.level >= companion.awakeLevel);
-
+  
   const wisMod = Math.floor(((char.stats?.WIS || 10) - 10) / 2);
   const passivePerception = 10 + wisMod;
 
@@ -66,7 +81,8 @@ export default function DMPlayerCard({ charId }) {
 
   return (
     <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-700 rounded-xl p-3 shadow-md relative overflow-hidden group">
-      {isEditing && <DMEditSheet char={char} charId={charId} onCancel={() => setIsEditing(false)} />}
+      {/* We now open the full CharacterCard in DM Mode instead of the old DMEditSheet */}
+      {isEditing && <CharacterCard currentUser={{ charId }} isDM={true} onClose={() => setIsEditing(false)} />}
       
       <div className={`absolute top-0 right-0 w-24 h-24 blur-[40px] rounded-full pointer-events-none opacity-20 bg-${char.theme || 'indigo'}-500`}></div>
 
@@ -81,7 +97,14 @@ export default function DMPlayerCard({ charId }) {
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {char.inspiration && <Sparkles className="w-4 h-4 text-amber-400 drop-shadow-[0_0_5px_rgba(245,158,11,0.8)]" title="Has Inspiration" />}
-          <button onClick={() => setIsEditing(true)} className="text-slate-500 hover:text-white transition-colors bg-slate-950 p-1.5 rounded-lg border border-slate-800 shadow-inner">
+          
+          {/* Kick & Reset Button */}
+          <button onClick={handleKickAndReset} className="text-slate-500 hover:text-red-400 transition-colors bg-slate-950 p-1.5 rounded-lg border border-slate-800 shadow-inner" title="Kick & Reset Onboarding">
+            <UserMinus className="w-3.5 h-3.5" />
+          </button>
+
+          {/* View/Edit Full Sheet Button */}
+          <button onClick={() => setIsEditing(true)} className="text-slate-500 hover:text-white transition-colors bg-slate-950 p-1.5 rounded-lg border border-slate-800 shadow-inner" title="Open Character Sheet">
             <Eye className="w-3.5 h-3.5" />
           </button>
         </div>
