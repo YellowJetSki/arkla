@@ -15,7 +15,6 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     name: '', level: 0, castTime: '1 Action', range: '60 feet', components: 'V, S', duration: 'Instantaneous', desc: '' 
   });
   
-  // SRD Search State (Fixed naming collision)
   const [srdSpellsList, setSrdSpellsList] = useState([]);
   const [filteredSrdSpells, setFilteredSrdSpells] = useState([]);
   const [showSpellDropdown, setShowSpellDropdown] = useState(false);
@@ -159,7 +158,6 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     await updateDoc(doc(db, 'characters', charId), { spellSlots: updatedSlots });
   };
 
-  // This is the variable that caused the collision!
   const filteredSpells = spells.filter(spell => {
     if (activeFilter === 'All') return true;
     if (activeFilter === 'Cantrips') return spell.level === 0;
@@ -189,17 +187,17 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     <div className="space-y-6">
       
       {spellToCast && !isDM && (
-        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-slate-900 border border-fuchsia-500/50 rounded-2xl w-full max-w-sm shadow-[0_0_50px_rgba(217,70,239,0.3)] flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-fuchsia-950/30">
-              <h3 className="font-bold text-fuchsia-400 flex items-center gap-2">
+        <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl w-full max-w-sm shadow-[8px_8px_0px_rgba(0,0,0,1)] flex flex-col overflow-hidden">
+            <div className="p-4 border-b-[3px] border-slate-950 flex justify-between items-center bg-fuchsia-600">
+              <h3 className="font-black text-slate-950 uppercase tracking-widest flex items-center gap-2">
                 <Wand2 className="w-5 h-5" /> Cast Spell
               </h3>
-              <button onClick={() => setSpellToCast(null)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+              <button onClick={() => setSpellToCast(null)} className="text-slate-950 hover:text-white bg-fuchsia-500 border-2 border-slate-950 rounded p-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-6">
-              <h4 className="text-xl font-black text-white mb-2">{spellToCast.name}</h4>
-              <p className="text-sm text-slate-400 mb-6">Select a slot level to expend for this cast. Base level is {spellToCast.level}.</p>
+              <h4 className="text-2xl font-black text-white leading-none mb-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">{spellToCast.name}</h4>
+              <p className="text-xs font-bold text-slate-400 mb-6 uppercase tracking-wider">Select a slot level to expend. Base: Lvl {spellToCast.level}.</p>
               
               <div className="grid grid-cols-3 gap-3">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].filter(l => l >= spellToCast.level && spellSlots[l]).map(level => {
@@ -210,10 +208,10 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
                       key={level}
                       onClick={() => executeCast(level)}
                       disabled={!hasSlots}
-                      className={`p-3 rounded-xl flex flex-col items-center justify-center border transition-all ${hasSlots ? 'bg-slate-800 border-fuchsia-500/50 hover:bg-fuchsia-600 hover:border-fuchsia-400 group cursor-pointer' : 'bg-slate-900 border-slate-800 opacity-50 cursor-not-allowed'}`}
+                      className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${hasSlots ? 'bg-fuchsia-600 border-slate-950 hover:bg-fuchsia-500 text-white shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] cursor-pointer' : 'bg-slate-900 border-slate-800 text-slate-600 opacity-50 cursor-not-allowed'}`}
                     >
-                      <span className={`text-sm font-bold ${hasSlots ? 'text-white' : 'text-slate-500'}`}>Lvl {level}</span>
-                      <span className={`text-[10px] uppercase font-bold ${hasSlots ? 'text-fuchsia-400 group-hover:text-fuchsia-200' : 'text-slate-600'}`}>{slots.current}/{slots.max} Slots</span>
+                      <span className="text-lg font-black leading-none mb-1">Lvl {level}</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest bg-slate-950 px-1.5 py-0.5 rounded shadow-inner">{slots.current}/{slots.max}</span>
                     </button>
                   );
                 })}
@@ -225,46 +223,46 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
 
       {hasSpellStats && (
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-slate-900 border border-fuchsia-900/50 rounded-xl p-4 flex items-center justify-between shadow-sm">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><ShieldAlert className="w-4 h-4 text-fuchsia-400"/> Save DC</span>
-            <span className="text-2xl font-black text-white">{char.spellSave}</span>
+          <div className="bg-slate-900 border-2 border-slate-950 rounded-xl p-4 flex items-center justify-between shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+            <span className="text-[10px] font-black text-fuchsia-400 uppercase tracking-widest flex items-center gap-1.5"><ShieldAlert className="w-4 h-4"/> Save DC</span>
+            <span className="text-3xl font-black text-white leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">{char.spellSave}</span>
           </div>
-          <div className="bg-slate-900 border border-fuchsia-900/50 rounded-xl p-4 flex items-center justify-between shadow-sm">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5"><Target className="w-4 h-4 text-fuchsia-400"/> Attack</span>
-            <span className="text-2xl font-black text-white">{char.spellAttack}</span>
+          <div className="bg-slate-900 border-2 border-slate-950 rounded-xl p-4 flex items-center justify-between shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+            <span className="text-[10px] font-black text-fuchsia-400 uppercase tracking-widest flex items-center gap-1.5"><Target className="w-4 h-4"/> Attack</span>
+            <span className="text-3xl font-black text-white leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">{char.spellAttack}</span>
           </div>
         </div>
       )}
 
-      <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/80 rounded-2xl p-5 md:p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-fuchsia-500/10 blur-[80px] rounded-full pointer-events-none"></div>
+      <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 md:p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-fuchsia-500/20 blur-[50px] rounded-full pointer-events-none"></div>
         
-        <div className="flex justify-between items-center mb-6 relative z-10">
-          <h3 className="text-lg font-black text-fuchsia-400 flex items-center gap-2 uppercase tracking-widest drop-shadow-sm"><Flame className="w-5 h-5" /> Spell Slots</h3>
+        <div className="flex justify-between items-center mb-6 relative z-10 border-b-2 border-slate-900 pb-2">
+          <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Flame className="w-5 h-5 text-fuchsia-500" /> Spell Slots</h3>
           {isDM && (
             <button 
               onClick={() => setIsEditingSlots(!isEditingSlots)} 
-              className={`text-[10px] md:text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isEditingSlots ? 'bg-fuchsia-600 border-fuchsia-500 text-white' : 'bg-slate-900 border-slate-700 text-fuchsia-400 hover:text-white hover:bg-slate-700'}`}
+              className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isEditingSlots ? 'bg-fuchsia-600 border-slate-950 text-white' : 'bg-slate-900 border-slate-950 text-fuchsia-400 hover:text-white hover:bg-slate-800'}`}
             >
-              <Settings className="w-3.5 h-3.5" /> {isEditingSlots ? 'Done Editing' : 'Config Slots'}
+              <Settings className="w-3.5 h-3.5" /> {isEditingSlots ? 'Done' : 'Config'}
             </button>
           )}
         </div>
         
         {isEditingSlots && isDM ? (
-          <div className="space-y-4 relative z-10 animate-in fade-in bg-slate-900/50 p-5 rounded-xl border border-slate-700/50 shadow-inner">
-            <p className="text-xs text-slate-400 mb-2">Set your maximum spell slots per level. Set to 0 to remove.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          <div className="space-y-4 relative z-10 animate-in fade-in bg-slate-900 p-4 rounded-xl border-2 border-slate-950 shadow-inner">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Set maximum slots per level. Set to 0 to remove.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => (
-                <div key={level} className="bg-slate-950 border border-slate-700 rounded-xl p-3 flex items-center justify-between shadow-inner">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Level {level}</span>
+                <div key={level} className="bg-slate-950 border-2 border-slate-900 rounded-lg p-2 flex items-center justify-between shadow-inner">
+                  <span className="text-[10px] font-black text-fuchsia-500 uppercase tracking-widest">Lvl {level}</span>
                   <input 
                     type="number" 
                     value={spellSlots[level]?.max || ''} 
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => updateSlotMax(level, e.target.value)}
                     placeholder="0"
-                    className="w-14 bg-slate-800 border border-slate-600 rounded-lg text-center text-white py-1.5 focus:border-fuchsia-500 focus:outline-none text-sm font-bold shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-12 bg-slate-800 border-2 border-slate-700 rounded text-center text-white py-1 focus:border-fuchsia-500 focus:outline-none text-sm font-black shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
                   />
                 </div>
               ))}
@@ -272,19 +270,19 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
           </div>
         ) : (
           Object.keys(spellSlots).length === 0 ? (
-            <p className="text-sm text-slate-500 italic relative z-10 bg-slate-900/50 p-4 rounded-xl border border-slate-800 border-dashed text-center">No spell slots configured for this character. {isDM && "Click Config to add them."}</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500 relative z-10 bg-slate-900/50 p-6 rounded-xl border-2 border-slate-900 border-dashed text-center shadow-inner">No spell slots configured. {isDM && "Click Config to add."}</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5 relative z-10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 relative z-10">
               {Object.entries(spellSlots).map(([level, data]) => (
-                <div key={level} className="bg-slate-900/80 border border-slate-700/80 rounded-xl p-4 shadow-sm hover:border-fuchsia-500/30 transition-colors">
-                  <span className="text-[10px] font-black text-fuchsia-500/70 uppercase tracking-widest block mb-3 border-b border-slate-800 pb-1">Level {level}</span>
+                <div key={level} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col justify-center">
+                  <span className="text-[10px] font-black text-fuchsia-400 uppercase tracking-widest block mb-2 leading-none">Level {level}</span>
                   <div className="flex gap-2 flex-wrap">
                     {Array.from({ length: data.max }).map((_, i) => (
                       <button 
                         key={i} 
                         onClick={() => handleSlotToggle(level, i, data.max)} 
                         disabled={isDM} 
-                        className={`w-7 h-7 rounded-full border-2 transition-all duration-300 shrink-0 ${i < data.current ? 'bg-fuchsia-500 border-fuchsia-400 shadow-[0_0_15px_rgba(217,70,239,0.5)] cursor-pointer hover:scale-110' : 'bg-slate-800 border-slate-600 opacity-50 cursor-pointer hover:opacity-80'}`} 
+                        className={`w-6 h-6 rounded-full border-[3px] transition-all duration-200 shrink-0 ${i < data.current ? 'bg-fuchsia-500 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] cursor-pointer' : 'bg-slate-800 border-slate-900 cursor-pointer'}`} 
                         title={i < data.current ? "Click to expend" : "Click to regain"} 
                       />
                     ))}
@@ -296,27 +294,27 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
         )}
       </div>
 
-      <div className="space-y-4">
-        <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-3">
-          <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest"><BookOpen className="w-5 h-5 text-fuchsia-400" /> Book of Magic</h3>
+      <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 md:p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden">
+        <div className="flex justify-between items-center px-1 border-b-2 border-slate-900 pb-3 mb-4">
+          <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><BookOpen className="w-5 h-5 text-fuchsia-500" /> Grimoire</h3>
           {isDM && (
             <button 
               onClick={() => setIsForgingSpell(!isForgingSpell)}
-              className={`text-[10px] md:text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isForgingSpell ? 'bg-fuchsia-700 border-fuchsia-500 text-white shadow-[0_0_15px_rgba(217,70,239,0.3)]' : 'bg-slate-800/80 border-slate-700 text-fuchsia-400 hover:text-white hover:bg-slate-700'}`}
+              className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingSpell ? 'bg-fuchsia-600 border-slate-950 text-white' : 'bg-slate-900 border-slate-950 text-fuchsia-400 hover:text-white hover:bg-slate-800'}`}
             >
-              <Hammer className="w-3.5 h-3.5" /> {isForgingSpell ? 'Close Forge' : 'Add Spell'}
+              <Hammer className="w-3.5 h-3.5" /> {isForgingSpell ? 'Close' : 'Add Spell'}
             </button>
           )}
         </div>
 
         {spells.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-3">
-            <Filter className="w-4 h-4 text-slate-500 shrink-0 my-auto mr-2" />
+          <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-3 mb-2">
+            <Filter className="w-4 h-4 text-slate-500 shrink-0 my-auto mr-1" />
             {SPELL_FILTERS.map(filter => (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
-                className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border shadow-sm ${activeFilter === filter ? 'bg-fuchsia-600 text-white border-fuchsia-500 shadow-[0_0_10px_rgba(217,70,239,0.3)]' : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-white'}`}
+                className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${activeFilter === filter ? 'bg-fuchsia-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 border-slate-950 hover:bg-slate-800 hover:text-white'}`}
               >
                 {filter}
               </button>
@@ -325,21 +323,20 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
         )}
 
         {isDM && isForgingSpell && (
-          <form onSubmit={handleForgeCustomSpell} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-fuchsia-500/30 shadow-inner mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
-            <div className="flex justify-between items-center border-b border-fuchsia-900/50 pb-2 mb-3">
+          <form onSubmit={handleForgeCustomSpell} className="bg-slate-900 border-2 border-fuchsia-950 p-5 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
+            <div className="flex justify-between items-center border-b-2 border-slate-950 pb-2 mb-3">
               <h4 className="text-sm font-black text-fuchsia-400 flex items-center gap-2 uppercase tracking-widest"><Hammer className="w-4 h-4" /> Spell Forge</h4>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div className="sm:col-span-2 relative">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> Spell Name (SRD Search)</label>
-                <input type="text" required value={customSpell.name} onChange={handleSpellNameChange} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Fireball" />
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> SRD Search</label>
+                <input type="text" required value={customSpell.name} onChange={handleSpellNameChange} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Fireball" />
                 
-                {/* AUTOFILL DROPDOWN (Now uses filteredSrdSpells) */}
                 {showSpellDropdown && filteredSrdSpells.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50">
+                  <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border-2 border-slate-950 rounded-lg shadow-[4px_4px_0px_rgba(0,0,0,1)] z-50">
                     {filteredSrdSpells.map(item => (
-                      <div key={item.index} onClick={() => handleSelectSrdSpell(item.index)} className="px-3 py-2 text-sm text-slate-300 hover:bg-fuchsia-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors">
+                      <div key={item.index} onClick={() => handleSelectSrdSpell(item.index)} className="px-3 py-2.5 text-sm font-bold text-slate-300 hover:bg-fuchsia-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors">
                         {item.name}
                       </div>
                     ))}
@@ -347,8 +344,8 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
                 )}
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Spell Level</label>
-                <select value={customSpell.level} onChange={e => setCustomSpell({...customSpell, level: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-fuchsia-500 shadow-inner">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Spell Level</label>
+                <select value={customSpell.level} onChange={e => setCustomSpell({...customSpell, level: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner">
                   <option value="0">Cantrip (0)</option>
                   {[1,2,3,4,5,6,7,8,9].map(l => <option key={l} value={l}>Level {l}</option>)}
                 </select>
@@ -357,36 +354,36 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Casting Time</label>
-                <input type="text" onFocus={(e) => e.target.select()} required value={customSpell.castTime} onChange={e => setCustomSpell({...customSpell, castTime: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 1 Action" />
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Casting Time</label>
+                <input type="text" onFocus={(e) => e.target.select()} required value={customSpell.castTime} onChange={e => setCustomSpell({...customSpell, castTime: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="1 Action" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Range</label>
-                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.range} onChange={e => setCustomSpell({...customSpell, range: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. 60 feet" />
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Range</label>
+                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.range} onChange={e => setCustomSpell({...customSpell, range: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="60 feet" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Components</label>
-                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.components} onChange={e => setCustomSpell({...customSpell, components: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. V, S, M" />
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Components</label>
+                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.components} onChange={e => setCustomSpell({...customSpell, components: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="V, S" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Duration</label>
-                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.duration} onChange={e => setCustomSpell({...customSpell, duration: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Concentration" />
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Duration</label>
+                <input type="text" onFocus={(e) => e.target.select()} value={customSpell.duration} onChange={e => setCustomSpell({...customSpell, duration: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="Instant" />
               </div>
             </div>
 
             <div className="mb-4">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
-              <textarea required value={customSpell.desc} onChange={e => setCustomSpell({...customSpell, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-fuchsia-500 resize-y shadow-inner leading-relaxed" placeholder="Describe the damage, saving throws, and effects..." />
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description</label>
+              <textarea required value={customSpell.desc} onChange={e => setCustomSpell({...customSpell, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-3 text-slate-300 font-medium focus:outline-none focus:border-fuchsia-500 resize-y shadow-inner leading-relaxed" placeholder="Spell effects..." />
             </div>
 
-            <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl shadow-[0_0_15px_rgba(217,70,239,0.3)] hover:shadow-[0_0_25px_rgba(217,70,239,0.5)] transition-all flex items-center justify-center gap-2">
+            <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-950 font-black uppercase tracking-widest text-xs py-3.5 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center gap-2 border-2 border-slate-950">
               <Plus className="w-4 h-4" /> Inject into Grimoire
             </button>
           </form>
         )}
 
         {Object.keys(groupedSpells).length === 0 ? (
-          <div className="bg-slate-900/50 border border-slate-800 border-dashed rounded-2xl p-8 text-center text-slate-500 italic">
+          <div className="bg-slate-900 border-2 border-slate-950 border-dashed rounded-xl p-8 text-center text-slate-500 font-bold uppercase tracking-widest shadow-inner">
             {spells.length === 0 ? (isDM ? 'Forge spells here.' : 'No magic inscribed.') : 'No spells match this filter.'}
           </div>
         ) : (
@@ -403,25 +400,24 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
                   const isConcentration = (spell.desc || '').toLowerCase().includes('concentration') || (spell.duration || '').toLowerCase().includes('concentration');
                   
                   return (
-                    <div key={idx} className="bg-slate-900/80 backdrop-blur-sm border border-slate-700/80 rounded-xl p-5 group shadow-sm hover:border-fuchsia-500/30 transition-colors">
-                      <div className="flex justify-between items-start mb-4">
+                    <div key={idx} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col transition-all">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
                         <div>
-                          <h4 className="font-black text-fuchsia-300 text-xl flex items-center gap-2 drop-shadow-sm mb-2">
+                          <h4 className="font-black text-fuchsia-300 text-xl flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] mb-2 leading-none">
                             {spell.name}
                             {isDM && (
                               <button 
                                 onClick={() => removeSpellFromGrimoire(spell)}
-                                className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 bg-slate-950 p-1.5 rounded transition-all shadow-inner ml-2"
-                                title="Remove Spell"
+                                className="text-slate-500 hover:text-red-500 hover:bg-red-950 border-2 border-slate-950 bg-slate-950 p-1.5 rounded-lg transition-all ml-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3 h-3" />
                               </button>
                             )}
                           </h4>
-                          <div className="flex gap-2 flex-wrap">
-                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-950 px-2 py-1 rounded shadow-inner">{spell.castTime || spell.castingTime || spell.casting_time || '1 Action'}</span>
-                             {spell.range && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-950 px-2 py-1 rounded shadow-inner">{spell.range}</span>}
-                             {spell.duration && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-950 px-2 py-1 rounded shadow-inner">{spell.duration}</span>}
+                          <div className="flex gap-1.5 flex-wrap">
+                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner">{spell.castTime || spell.castingTime || spell.casting_time || '1 Action'}</span>
+                             {spell.range && <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner">{spell.range}</span>}
+                             {spell.duration && <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner">{spell.duration}</span>}
                           </div>
                         </div>
                         
@@ -430,22 +426,22 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
                             <button 
                               onClick={() => setSpellToCast(spell)}
                               disabled={!canCastAny}
-                              className={`text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition-colors ${canCastAny ? 'bg-fuchsia-600 hover:bg-fuchsia-500 text-white cursor-pointer shadow-[0_0_10px_rgba(217,70,239,0.3)]' : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'}`}
+                              className={`text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${canCastAny ? 'bg-fuchsia-600 border-slate-950 hover:bg-fuchsia-500 text-white cursor-pointer' : 'bg-slate-800 border-slate-900 text-slate-600 cursor-not-allowed'}`}
                             >
-                              <Wand2 className="w-3.5 h-3.5" /> {canCastAny ? 'Cast' : 'No Slots'}
+                              <Wand2 className="w-3 h-3" /> {canCastAny ? 'Cast' : 'No Slots'}
                             </button>
                           )}
                           {!isDM && isConcentration && (
                             <button 
                               onClick={toggleConcentration}
-                              className={`text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition-colors ${char.isConcentrating ? 'bg-amber-500 text-slate-900 cursor-pointer animate-pulse shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-slate-800 text-amber-500 border border-amber-900/50 hover:bg-slate-700 cursor-pointer'}`}
+                              className={`text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${char.isConcentrating ? 'bg-amber-400 border-slate-950 text-slate-950 cursor-pointer animate-pulse' : 'bg-slate-800 border-slate-950 text-amber-500 hover:bg-slate-700 cursor-pointer'}`}
                             >
-                              <BrainCircuit className="w-3.5 h-3.5" /> Conc.
+                              <BrainCircuit className="w-3 h-3" /> Conc.
                             </button>
                           )}
                         </div>
                       </div>
-                      <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{spell.desc}</p>
+                      <p className="text-[11px] md:text-xs text-slate-300 font-medium leading-relaxed whitespace-pre-wrap bg-slate-950/50 p-3 rounded-lg border border-slate-800/50 shadow-inner mt-2">{spell.desc}</p>
                     </div>
                   );
                 })}
