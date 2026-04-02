@@ -41,9 +41,15 @@ export default function Login({ onLogin }) {
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.name && data.name.toLowerCase() === normalizedName) {
-          foundCharId = doc.id;
-          foundCharName = data.name;
+        if (data.name) {
+          const dbName = data.name.toLowerCase();
+          const dbFirstName = dbName.split(' ')[0];
+          
+          // Accept either the exact full name or just the first name
+          if (dbName === normalizedName || dbFirstName === normalizedName) {
+            foundCharId = doc.id;
+            foundCharName = data.name;
+          }
         }
       });
 

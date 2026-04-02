@@ -63,9 +63,21 @@ export const fetchEquipmentDetails = async (urlOrIndex) => {
        if (data.range.long) rangeStr += ` / ${data.range.long} ft`;
     }
 
-    let descText = data.desc?.join('\n') || '';
-    // Intelligently strip out descriptions that just tell the user to read a table
-    if (descText.match(/(refer to|see|see the).*table/i)) {
+    let descText = '';
+    if (data.desc && Array.isArray(data.desc)) {
+      // 1. Strip out pure Markdown table formatting if the API leaks it
+      let cleanDesc = data.desc.filter(p => !p.includes('|---') && !p.startsWith('| '));
+      
+      // 2. Strip out literal book references
+      cleanDesc = cleanDesc.filter(p => !/(refer to|see the|roll on).*table/i.test(p));
+
+      descText = cleanDesc.join('\n\n').trim();
+    }
+
+    // 3. Smart Muting: Standard weapons/armor have useless descriptions ("See weapons table").
+    // We already display their mechanics in the UI, so we wipe the text.
+    // We ONLY keep descriptions for Magic Items (which have a URL rather than an index in this check) or Wondrous gear.
+    if ((category === 'Weapon' || category === 'Armor') && !urlOrIndex.includes('magic-items')) {
        descText = '';
     }
 
@@ -79,6 +91,7 @@ export const fetchEquipmentDetails = async (urlOrIndex) => {
       ac: data.armor_class?.base || 14,
       desc: descText
     };
+    
     equipmentDetailsCache.set(urlOrIndex, result);
     return result;
   } catch (e) { return null; }
