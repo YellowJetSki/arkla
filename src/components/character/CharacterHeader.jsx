@@ -54,7 +54,7 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
         <div className={`w-full h-full relative ${char.isConcentrating ? `ring-[4px] ring-inset ${activeTheme.ring} animate-pulse z-20` : ''} ${isFrightened ? 'ring-[4px] ring-inset ring-fuchsia-600 animate-pulse z-20' : ''}`}>
           <img 
             src={`/${charId}.png`} 
-            alt={char.name} 
+            alt={char.name || 'Unknown'} 
             className={`w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105 ${isUnconscious ? 'grayscale' : ''}`} 
             onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://via.placeholder.com/800x400?text=No+Image'; }} 
           />
@@ -117,12 +117,12 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
             {isEditMode ? (
               <input 
                 type="text" 
-                defaultValue={char.name} 
+                defaultValue={char.name || ''} 
                 onBlur={(e) => updateField('name', e.target.value)}
                 className={`text-2xl md:text-3xl font-black leading-tight bg-slate-900/80 border border-amber-500 rounded px-2 py-0.5 focus:outline-none w-48 pointer-events-auto shadow-xl ${isUnconscious ? 'text-red-400' : 'text-white'}`}
               />
             ) : (
-              <h2 className={`text-2xl md:text-3xl font-black leading-tight drop-shadow-lg text-balance ${isUnconscious ? 'text-red-400' : 'text-white'}`}>{char.name}</h2>
+              <h2 className={`text-2xl md:text-3xl font-black leading-tight drop-shadow-lg text-balance ${isUnconscious ? 'text-red-400' : 'text-white'}`}>{char.name || 'Unknown'}</h2>
             )}
             <div className="flex items-center pointer-events-auto">
               <button onClick={isDM ? toggleInspiration : undefined} className={`shrink-0 transition-all z-10 flex items-center justify-center ${isDM ? 'cursor-pointer hover:scale-110' : 'pointer-events-none'} ${char.inspiration ? 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,1)] scale-110' : (isDM ? 'text-slate-400 hover:text-yellow-400/50' : 'text-slate-600')}`}><Star className="w-5 h-5 md:w-6 md:h-6 fill-current pointer-events-none" /></button>
@@ -130,12 +130,12 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
           </div>
           {isEditMode ? (
             <div className="flex gap-2 mt-1.5 pointer-events-auto">
-                <input type="number" defaultValue={char.level} onBlur={e => updateField('level', Number(e.target.value))} className={`w-12 bg-slate-900/80 border border-amber-500 shadow-xl rounded px-1.5 py-0.5 text-xs font-bold ${activeTheme.text} focus:outline-none`} />
-                <input type="text" defaultValue={char.species || char.race} onBlur={e => updateField('species', e.target.value)} className={`w-24 bg-slate-900/80 border border-amber-500 shadow-xl rounded px-1.5 py-0.5 text-xs font-bold ${activeTheme.text} focus:outline-none`} />
-                <input type="text" defaultValue={char.class} onBlur={e => updateField('class', e.target.value)} className={`w-28 bg-slate-900/80 border border-amber-500 shadow-xl rounded px-1.5 py-0.5 text-xs font-bold ${activeTheme.text} focus:outline-none`} />
+                <input type="number" defaultValue={char.level || 1} onBlur={e => updateField('level', Number(e.target.value))} className={`w-12 bg-slate-900/80 border border-amber-500 shadow-xl rounded px-1.5 py-0.5 text-xs font-bold ${activeTheme.text} focus:outline-none`} />
+                <input type="text" defaultValue={char.species || char.race || ''} onBlur={e => updateField('species', e.target.value)} className={`w-24 bg-slate-900/80 border border-amber-500 shadow-xl rounded px-1.5 py-0.5 text-xs font-bold ${activeTheme.text} focus:outline-none`} />
+                <input type="text" defaultValue={char.class || ''} onBlur={e => updateField('class', e.target.value)} className={`w-28 bg-slate-900/80 border border-amber-500 shadow-xl rounded px-1.5 py-0.5 text-xs font-bold ${activeTheme.text} focus:outline-none`} />
             </div>
           ) : (
-            <p className={`${activeTheme.text} font-bold text-xs md:text-sm drop-shadow-md`}>Lvl {char.level} {char.species || char.race} {char.class.split(' ')[0]}</p>
+            <p className={`${activeTheme.text} font-bold text-xs md:text-sm drop-shadow-md`}>Lvl {char.level || 1} {char.species || char.race || ''} {(char.class || '').split(' ')[0]}</p>
           )}
         </div>
       </div>
@@ -194,7 +194,7 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
           <div className="flex gap-2 h-full">
             <button onClick={handleSpendHitDie} className="flex-1 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl flex items-center justify-center flex-col shadow-inner px-2 py-1 transition-colors cursor-pointer group">
               <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-0.5 group-hover:text-slate-300 transition-colors">Hit Dice</span>
-              <span className="text-sm font-black text-emerald-400">{char.hitDice?.current ?? char.level}/{char.hitDice?.max ?? char.level}</span>
+              <span className="text-sm font-black text-emerald-400">{char.hitDice?.current ?? (char.level || 1)}/{char.hitDice?.max ?? (char.level || 1)}</span>
             </button>
 
             <button onClick={onOpenShortRest} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 flex flex-col items-center justify-center transition-colors shadow-sm py-1">
