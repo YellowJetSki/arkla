@@ -1,35 +1,55 @@
-import { Zap } from 'lucide-react';
+import { ArrowUpCircle } from 'lucide-react';
 
-export default function XPBar({ exp = 0, level = 1 }) {
-  // Standard D&D 5e XP Thresholds
-  const xpLevels = [
-    0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 
-    85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000
-  ];
-
-  const currentLevelXP = xpLevels[level - 1] || 0;
-  // If they are level 20+, just cap the next level at the max threshold
-  const nextLevelXP = xpLevels[level] || xpLevels[19]; 
-  
-  // Calculate percentage, clamped between 0 and 100
-  const progress = Math.min(100, Math.max(0, ((exp - currentLevelXP) / (nextLevelXP - currentLevelXP)) * 100));
-
+export default function XPBar({ 
+  currentXp, 
+  nextLevelXp, 
+  xpPercent, 
+  canLevelUp, 
+  isDM, 
+  isEditingXp, 
+  displayXp, 
+  setDisplayXp, 
+  setIsEditingXp, 
+  adjustXp, 
+  updateField, 
+  onOpenLevelUp 
+}) {
   return (
-    <div className="w-full mt-3 mb-2">
-      <div className="flex justify-between items-end text-xs text-slate-400 mb-1.5 font-bold uppercase tracking-wider">
-        <span className="flex items-center gap-1">
-          <Zap className="w-3 h-3 text-emerald-400" /> XP {exp}
-        </span>
-        <span>Next: {nextLevelXP}</span>
+    <div className="relative bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-inner flex items-center justify-between p-2">
+      <div className={`absolute left-0 top-0 bottom-0 ${canLevelUp ? 'bg-amber-500/30' : 'bg-blue-500/20'} transition-all duration-500`} style={{ width: `${xpPercent}%` }}></div>
+      <div className="relative z-10 flex items-center gap-2 pl-2">
+        {canLevelUp && !isDM ? (
+           <button 
+             onClick={onOpenLevelUp} 
+             className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-500 text-white px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(245,158,11,0.5)] animate-pulse"
+           >
+             <ArrowUpCircle className="w-3.5 h-3.5" /> Level Up
+           </button>
+        ) : (
+           <>
+             <ArrowUpCircle className={`w-4 h-4 ${canLevelUp ? 'text-amber-400 animate-pulse' : 'text-blue-400'}`} />
+             <span className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-widest">Experience</span>
+           </>
+        )}
       </div>
-      <div className="h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 shadow-inner">
-        <div 
-          className="h-full bg-emerald-500 transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(16,185,129,0.8)] relative" 
-          style={{ width: `${progress}%` }}
-        >
-          {/* Add a tiny glowing tip to the progress bar */}
-          <div className="absolute right-0 top-0 bottom-0 w-2 bg-white/50 blur-[2px]"></div>
+      <div className="relative z-10 flex items-center gap-1 pr-1">
+        <button onClick={() => adjustXp(-50)} className="w-6 h-6 md:w-8 md:h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 font-bold flex items-center justify-center border border-slate-600 transition-colors shadow-sm cursor-pointer">-</button>
+        <div className="flex items-center gap-1 text-white bg-slate-800/50 border border-slate-600 rounded-lg px-2 py-0.5 md:py-1">
+          
+          <input 
+            type="number" 
+            value={isEditingXp ? displayXp : currentXp} 
+            onFocus={(e) => { setDisplayXp(currentXp); setIsEditingXp(true); e.target.select(); }}
+            onChange={(e) => setDisplayXp(e.target.value)} 
+            onBlur={() => { setIsEditingXp(false); updateField('exp', Number(displayXp)); }}
+            onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
+            className="w-12 md:w-16 bg-transparent focus:outline-none text-right font-black text-sm md:text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-slate-100" 
+          />
+          
+          <span className="text-slate-500 font-black text-sm md:text-base">/</span>
+          <span className="w-12 md:w-16 text-left text-slate-400 text-sm md:text-base font-bold">{nextLevelXp}</span>
         </div>
+        <button onClick={() => adjustXp(50)} className="w-6 h-6 md:w-8 md:h-8 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-400 font-bold flex items-center justify-center border border-slate-600 transition-colors shadow-sm cursor-pointer">+</button>
       </div>
     </div>
   );

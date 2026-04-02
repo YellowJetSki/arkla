@@ -1,8 +1,11 @@
-import { LogOut } from 'lucide-react';
+import { Shield, LogOut } from 'lucide-react';
 
-export default function DisplayWaitingScreen({ onLogout }) {
+export default function DisplayWaitingScreen({ mapData, onLogout }) {
   return (
     <div className="fixed inset-0 bg-black flex items-center justify-center z-[99999]">
+      {/* INVISIBLE PRELOADER: Forces browser to download the huge map image before the DM publishes it */}
+      {mapData?.imageUrl && <img src={mapData.imageUrl} alt="Preload Cache" style={{ display: 'none' }} />}
+      
       <img 
         src="/icon.png" 
         alt="Campaign Logo" 
