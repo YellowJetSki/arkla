@@ -7,8 +7,7 @@ import {
 } from 'lucide-react';
 
 import StatGrid from './shared/StatGrid';
-import QuickTraits from './shared/QuickTraits'; 
-import FeatureCard from './shared/FeatureCard';
+import QuickTraits from './shared/QuickTraits';
 import ImageModal from './shared/ImageModal'; 
 import GlobalLoader from './shared/GlobalLoader';
 import DialogModal from './shared/DialogModal';
