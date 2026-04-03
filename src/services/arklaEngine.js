@@ -32,7 +32,6 @@ export const calculateSpellcastingStats = (classesArray, stats) => {
   let primaryCastingStat = 'CHA'; 
   let highestCasterLevel = 0;
 
-  // Fallback for single-string class names (e.g. "Fighter 3 / Rogue 1")
   let parsedClasses = classesArray;
   if (typeof classesArray === 'string') {
      parsedClasses = classesArray.split('/').map(c => ({
@@ -92,7 +91,6 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, className = '') =
     activeStat = 'DEX';
   }
 
-  // Allow custom override via properties box (e.g. "use: cha" for Hexblades)
   const overrideMatch = properties.match(/use:\s*([a-z]{3})/i);
   if (overrideMatch) {
     const forcedStat = overrideMatch[1].toUpperCase();
@@ -106,16 +104,31 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, className = '') =
   const formattedHit = toHit >= 0 ? `+${toHit}` : `${toHit}`;
 
   let formattedDamage = attack.damage || ''; 
-  const modString = useStatMod === 0 ? '' : useStatMod > 0 ? ` + ${useStatMod}` : ` - ${Math.abs(useStatMod)}`;
 
   if (formattedDamage) {
-     // 1. Safely inject modifier to the first dice (Base Damage)
-     formattedDamage = formattedDamage.replace(/(\d+d\d+)/, `$1${modString}`);
-     
-     // 2. If there are parentheses (Versatile Damage), safely inject the modifier in there too!
-     if (formattedDamage.includes('(')) {
-       formattedDamage = formattedDamage.replace(/\((\d+d\d+)\)/, `($1${modString})`);
-     }
+    // Safely combine existing flat bonuses in the string with the active stat modifier
+    formattedDamage = formattedDamage.replace(/(\d+d\d+)(?:\s*([+-])\s*(\d+))?/, (match, dice, sign, flat) => {
+      let baseFlat = 0;
+      if (sign && flat) {
+        baseFlat = sign === '-' ? -parseInt(flat) : parseInt(flat);
+      }
+      const totalMod = baseFlat + useStatMod;
+      if (totalMod === 0) return dice;
+      return totalMod > 0 ? `${dice} + ${totalMod}` : `${dice} - ${Math.abs(totalMod)}`;
+    });
+    
+    // Apply the same math to Versatile damage inside parentheses
+    if (formattedDamage.includes('(')) {
+      formattedDamage = formattedDamage.replace(/\((\d+d\d+)(?:\s*([+-])\s*(\d+))?\)/, (match, dice, sign, flat) => {
+        let baseFlat = 0;
+        if (sign && flat) {
+          baseFlat = sign === '-' ? -parseInt(flat) : parseInt(flat);
+        }
+        const totalMod = baseFlat + useStatMod;
+        if (totalMod === 0) return `(${dice})`;
+        return totalMod > 0 ? `(${dice} + ${totalMod})` : `(${dice} - ${Math.abs(totalMod)})`;
+      });
+    }
   }
 
   return { ...attack, hit: formattedHit, damage: formattedDamage };

@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { createPortal } from 'react-dom';
+import { doc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
-  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, Loader2
+  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 import StatGrid from './shared/StatGrid';
 import QuickTraits from './shared/QuickTraits'; 
-import FeatureCard from './shared/FeatureCard';
 import ImageModal from './shared/ImageModal'; 
 import GlobalLoader from './shared/GlobalLoader';
 import DialogModal from './shared/DialogModal';
@@ -19,7 +19,6 @@ import LevelUpModal from './LevelUpModal';
 import SessionResetModal from './SessionResetModal';
 import PlayerGuideModal from './PlayerGuideModal';
 import PartyLootModal from './PartyLootModal'; 
-import DMEditSheet from './DMEditSheet';
 import ShortRestModal from './ShortRestModal'; 
 import LongRestModal from './LongRestModal'; 
 import Spellbook from './Spellbook'; 
@@ -73,7 +72,14 @@ const THEMES = {
 
 export default function CharacterCard({ currentUser, onLogout, isDM = false, onClose = null }) {
   const CardWrapper = isDM ? 
-    ({ children }) => <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300"><div className="bg-slate-900 border border-indigo-500/50 rounded-2xl w-full max-w-5xl shadow-[0_0_40px_rgba(99,102,241,0.2)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500 overflow-y-auto custom-scrollbar relative">{children}</div></div> 
+    ({ children }) => createPortal(
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
+        <div className="bg-slate-900 border-[3px] border-indigo-500 rounded-3xl w-full max-w-5xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500 overflow-y-auto custom-scrollbar relative">
+          {children}
+        </div>
+      </div>,
+      document.body
+    ) 
     : ({ children }) => <>{children}</>;
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -95,6 +101,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [activeLoot, setActiveLoot] = useState(null); 
   const [isBattleMapOpen, setIsBattleMapOpen] = useState(false);
   const [saveToast, setSaveToast] = useState(''); 
+  const [showCoreStats, setShowCoreStats] = useState(false);
 
   const [isForgingFeat, setIsForgingFeat] = useState(false);
   const [customFeat, setCustomFeat] = useState({ name: '', desc: '', hasTracker: false, trackerMax: 1, trackerRecharge: 'long' });
@@ -158,7 +165,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const updateField = async (field, value) => {
     if (!char) return;
     await updateDoc(doc(db, 'characters', currentUser.charId), { [field]: value });
-    if (['inventory', 'backstory', 'journal', 'theme'].includes(field)) {
+    if (['inventory', 'backstory', 'journal', 'theme', 'stats', 'ac', 'speed', 'initiative'].includes(field)) {
       setSaveToast('Saved to Cloud');
       setTimeout(() => setSaveToast(''), 2500);
     }
@@ -175,7 +182,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   };
 
   const handleResourceToggle = async (resourceIndex, newCurrentValue) => {
-    if (!char || !char.resources || isDM) return;
+    if (!char || !char.resources || (isDM && !isEditMode)) return;
     const updatedResources = [...char.resources];
     updatedResources[resourceIndex] = {
       ...updatedResources[resourceIndex],
@@ -187,7 +194,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const removeFeature = async (featToRemove) => {
     showDialog({
       title: 'Remove Feature?',
-      message: `Are you sure you want to permanently delete ${featToRemove.name} from this character?`,
+      message: `Are you sure you want to permanently delete ${featToRemove.name}?`,
       type: 'confirm',
       onConfirm: async () => {
         await updateDoc(doc(db, 'characters', currentUser.charId), {
@@ -264,14 +271,21 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   };
 
   const handleCompleteOnboarding = async (wizardData) => {
-    let updates = {
-      theme: wizardData.theme,
-      hasCompletedTutorial: true
-    };
+    let updates = { theme: wizardData.theme, hasCompletedTutorial: true };
     await updateDoc(doc(db, 'characters', currentUser.charId), updates);
   };
 
-  const restoreCharacter = async () => {};
+  const restoreCharacter = async (importedData) => {
+    try {
+      const dataToSave = { ...importedData, id: currentUser.charId };
+      await setDoc(doc(db, 'characters', currentUser.charId), dataToSave);
+      setSaveToast('Character Restored from Backup!');
+      setTimeout(() => setSaveToast(''), 2500);
+    } catch (err) {
+      console.error("Failed to restore character:", err);
+      showDialog({ title: 'Restore Failed', message: 'There was an error restoring your character data to the cloud.', type: 'alert' });
+    }
+  };
 
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
   if (!char) return <CardWrapper><GlobalLoader /></CardWrapper>;
@@ -313,17 +327,10 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
          <div className={`fixed inset-0 bg-gradient-to-b ${activeTheme.ambient} to-slate-950 pointer-events-none -z-10 transition-colors duration-1000`}></div>
       )}
 
-      <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} pb-24 relative`}>
+      {/* Main Container - Padded at bottom to account for fixed Mobile Nav */}
+      <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} pb-28 md:pb-12 relative h-full flex flex-col md:flex-row`}>
         
-        <DialogModal 
-          isOpen={dialog.isOpen} 
-          title={dialog.title} 
-          message={dialog.message} 
-          type={dialog.type} 
-          inputPlaceholder={dialog.inputPlaceholder}
-          onConfirm={dialog.onConfirm} 
-          onCancel={closeDialog} 
-        />
+        <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} inputPlaceholder={dialog.inputPlaceholder} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
         {!isDM && (
           <>
@@ -339,51 +346,52 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         )}
 
         {saveToast && (
-          <div className="fixed bottom-6 right-6 bg-slate-800 text-emerald-400 px-4 py-3 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] border border-emerald-900/50 z-[99999] animate-in slide-in-from-bottom-5 fade-in duration-300 font-bold text-sm flex items-center gap-2">
+          <div className="fixed top-6 right-6 bg-slate-900 border-2 border-slate-950 text-emerald-400 px-4 py-3 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] z-[99999] animate-in slide-in-from-top-5 fade-in duration-300 font-black uppercase tracking-widest text-xs flex items-center gap-2">
             <Sparkles className="w-4 h-4" /> {saveToast}
           </div>
         )}
 
         <ImageModal isOpen={isImageOpen} url={`/${currentUser.charId}.png`} alt={char.name || 'Character'} onClose={() => setIsImageOpen(false)} />
         <ImageModal isOpen={!!activeLoot} url={activeLoot?.url} alt={activeLoot?.name} onClose={() => setActiveLoot(null)} />
-        {isDM && isEditMode && <DMEditSheet char={char} charId={currentUser.charId} onCancel={() => setIsEditMode(false)} />}
 
-        <div className={`${isDM ? 'p-6' : 'max-w-4xl mx-auto p-3 md:p-8 min-h-[100dvh]'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'}`}>
+        {/* LEFT ANCHOR PANEL (Desktop) / TOP HEADER (Mobile) */}
+        <div className={`w-full md:w-[350px] lg:w-[400px] shrink-0 ${isDM ? 'p-4 md:p-6' : 'p-3 md:p-6'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} md:sticky md:top-0 md:h-screen md:overflow-y-auto custom-scrollbar`}>
           
           {isDM ? (
-            <div className="flex justify-between items-center mb-4 border-b border-slate-700 pb-4 sticky top-0 bg-slate-900 z-40 pt-2">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2"><User className="w-6 h-6 text-indigo-400" /> {char.name}'s Sheet (DM Mode)</h2>
+            <div className="flex justify-between items-center mb-4 border-b-2 border-slate-950 pb-4">
+              <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><User className="w-6 h-6 text-indigo-400" /> {char.name || 'Unknown'} (DM)</h2>
               <div className="flex items-center gap-2">
-                <button onClick={() => setIsEditMode(true)} className="flex items-center gap-2 text-indigo-400 hover:text-white transition-colors bg-indigo-900/30 px-3 py-1.5 rounded-lg border border-indigo-500/30 hover:bg-indigo-600 text-sm"><Edit3 className="w-4 h-4" /> Edit Core Stats</button>
-                <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-800 p-1.5 rounded-lg"><X className="w-5 h-5" /></button>
+                <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center gap-2 transition-all px-3 py-1.5 rounded-lg border-2 text-xs uppercase tracking-widest font-black shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isEditMode ? 'bg-amber-600 text-slate-950 border-amber-900' : 'text-indigo-400 bg-slate-900 border-slate-950 hover:bg-slate-800'}`}>
+                  <Edit3 className="w-3 h-3" /> {isEditMode ? 'Exit Edit' : 'Edit Live'}
+                </button>
+                <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-900 p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]"><X className="w-4 h-4" /></button>
               </div>
             </div>
           ) : (
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-md shadow-lg ${activeTheme.accent} border border-white/10 flex items-center justify-center p-1`}>
+                <div className={`w-8 h-8 rounded-md shadow-[2px_2px_0px_rgba(0,0,0,1)] ${activeTheme.accent} border-2 border-slate-950 flex items-center justify-center p-1`}>
                   <img src="/icon.png" alt="App Icon" className="w-full h-full object-cover rounded-sm" />
                 </div>
-                <h1 className="text-lg font-bold text-slate-300 tracking-wider hidden sm:block">CAMPAIGN COMPANION</h1>
+                <h1 className="text-sm font-black text-white uppercase tracking-widest hidden sm:block drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">CAMPAIGN COMPANION</h1>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setIsGuideOpen(true)} className={`flex items-center justify-center w-9 h-9 ${activeTheme.text} hover:text-white transition-colors bg-slate-900/50 rounded-lg border ${activeTheme.border} ${activeTheme.hoverBg} shadow-sm backdrop-blur-sm`}><HelpCircle className="w-4 h-4" /></button>
-                <button onClick={onLogout} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors bg-slate-900/50 backdrop-blur-sm px-3 py-1.5 h-9 rounded-lg border border-slate-700 text-sm shadow-sm"><LogOut className="w-3 h-3" /> Exit</button>
+                <button onClick={() => setIsGuideOpen(true)} className={`flex items-center justify-center w-9 h-9 ${activeTheme.text} hover:text-white transition-all bg-slate-900 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]`}><HelpCircle className="w-4 h-4" /></button>
+                <button onClick={onLogout} className="flex items-center gap-2 text-slate-400 hover:text-white transition-all bg-slate-900 px-3 py-1.5 h-9 rounded-lg border-2 border-slate-950 text-xs font-black uppercase tracking-widest shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"><LogOut className="w-3 h-3" /> Exit</button>
               </div>
             </div>
           )}
 
           {isDM && char.levelUpPending && (
-            <div className="bg-amber-900/50 border border-amber-500/50 rounded-xl p-4 mb-6 shadow-[0_0_15px_rgba(245,158,11,0.2)] flex justify-between items-center animate-pulse">
-              <div className="flex items-center gap-3 text-amber-400">
+            <div className="bg-amber-500 border-[3px] border-amber-950 rounded-xl p-4 mb-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex justify-between items-center animate-pulse">
+              <div className="flex items-center gap-3 text-amber-950">
                 <BellRing className="w-6 h-6" />
                 <div>
-                  <h4 className="font-bold uppercase tracking-widest text-sm">Level Up Pending</h4>
-                  <p className="text-xs text-amber-200/70">{char.name} has signaled an ascension. Update their stats and features.</p>
+                  <h4 className="font-black uppercase tracking-widest text-sm leading-none">Level Up!</h4>
                 </div>
               </div>
-              <button onClick={() => setIsEditMode(true)} className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors">
-                Resolve & Edit
+              <button onClick={() => setIsEditMode(true)} className="bg-slate-950 text-amber-400 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded border-2 border-amber-900 transition-colors">
+                Resolve
               </button>
             </div>
           )}
@@ -392,6 +400,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             char={char} 
             charId={currentUser.charId} 
             isDM={isDM} 
+            isEditMode={isEditMode}
             activeTheme={activeTheme} 
             showDialog={showDialog}
             onOpenImage={() => setIsImageOpen(true)}
@@ -400,71 +409,64 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             onOpenLevelUp={() => setIsLevelUpOpen(true)}
           />
 
-          <div className="mb-6">
-            <StatGrid char={char} activeTheme={activeTheme} />
-            <QuickTraits features={char.features} />
-          </div>
-
-          <div className={`sticky top-0 z-30 pt-1 pb-3 -mx-3 px-3 md:-mx-8 md:px-8 border-b border-slate-800/80 shadow-md mb-6 ${isDM ? 'bg-slate-950/90 backdrop-blur-xl' : 'bg-slate-950/60 backdrop-blur-2xl'}`}>
-            <div className={`bg-slate-900/80 p-1.5 rounded-xl border border-slate-800/80 shadow-inner flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-1 sm:gap-2 justify-between snap-x snap-mandatory backdrop-blur-md`}>
-              {availableTabs.map(tab => (
-                <button 
-                  key={tab.id} id={`tab-btn-${tab.id}`} onClick={() => setActiveTab(tab.id)} 
-                  className={`snap-center flex-1 min-w-[50px] sm:min-w-[70px] flex items-center justify-center gap-2 px-2 py-2.5 rounded-lg font-medium text-xs md:text-sm whitespace-nowrap transition-all relative ${activeTab === tab.id ? `${activeTheme.bg} text-white shadow-md` : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'}`}
-                >
-                  <tab.icon className="w-4 h-4" /> 
-                  <span className="hidden sm:inline">{tab.label}</span>
-                  {tab.id === 'partyLoot' && partyLoot.length > 0 && activeTab !== 'partyLoot' && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>}
-                  {activeTab === tab.id && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1/2 h-0.5 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.8)] animate-in fade-in zoom-in duration-300"></div>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-6 animate-in fade-in duration-500">
+          {/* Collapsible Math (Core Stats) to save space on mobile */}
+          <div className="mb-4 pt-2">
+            <button 
+              onClick={() => setShowCoreStats(!showCoreStats)}
+              className="w-full flex items-center justify-between bg-slate-900 border-2 border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-slate-800 transition-all active:shadow-[0px_0px_0px_rgba(0,0,0,1)] active:translate-y-[4px]"
+            >
+              <span className="text-xs font-black text-slate-300 uppercase tracking-widest">Core Stats & Proficiencies</span>
+              {showCoreStats ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+            </button>
             
+            {showCoreStats && (
+              <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 fade-in duration-200">
+                <StatGrid char={char} activeTheme={activeTheme} isEditMode={isEditMode} updateField={updateField} />
+                <QuickTraits features={char.features} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT DYNAMIC PANEL (Desktop) / MAIN CONTENT (Mobile) */}
+        <div className={`flex-1 ${isDM ? 'p-4 md:p-6' : 'p-3 md:p-6 pt-0 md:pt-6'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} overflow-x-hidden`}>
+          
+          <div className="space-y-6 animate-in fade-in duration-500">
             {activeTab === 'combat' && (
               <CombatTab 
-                char={char} charId={currentUser.charId} isDM={isDM} activeTheme={activeTheme} 
+                char={char} charId={currentUser.charId} 
+                isDM={isDM} isEditMode={isEditMode} activeTheme={activeTheme} 
                 combatWarnings={combatWarnings} activeConditions={activeConditions}
                 handleAddCondition={(e) => handleAddCondition(e.target.value)}
                 handleRemoveCondition={handleRemoveCondition} handleResourceToggle={handleResourceToggle} showDialog={showDialog}
               />
             )}
 
-            {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM} showDialog={showDialog} />}
+            {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} showDialog={showDialog} />}
 
             {activeTab === 'features' && (
               <div className="space-y-6">
-                
-                <div className="flex justify-between items-center px-1 border-b border-slate-700 pb-2">
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
-                  {isDM && (
-                    <button 
-                      onClick={() => setIsForgingFeat(!isForgingFeat)}
-                      className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isForgingFeat ? 'bg-amber-700 border-amber-500 text-white shadow-[0_0_15px_rgba(245,158,11,0.3)]' : `bg-slate-800/80 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}
-                    >
-                      <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Close Forge' : 'Add Feature'}
+                <div className="flex justify-between items-center px-1 border-b-2 border-slate-950 pb-2">
+                  <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
+                  {(isDM || isEditMode) && (
+                    <button onClick={() => setIsForgingFeat(!isForgingFeat)} className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingFeat ? 'bg-amber-600 border-amber-950 text-slate-950' : `bg-slate-900 border-slate-950 ${activeTheme.text} hover:bg-slate-800`}`}>
+                      <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Close' : 'Forge'}
                     </button>
                   )}
                 </div>
 
-                {isDM && isForgingFeat && (
-                  <form onSubmit={handleForgeCustomFeat} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-amber-500/30 mb-6 animate-in fade-in slide-in-from-top-2 space-y-4 shadow-inner relative z-10">
-                    
-                    <div className="flex justify-between items-center border-b border-amber-900/50 pb-2">
-                      <h4 className="text-sm font-black text-amber-400 flex items-center gap-2 uppercase tracking-widest"><Hammer className="w-4 h-4" /> Feature Forge</h4>
-                    </div>
-
+                {(isDM || isEditMode) && isForgingFeat && (
+                  <form onSubmit={handleForgeCustomFeat} className="bg-slate-900 border-2 border-indigo-950 p-5 rounded-2xl mb-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 space-y-4">
+                    <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b-2 border-indigo-950/50 pb-2"><Hammer className="w-4 h-4" /> Feature Forge</h4>
                     <div className="grid grid-cols-1 gap-4">
                       <div className="relative">
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> Feature Name (SRD Search)</label>
-                        <input type="text" required value={customFeat.name} onChange={handleFeatNameChange} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 shadow-inner" placeholder="e.g. Action Surge" />
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> SRD Search</label>
+                        <input type="text" required value={customFeat.name} onChange={handleFeatNameChange} className="w-full bg-slate-950 border-2 border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 font-bold" placeholder="e.g. Action Surge" />
                         
                         {showFeatDropdown && filteredFeats.length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50">
+                          <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border-2 border-slate-950 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] z-50">
                             {filteredFeats.map(item => (
-                              <div key={item.index} onClick={() => handleSelectSrdFeat(item)} className="px-3 py-2 text-sm text-slate-300 hover:bg-amber-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors">
+                              <div key={item.index} onClick={() => handleSelectSrdFeat(item)} className="px-3 py-2.5 text-sm font-bold text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors">
                                 {item.name}
                               </div>
                             ))}
@@ -472,21 +474,21 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                         )}
                       </div>
 
-                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 shadow-inner">
+                      <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900">
                         <label className="flex items-center gap-2 cursor-pointer mb-3">
                           <input type="checkbox" checked={customFeat.hasTracker} onChange={(e) => setCustomFeat({...customFeat, hasTracker: e.target.checked})} className="w-4 h-4 rounded border-slate-600 text-amber-500 bg-slate-800 focus:ring-amber-500" />
-                          <span className="text-sm font-bold text-slate-300">Needs Resource Tracker?</span>
+                          <span className="text-sm font-black text-slate-300 uppercase tracking-widest">Needs Tracker?</span>
                         </label>
                         
                         {customFeat.hasTracker && (
                           <div className="flex gap-4 animate-in fade-in">
                             <div className="flex-1">
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Max Slots</label>
-                              <input type="number" value={customFeat.trackerMax} onChange={(e) => setCustomFeat({...customFeat, trackerMax: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Max Slots</label>
+                              <input type="number" value={customFeat.trackerMax} onChange={(e) => setCustomFeat({...customFeat, trackerMax: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
                             </div>
                             <div className="flex-1">
-                              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Recharges On</label>
-                              <select value={customFeat.trackerRecharge} onChange={(e) => setCustomFeat({...customFeat, trackerRecharge: e.target.value})} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-amber-500">
+                              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Recharges On</label>
+                              <select value={customFeat.trackerRecharge} onChange={(e) => setCustomFeat({...customFeat, trackerRecharge: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
                                 <option value="short">Short Rest</option>
                                 <option value="long">Long Rest</option>
                                 <option value="none">Never</option>
@@ -497,19 +499,19 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                       </div>
 
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Effects</label>
-                        <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-amber-500 resize-y shadow-inner leading-relaxed" placeholder="Describe the mechanics..." />
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description & Effects</label>
+                        <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border-2 border-slate-800 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 resize-y font-medium leading-relaxed" placeholder="Describe the mechanics..." />
                       </div>
                     </div>
-                    <button type="submit" className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:shadow-[0_0_25px_rgba(245,158,11,0.5)] flex items-center justify-center gap-2 mt-4">
+                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl border-2 border-indigo-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] flex items-center justify-center gap-2 mt-4 transition-all">
                       <Plus className="w-4 h-4" /> Inject Feature
                     </button>
                   </form>
                 )}
 
                 {(!char.features || char.features.length === 0) ? (
-                   <div className="text-center p-8 bg-slate-900/50 border border-slate-800 border-dashed rounded-xl">
-                      <p className="text-slate-500 text-sm italic">No features assigned yet.</p>
+                   <div className="text-center p-8 bg-slate-900 border-[3px] border-slate-950 border-dashed rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                      <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">No features assigned yet.</p>
                    </div>
                 ) : (
                    <div className="space-y-4">
@@ -518,13 +520,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                          key={`feat-${i}`} 
                          title={
                            <div className="flex items-center gap-2">
-                             {feat.name}
-                             {isDM && (
-                               <button 
-                                 onClick={(e) => { e.stopPropagation(); removeFeature(feat); }}
-                                 className="text-slate-500 hover:text-red-400 bg-slate-900 p-1.5 rounded transition-all shadow-inner ml-2"
-                                 title="Delete Feature"
-                               >
+                             <span className="font-black uppercase tracking-widest">{feat.name}</span>
+                             {(isDM || isEditMode) && (
+                               <button onClick={(e) => { e.stopPropagation(); removeFeature(feat); }} className="text-slate-500 hover:text-red-400 bg-slate-950 border-2 border-slate-800 p-1.5 rounded transition-all ml-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]" title="Delete Feature">
                                  <Trash2 className="w-3.5 h-3.5" />
                                </button>
                              )}
@@ -532,7 +530,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                          } 
                          defaultOpen={i === 0}
                        >
-                         <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
+                         <p className="text-slate-300 font-medium text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
                        </CollapsibleSection>
                      ))}
                    </div>
@@ -541,13 +539,29 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             )}
 
             {activeTab === 'companion' && <CompanionTab char={char} activeTheme={activeTheme} />}
-            {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
+            {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
             {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} charId={currentUser.charId} />}
-            {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
+            {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} />}
             {activeTab === 'journal' && <JournalTab char={char} updateField={updateField} activeTheme={activeTheme} />}
             {activeTab === 'settings' && <SettingsTab char={char} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
             
           </div>
+        </div>
+
+        {/* FLOATING APP-STYLE NAV BAR (Sticky to bottom on mobile) */}
+        <div className={`fixed bottom-0 left-0 w-full z-40 bg-slate-950 border-t-[3px] border-slate-900 shadow-[0_-4px_20px_rgba(0,0,0,0.8)] pb-safe md:sticky md:bottom-auto md:top-0 md:w-auto md:bg-transparent md:border-none md:shadow-none md:z-30 md:-mx-8 md:px-8 md:mb-6`}>
+            <div className={`bg-slate-900 md:bg-slate-900/80 p-2 md:rounded-xl md:border-2 md:border-slate-950 md:shadow-[6px_6px_0px_rgba(0,0,0,1)] flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-2 justify-between snap-x snap-mandatory md:backdrop-blur-md`}>
+              {availableTabs.map(tab => (
+                <button 
+                  key={tab.id} id={`tab-btn-${tab.id}`} onClick={() => setActiveTab(tab.id)} 
+                  className={`snap-center flex-1 min-w-[60px] sm:min-w-[70px] flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-2 py-2 md:py-2.5 rounded-lg transition-all relative ${activeTab === tab.id ? `${activeTheme.bg} text-white border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]` : 'bg-slate-950 border-2 border-slate-900 text-slate-400 hover:text-slate-200 shadow-[2px_2px_0px_rgba(0,0,0,0.5)]'}`}
+                >
+                  <tab.icon className={`w-4 h-4 md:w-4 md:h-4 ${activeTab === tab.id ? 'animate-bounce' : ''}`} /> 
+                  <span className={`text-[9px] md:text-xs font-black uppercase tracking-widest ${activeTab === tab.id ? 'block' : 'hidden sm:block'}`}>{tab.label}</span>
+                  {tab.id === 'partyLoot' && partyLoot.length > 0 && activeTab !== 'partyLoot' && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border border-slate-950"></span>}
+                </button>
+              ))}
+            </div>
         </div>
 
         {isLevelUpOpen && <LevelUpModal char={char} charId={currentUser.charId} onClose={() => setIsLevelUpOpen(false)} />}

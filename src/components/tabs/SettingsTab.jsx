@@ -4,8 +4,6 @@ import DialogModal from '../shared/DialogModal';
 
 export default function SettingsTab({ char, updateField, activeTheme, THEMES, restoreCharacter }) {
   const [fileError, setFileError] = useState('');
-  
-  // Hook into the global DialogModal system
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
@@ -30,7 +28,6 @@ export default function SettingsTab({ char, updateField, activeTheme, THEMES, re
         const importedData = JSON.parse(event.target.result);
         if (!importedData.name || !importedData.stats) throw new Error("Invalid format");
         
-        // Trigger the global DialogModal
         setDialog({
           isOpen: true,
           title: 'Overwrite Character?',
@@ -48,13 +45,12 @@ export default function SettingsTab({ char, updateField, activeTheme, THEMES, re
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset input
+    e.target.value = ''; 
   };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 relative">
       
-      {/* Global Dialog Modal */}
       <DialogModal 
         isOpen={dialog.isOpen} 
         title={dialog.title} 
@@ -65,60 +61,60 @@ export default function SettingsTab({ char, updateField, activeTheme, THEMES, re
       />
 
       {/* App Setup & Tutorial */}
-      <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-sm">
-        <h3 className="text-sm font-black text-white uppercase tracking-widest border-b border-slate-700 pb-2 mb-4 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400" /> App Setup
+      <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+        <h3 className="text-sm font-black text-white uppercase tracking-widest border-b-2 border-slate-900 pb-2 mb-4 flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
+          <Sparkles className="w-5 h-5 text-amber-400" /> App Setup
         </h3>
-        <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+        <p className="text-xs font-bold text-slate-400 mb-5 leading-relaxed">
           Need to review the rules, see the welcome guide, or re-select your theme? You can replay the initial startup tutorial here.
         </p>
         <button 
           onClick={() => updateField('hasCompletedTutorial', false)} 
-          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold py-2.5 px-6 rounded-lg border border-amber-900/50 transition-colors"
+          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black uppercase tracking-widest py-3 px-6 rounded-xl border-2 border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px]"
         >
-          <RotateCcw className="w-4 h-4" /> Replay Startup Tutorial
+          <RotateCcw className="w-5 h-5" /> Replay Tutorial
         </button>
       </div>
 
       {/* Theme Settings */}
-      <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-sm">
-        <h3 className="text-sm font-black text-white uppercase tracking-widest border-b border-slate-700 pb-2 mb-4 flex items-center gap-2">
-          <Palette className="w-4 h-4 text-indigo-400" /> Interface Theme
+      <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+        <h3 className="text-sm font-black text-white uppercase tracking-widest border-b-2 border-slate-900 pb-2 mb-5 flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
+          <Palette className="w-5 h-5 text-indigo-400" /> Interface Theme
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {Object.entries(THEMES).map(([themeName, themeClasses]) => (
             <button
               key={themeName}
               onClick={() => updateField('theme', themeName)}
-              className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${char.theme === themeName ? `border-${themeName}-500 bg-slate-800` : 'border-slate-700 bg-slate-900 hover:border-slate-500'}`}
+              className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${char.theme === themeName ? `border-slate-950 bg-slate-950 ring-2 ring-offset-2 ring-offset-slate-800 ring-${themeName}-500` : 'border-slate-950 bg-slate-900 hover:bg-slate-950'}`}
             >
-              <div className={`w-6 h-6 rounded-full ${themeClasses.bg} shadow-sm`}></div>
-              <span className="text-xs font-bold text-slate-300 capitalize">{themeName}</span>
+              <div className={`w-8 h-8 rounded-full ${themeClasses.bg} border-2 border-slate-950 shadow-inner`}></div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{themeName}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Character Backup */}
-      <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 shadow-sm">
-        <h3 className="text-sm font-black text-white uppercase tracking-widest border-b border-slate-700 pb-2 mb-4 flex items-center gap-2">
-          <Download className="w-4 h-4 text-emerald-400" /> Character Backup
+      <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+        <h3 className="text-sm font-black text-white uppercase tracking-widest border-b-2 border-slate-900 pb-2 mb-4 flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
+          <Download className="w-5 h-5 text-emerald-400" /> Character Backup
         </h3>
-        <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-          Export your character sheet to save it locally, or restore from a previous backup file if you made a mistake.
+        <p className="text-xs font-bold text-slate-400 mb-5 leading-relaxed">
+          Export your character sheet to save it locally, or restore from a previous backup file.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button onClick={handleExport} className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold py-2.5 rounded-lg border border-emerald-900/50 transition-colors">
-            <Download className="w-4 h-4" /> Export Backup
+        <div className="flex flex-col sm:flex-row gap-4">
+          <button onClick={handleExport} className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black uppercase tracking-widest py-3 rounded-xl border-2 border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px]">
+            <Download className="w-5 h-5" /> Export JSON
           </button>
-          <label className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold py-2.5 rounded-lg border border-amber-900/50 transition-colors cursor-pointer">
-            <Upload className="w-4 h-4" /> Restore Backup
+          <label className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-black uppercase tracking-widest py-3 rounded-xl border-2 border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] cursor-pointer">
+            <Upload className="w-5 h-5" /> Restore JSON
             <input type="file" accept=".json" onChange={handleImport} className="hidden" />
           </label>
         </div>
         {fileError && (
-          <p className="text-xs text-red-400 font-bold mt-3 text-center flex items-center justify-center gap-1">
-            <ShieldAlert className="w-3 h-3" /> {fileError}
+          <p className="text-xs text-red-500 font-black uppercase tracking-widest mt-4 text-center flex items-center justify-center gap-1 bg-red-950 p-2 rounded-lg border-2 border-slate-950">
+            <ShieldAlert className="w-4 h-4" /> {fileError}
           </p>
         )}
       </div>

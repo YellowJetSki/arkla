@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, runTransaction, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Backpack, Coins, Search, Hammer, Plus, Minus, Send, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon, Filter } from 'lucide-react';
+import { Backpack, Coins, Search, Hammer, Plus, Minus, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon, Filter } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
 
 const INVENTORY_FILTERS = ['All', 'Weapon', 'Armor', 'Consumable', 'Potion', 'Adventuring Gear', 'Wondrous Item'];
@@ -144,6 +144,19 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
     });
   };
 
+  const promptDelete = (item, idx) => {
+    showDialog({
+      title: 'Delete Item?',
+      message: `Are you sure you want to permanently remove ${item.name} from your inventory?`,
+      type: 'confirm',
+      onConfirm: async () => {
+        await deleteItem(idx);
+        showDialog({ isOpen: false });
+      },
+      onCancel: () => showDialog({ isOpen: false })
+    });
+  };
+
   const handleConsume = (item, idx) => {
     const realIndex = inventoryArray.findIndex(i => 
       (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
@@ -167,7 +180,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           return; 
         }
 
-        // 1. Remove the item from inventory
         await runInventoryTransaction((inv) => {
           if (!inv[realIndex]) return inv;
           inv[realIndex].quantity -= 1;
@@ -177,7 +189,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           return inv;
         });
 
-        // 2. Dual-Sync the HP to both the Character Sheet and the Battlemap
         try {
           const batch = writeBatch(db);
           const charRef = doc(db, 'characters', charId);
@@ -202,49 +213,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
           console.error("Failed to sync consumable HP to map:", error);
         }
 
-        showDialog({ isOpen: false });
-      },
-      onCancel: () => showDialog({ isOpen: false })
-    });
-  };
-
-  const handleShareToParty = async (item, idx) => {
-    const realIndex = inventoryArray.findIndex(i => 
-      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
-    );
-    if (realIndex === -1) return;
-
-    showDialog({
-      title: 'Share with Party?',
-      message: `Send ${item.name} to the Shared Party Loot? It will be removed from your personal inventory.`,
-      type: 'confirm',
-      onConfirm: async () => {
-        await runInventoryTransaction((inv) => {
-          if (!inv[realIndex]) return inv;
-          inv.splice(realIndex, 1);
-          return inv;
-        });
-
-        let descText = `${item.category}\n`;
-        if (item.category === 'Weapon') descText += `Damage: ${item.damageDice} ${item.damageType}\n`;
-        if (item.category === 'Armor') descText += `AC: ${item.ac}\n`;
-        descText += item.desc;
-
-        const newItem = {
-          id: `loot_${Date.now()}`,
-          name: item.name,
-          desc: descText,
-          url: item.imageUrl || '',
-          source: char.name
-        };
-        
-        const lootRef = doc(db, 'campaign', 'shared_loot');
-        const lootSnap = await getDoc(lootRef);
-        let items = [];
-        if (lootSnap.exists()) items = lootSnap.data().items || [];
-        
-        items.push(newItem);
-        await setDoc(lootRef, { items, latestShareId: newItem.id }, { merge: true });
         showDialog({ isOpen: false });
       },
       onCancel: () => showDialog({ isOpen: false })
@@ -301,28 +269,30 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   const toggleItemOpen = (idx) => setOpenItems(prev => ({ ...prev, [idx]: !prev[idx] }));
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="md:col-span-2 bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-5 shadow-xl relative overflow-hidden h-fit">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      {/* EQUIPMENT BAG */}
+      <div className="lg:col-span-2 bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 md:p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden h-fit">
         
         <div className="absolute top-0 right-0 w-64 h-64 bg-slate-700/10 blur-[80px] rounded-full pointer-events-none"></div>
 
-        <div className="flex justify-between items-center border-b border-slate-700 pb-2 mb-4 relative z-10">
-          <h3 className="text-lg font-bold text-white flex items-center gap-2"><Backpack className={`w-5 h-5 ${activeTheme.text}`} /> Equipment</h3>
+        <div className="flex justify-between items-center border-b-2 border-slate-900 pb-2 mb-4 relative z-10">
+          <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Backpack className={`w-5 h-5 ${activeTheme.text}`} /> Equipment</h3>
           {isDM && (
-            <button onClick={() => setIsForgingItem(!isForgingItem)} className={`text-[10px] md:text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors border shadow-sm ${isForgingItem ? 'bg-indigo-700 border-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.3)]' : `bg-slate-800/80 border-slate-700 ${activeTheme.text} hover:bg-slate-700`}`}>
-              <Hammer className="w-3 h-3" /> {isForgingItem ? 'Close Forge' : 'Add Item'}
+            <button onClick={() => setIsForgingItem(!isForgingItem)} className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingItem ? 'bg-indigo-600 border-slate-950 text-white' : `bg-slate-900 border-slate-950 ${activeTheme.text} hover:bg-slate-800`}`}>
+              <Hammer className="w-3 h-3" /> {isForgingItem ? 'Close' : 'Add Item'}
             </button>
           )}
         </div>
 
         {inventoryArray.length > 0 && (
           <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-3 mb-2 relative z-10">
-            <Filter className="w-4 h-4 text-slate-500 shrink-0 my-auto mr-2" />
+            <Filter className="w-4 h-4 text-slate-500 shrink-0 my-auto mr-1" />
             {INVENTORY_FILTERS.map(filter => (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
-                className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border shadow-sm ${activeFilter === filter ? `${activeTheme.bg} text-white ${activeTheme.activeBorder} shadow-[0_0_10px_rgba(255,255,255,0.1)]` : 'bg-slate-900/80 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-white'}`}
+                className={`px-3 py-1.5 rounded text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${activeFilter === filter ? `${activeTheme.bg} text-slate-950 border-slate-950` : 'bg-slate-900 text-slate-400 border-slate-950 hover:bg-slate-800 hover:text-white'}`}
               >
                 {filter}
               </button>
@@ -331,31 +301,19 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         )}
         
         {isDM && isForgingItem && (
-          <form onSubmit={handleForgeCustomItem} className="bg-slate-900/80 backdrop-blur-sm p-5 rounded-2xl border border-indigo-500/30 mb-6 animate-in fade-in slide-in-from-top-2 space-y-4 shadow-inner relative z-10">
-            <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b border-indigo-900/50 pb-2"><Hammer className="w-4 h-4" /> Inject Item</h4>
+          <form onSubmit={handleForgeCustomItem} className="bg-slate-900 border-2 border-indigo-950 p-5 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
+            <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b-2 border-slate-950 pb-2"><Hammer className="w-4 h-4" /> Inject Item</h4>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="relative">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <Search className="w-3 h-3" /> Item Name (SRD Search)
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                  <Search className="w-3 h-3" /> Item Name (SRD)
                 </label>
-                <input 
-                  type="text" 
-                  required 
-                  value={customItem.name} 
-                  onChange={handleNameChange} 
-                  className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" 
-                  placeholder="e.g. Ring of Fire or Longsword" 
-                />
-                
+                <input type="text" required value={customItem.name} onChange={handleNameChange} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. Longsword" />
                 {showEquipDropdown && filteredEquip.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-600 rounded-lg shadow-2xl z-50">
+                  <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border-2 border-slate-950 rounded-lg shadow-[4px_4px_0px_rgba(0,0,0,1)] z-50">
                     {filteredEquip.map(item => (
-                      <div 
-                        key={item.url || item.index} 
-                        onClick={() => handleSelectSrdItem(item.url || item.index)} 
-                        className="px-3 py-2.5 text-sm text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors"
-                      >
+                      <div key={item.url || item.index} onClick={() => handleSelectSrdItem(item.url || item.index)} className="px-3 py-2 text-sm font-bold text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors">
                         {item.name}
                       </div>
                     ))}
@@ -363,8 +321,8 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                 )}
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Category</label>
-                <select value={customItem.category} onChange={e => setCustomItem({...customItem, category: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Category</label>
+                <select value={customItem.category} onChange={e => setCustomItem({...customItem, category: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner">
                   <option value="Wondrous Item">Wondrous Item</option>
                   <option value="Weapon">Weapon</option>
                   <option value="Armor">Armor</option>
@@ -375,52 +333,52 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
               </div>
 
               {customItem.category === 'Weapon' && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800 sm:col-span-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-3 rounded-lg border-2 border-slate-800 sm:col-span-2">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Sword className="w-3 h-3 inline"/> Damage</label>
-                    <input type="text" value={customItem.damageDice} onChange={e => setCustomItem({...customItem, damageDice: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="1d8" />
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1"><Sword className="w-3 h-3 inline"/> Damage</label>
+                    <input type="text" value={customItem.damageDice} onChange={e => setCustomItem({...customItem, damageDice: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-bold focus:outline-none" placeholder="1d8" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Type</label>
-                    <input type="text" value={customItem.damageType} onChange={e => setCustomItem({...customItem, damageType: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="Slashing" />
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Type</label>
+                    <input type="text" value={customItem.damageType} onChange={e => setCustomItem({...customItem, damageType: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-bold focus:outline-none" placeholder="Slashing" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Crosshair className="w-3 h-3 inline"/> Range</label>
-                    <input type="text" value={customItem.range || ''} onChange={e => setCustomItem({...customItem, range: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="5 ft" />
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1"><Crosshair className="w-3 h-3 inline"/> Range</label>
+                    <input type="text" value={customItem.range || ''} onChange={e => setCustomItem({...customItem, range: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-bold focus:outline-none" placeholder="5 ft" />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Properties</label>
-                    <input type="text" value={customItem.properties} onChange={e => setCustomItem({...customItem, properties: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" placeholder="Finesse, Light" />
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Properties</label>
+                    <input type="text" value={customItem.properties} onChange={e => setCustomItem({...customItem, properties: e.target.value})} className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white text-xs font-bold focus:outline-none" placeholder="Finesse, Light" />
                   </div>
                 </div>
               )}
 
               {(customItem.category === 'Consumable' || customItem.category === 'Potion') && (
                 <div className="sm:col-span-2">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">HP Recovery (Dice or Flat Value)</label>
-                  <input type="text" value={customItem.hpRecovery} onChange={e => setCustomItem({...customItem, hpRecovery: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 2d4+2 or 10" />
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">HP Recovery (Dice or Flat Value)</label>
+                  <input type="text" value={customItem.hpRecovery} onChange={e => setCustomItem({...customItem, hpRecovery: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 2d4+2 or 10" />
                 </div>
               )}
 
               {customItem.category === 'Armor' && (
                 <div className="sm:col-span-2">
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Base AC</label>
-                  <input type="number" required value={customItem.ac} onChange={e => setCustomItem({...customItem, ac: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="e.g. 14" />
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Base AC</label>
+                  <input type="number" required value={customItem.ac} onChange={e => setCustomItem({...customItem, ac: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="14" />
                 </div>
               )}
 
               <div className="sm:col-span-2">
-                <label className="flex items-center gap-1 block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><ImageIcon className="w-3 h-3" /> Image URL (Optional)</label>
-                <input type="url" value={customItem.imageUrl} onChange={e => setCustomItem({...customItem, imageUrl: e.target.value})} className="w-full bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="https://..." />
+                <label className="flex items-center gap-1 block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1"><ImageIcon className="w-3 h-3" /> Image URL (Optional)</label>
+                <input type="url" value={customItem.imageUrl} onChange={e => setCustomItem({...customItem, imageUrl: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="https://..." />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description & Lore</label>
-                <textarea required value={customItem.desc} onChange={e => setCustomItem({...customItem, desc: e.target.value})} className="w-full min-h-[80px] bg-slate-950 border border-slate-600 rounded-xl px-3 py-2.5 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 resize-y shadow-inner leading-relaxed" placeholder="Notes..." />
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description</label>
+                <textarea required value={customItem.desc} onChange={e => setCustomItem({...customItem, desc: e.target.value})} className="w-full min-h-[80px] bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-slate-300 font-medium focus:outline-none focus:border-indigo-500 resize-y shadow-inner leading-relaxed" placeholder="Notes..." />
               </div>
             </div>
             
-            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:shadow-[0_0_25px_rgba(99,102,241,0.5)] flex items-center justify-center gap-2 mt-2">
+            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-black uppercase tracking-widest text-xs py-3.5 rounded-xl border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center gap-2 mt-2">
               <Plus className="w-4 h-4" /> Inject into Bags
             </button>
           </form>
@@ -428,80 +386,77 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
 
         <div className="space-y-4 relative z-10">
           {filteredInventoryArray.length === 0 ? (
-             <p className="text-slate-500 italic p-6 text-center bg-slate-900/50 rounded-xl border border-slate-800 border-dashed">No items found.</p>
+             <p className="text-slate-500 font-bold uppercase tracking-widest text-sm text-center bg-slate-900 p-8 rounded-xl border-2 border-slate-950 border-dashed shadow-inner">No items found.</p>
           ) : (
             filteredInventoryArray.map((item, i) => (
-              <div key={item.id || i} className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl overflow-hidden transition-colors shadow-sm ${openItems[i] ? `${activeTheme.activeBorder} shadow-[0_0_15px_rgba(255,255,255,0.05)]` : 'border-slate-700/80 hover:border-slate-500'}`}>
-                <div className="flex justify-between items-center p-3 sm:p-4 cursor-pointer" onClick={() => toggleItemOpen(i)}>
+              <div key={item.id || i} className={`bg-slate-900 border-2 rounded-xl overflow-hidden transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col ${openItems[i] ? `${activeTheme.activeBorder}` : 'border-slate-950'}`}>
+                <div className="flex justify-between items-start sm:items-center p-3 sm:p-4 cursor-pointer" onClick={() => toggleItemOpen(i)}>
                   
-                  <div className="flex items-center gap-3">
-                    <div className="flex flex-col items-center bg-slate-950 border border-slate-700 rounded-lg overflow-hidden shrink-0">
-                       <button onClick={(e) => { e.stopPropagation(); updateQuantity(i, 1); }} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-0.5"><Plus className="w-3 h-3"/></button>
-                       <span className="text-xs font-black text-white py-1">{item.quantity}</span>
-                       <button onClick={(e) => { e.stopPropagation(); updateQuantity(i, -1); }} className="bg-slate-800 hover:bg-slate-700 text-slate-400 px-2 py-0.5"><Minus className="w-3 h-3"/></button>
-                    </div>
-                    <div>
-                      <span className={`font-black text-sm md:text-base block ${openItems[i] ? activeTheme.text : 'text-slate-200'}`}>{item.name}</span>
-                      <span className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">{item.category}</span>
+                  <div className="flex items-start sm:items-center gap-3">
+                    {isDM ? (
+                      <div className="flex flex-col items-center bg-slate-950 border border-slate-800 rounded-lg overflow-hidden shrink-0 shadow-inner mt-1 sm:mt-0">
+                         <button onClick={(e) => { e.stopPropagation(); updateQuantity(i, 1); }} className="bg-slate-800 hover:bg-slate-700 text-white font-black px-2 py-0.5">+</button>
+                         <span className="text-xs font-black text-white py-1">{item.quantity}</span>
+                         <button onClick={(e) => { e.stopPropagation(); updateQuantity(i, -1); }} className="bg-slate-800 hover:bg-slate-700 text-white font-black px-2 py-0.5">-</button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center bg-slate-950 border-2 border-slate-900 rounded-lg overflow-hidden shrink-0 px-2 py-1 shadow-inner mt-1 sm:mt-0">
+                         <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-0.5">QTY</span>
+                         <span className="text-xs font-black text-white">{item.quantity}</span>
+                      </div>
+                    )}
+                    <div className="pt-1 sm:pt-0">
+                      <span className={`font-black text-base leading-none block mb-1 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${openItems[i] ? activeTheme.text : 'text-slate-200'}`}>{item.name}</span>
+                      <span className="text-[9px] uppercase tracking-widest text-slate-400 font-bold bg-slate-950 px-1.5 py-0.5 rounded shadow-inner">{item.category}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleShareToParty(item, i); }}
-                      className="bg-slate-800 border border-slate-700 p-2 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors text-slate-400 shadow-sm"
-                      title="Share to Party Loot"
-                    >
-                      <Send className="w-4 h-4" />
+                  <div className="flex items-center gap-2 mt-2 sm:mt-0 self-end sm:self-auto">
+                    <button onClick={(e) => { e.stopPropagation(); promptDelete(item, i); }} className="bg-slate-950 border-2 border-slate-800 p-2 rounded-lg hover:bg-red-950 transition-colors text-slate-500 hover:text-red-500 shadow-sm" title="Delete Item">
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                    {isDM && (
-                      <button onClick={(e) => { e.stopPropagation(); deleteItem(i); }} className="bg-slate-800 border border-slate-700 p-2 rounded-lg hover:bg-red-600 hover:text-white transition-colors text-slate-400 shadow-sm">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                    <div className="text-slate-500 bg-slate-950 p-1 rounded border border-slate-800 ml-1">
+                    <div className="text-slate-400 bg-slate-950 p-1 rounded-lg border-2 border-slate-800 ml-1">
                       {openItems[i] ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>}
                     </div>
                   </div>
                 </div>
 
                 {openItems[i] && (
-                  <div className="p-4 pt-0 border-t border-slate-800/50 text-sm text-slate-300 animate-in slide-in-from-top-1 fade-in bg-slate-950/30">
-                    <div className="flex flex-col sm:flex-row gap-4 mt-3">
+                  <div className="p-4 pt-0 border-t-2 border-slate-950 text-sm text-slate-300 animate-in slide-in-from-top-1 fade-in bg-slate-950/50">
+                    <div className="flex flex-col sm:flex-row gap-4 mt-4">
                       {item.imageUrl && (
-                        <div className="w-full sm:w-32 h-32 shrink-0 rounded-lg overflow-hidden border border-slate-700 bg-slate-900 cursor-pointer group" onClick={(e) => { e.stopPropagation(); showDialog({ title: item.name, message: <img src={item.imageUrl} alt={item.name} className="max-h-[60vh] object-contain rounded-lg border border-slate-700 w-full" />, type: 'alert', onConfirm: () => showDialog({ isOpen: false }) }); }}>
+                        <div className="w-full sm:w-32 h-32 shrink-0 rounded-xl overflow-hidden border-2 border-slate-900 bg-slate-900 cursor-pointer group shadow-inner" onClick={(e) => { e.stopPropagation(); showDialog({ title: item.name, message: <img src={item.imageUrl} alt={item.name} className="max-h-[60vh] object-contain rounded-xl border-2 border-slate-950 w-full shadow-[8px_8px_0px_rgba(0,0,0,1)]" />, type: 'alert', onConfirm: () => showDialog({ isOpen: false }) }); }}>
                           <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
                         </div>
                       )}
                       <div className="flex-1">
                         {item.category === 'Weapon' && (
                           <div className="flex flex-wrap gap-2 mb-3">
-                            <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Damage: <span className="text-white">{item.damageDice || (item.damage?.damage_dice)} {item.damageType || (item.damage?.damage_type?.name)}</span></span>
-                            {item.range && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Range: <span className="text-white">{item.range}</span></span>}
-                            {(item.properties && Array.isArray(item.properties) && item.properties.length > 0) && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties.map(p => p.name).join(', ')}</span></span>}
-                            {(item.properties && typeof item.properties === 'string') && <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">Props: <span className="text-white">{item.properties}</span></span>}
+                            <span className="text-[10px] uppercase tracking-widest font-black bg-slate-900 border border-slate-800 px-2 py-1 rounded text-slate-400 shadow-inner">Damage: <span className="text-white">{item.damageDice || (item.damage?.damage_dice)} {item.damageType || (item.damage?.damage_type?.name)}</span></span>
+                            {item.range && <span className="text-[10px] uppercase tracking-widest font-black bg-slate-900 border border-slate-800 px-2 py-1 rounded text-slate-400 shadow-inner">Range: <span className="text-white">{item.range}</span></span>}
+                            {(item.properties && Array.isArray(item.properties) && item.properties.length > 0) && <span className="text-[10px] uppercase tracking-widest font-black bg-slate-900 border border-slate-800 px-2 py-1 rounded text-slate-400 shadow-inner">Props: <span className="text-white">{item.properties.map(p => p.name).join(', ')}</span></span>}
+                            {(item.properties && typeof item.properties === 'string') && <span className="text-[10px] uppercase tracking-widest font-black bg-slate-900 border border-slate-800 px-2 py-1 rounded text-slate-400 shadow-inner">Props: <span className="text-white">{item.properties}</span></span>}
                           </div>
                         )}
                         {item.category === 'Armor' && (
                           <div className="flex flex-wrap gap-2 mb-3">
-                            <span className="text-[10px] uppercase tracking-widest font-bold bg-slate-800 px-2 py-1 rounded text-slate-300 shadow-inner">AC: <span className="text-white">{item.ac || item.armor_class?.base}</span></span>
+                            <span className="text-[10px] uppercase tracking-widest font-black bg-slate-900 border border-slate-800 px-2 py-1 rounded text-slate-400 shadow-inner">AC: <span className="text-white">{item.ac || item.armor_class?.base}</span></span>
                           </div>
                         )}
-                        <p className="whitespace-pre-wrap leading-relaxed">{typeof item.desc === 'string' ? item.desc : (item.desc || []).join('\n')}</p>
+                        <p className="whitespace-pre-wrap leading-relaxed font-medium text-[11px] md:text-xs">{typeof item.desc === 'string' ? item.desc : (item.desc || []).join('\n')}</p>
                         
                         {!isDM && (item.hpRecovery || item.category === 'Consumable' || item.category === 'Potion') && (
-                          <button onClick={() => handleConsume(item, i)} className="mt-4 bg-emerald-900/40 border border-emerald-500/50 hover:bg-emerald-600 text-emerald-400 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm">
-                            <Utensils className="w-3 h-3" /> Consume
+                          <button onClick={() => handleConsume(item, i)} className="mt-4 w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black uppercase tracking-widest px-4 py-2.5 rounded-lg text-[10px] transition-all flex justify-center items-center gap-1.5 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">
+                            <Utensils className="w-3.5 h-3.5" /> Consume
                           </button>
                         )}
                         
                         {item.category === 'Weapon' && (
-                          <div className="flex items-center gap-1.5 mt-4">
+                          <div className="flex items-center gap-1.5 mt-4 bg-slate-900 p-2 rounded-lg border border-slate-800 w-fit">
                              <Sword className="w-3 h-3 text-slate-500" />
-                             <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Automatically available in Combat Tab</span>
+                             <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Available in Combat Tab</span>
                           </div>
                         )}
-
                       </div>
                     </div>
                   </div>
@@ -512,39 +467,41 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         </div>
       </div>
 
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-5 h-fit flex flex-col shadow-xl">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4"><Coins className="w-5 h-5 text-yellow-400" /> Wallet</h3>
+      {/* WALLET */}
+      <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 md:p-5 h-fit flex flex-col shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+        <h3 className="text-lg font-black text-white flex items-center gap-2 mb-4 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Coins className="w-5 h-5 text-yellow-400" /> Wallet</h3>
         
-        <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-600 mb-5 flex flex-col gap-3 shadow-inner">
-          <div className="flex gap-2">
+        <div className="bg-slate-900 p-4 rounded-xl border-2 border-slate-950 mb-5 flex flex-col gap-3 shadow-inner">
+          <div className="flex flex-col sm:flex-row gap-3">
             <input 
               type="number" 
               value={transactionAmount}
               onFocus={(e) => e.target.select()}
               onChange={(e) => setTransactionAmount(e.target.value)}
               placeholder="Amount..." 
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white font-black focus:outline-none focus:border-yellow-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-black text-center sm:text-left focus:outline-none focus:border-yellow-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
-            <div className="flex flex-col gap-1.5 shrink-0">
-              <button onClick={() => handleTransaction(true)} disabled={!transactionAmount} className="bg-emerald-900/40 hover:bg-emerald-600 disabled:opacity-50 text-emerald-400 hover:text-white border border-emerald-900/50 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors shadow-sm">+ Loot</button>
-              <button onClick={() => handleTransaction(false)} disabled={!transactionAmount} className="bg-red-900/40 hover:bg-red-600 disabled:opacity-50 text-red-400 hover:text-white border border-red-900/50 px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors shadow-sm">- Pay</button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button onClick={() => handleTransaction(true)} disabled={!transactionAmount} className="flex-1 sm:w-20 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:border-slate-950 text-slate-950 border-2 border-slate-950 px-2 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">+ Loot</button>
+              <button onClick={() => handleTransaction(false)} disabled={!transactionAmount} className="flex-1 sm:w-20 bg-red-600 hover:bg-red-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:border-slate-950 text-slate-950 border-2 border-slate-950 px-2 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">- Pay</button>
             </div>
           </div>
           
           <div className="flex gap-2">
              {[1, 5, 10, 50].map(val => (
-               <button key={val} onClick={() => setTransactionAmount(val.toString())} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 rounded py-1.5 text-xs font-bold transition-colors shadow-sm">
+               <button key={val} onClick={() => setTransactionAmount(val.toString())} className="flex-1 bg-slate-950 hover:bg-slate-800 text-slate-400 border-2 border-slate-900 rounded-lg py-1.5 text-xs font-black transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">
                  {val}
                </button>
              ))}
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="bg-slate-900 p-4 rounded-xl border border-yellow-900/30 shadow-sm">
-            <span className="text-yellow-500/50 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Assarions</span>
+        <div className="space-y-3">
+          {/* ASSARIONS */}
+          <div className="bg-slate-900 p-3 rounded-xl border-2 border-yellow-900 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+            <span className="text-yellow-600 text-[10px] font-black uppercase tracking-widest block mb-2 text-center drop-shadow-sm">Assarions</span>
             <div className="flex items-center justify-between gap-3">
-              <button onClick={() => adjustCurrency('assarions', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
+              <button onClick={() => adjustCurrency('assarions', -1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-800 hover:bg-slate-800 text-slate-400 flex items-center justify-center font-black text-xl transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">-</button>
               <input 
                 type="number" 
                 value={isEditingGold ? displayGold : (char.currency?.assarions || 0)} 
@@ -552,16 +509,17 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                 onChange={(e) => setDisplayGold(e.target.value)}
                 onBlur={() => { setIsEditingGold(false); updateField('currency.assarions', Number(displayGold)); }}
                 onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
-                className="w-20 bg-transparent text-yellow-400 font-black text-3xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                className="w-24 bg-transparent text-yellow-400 font-black text-3xl text-center focus:outline-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
               />
-              <button onClick={() => adjustCurrency('assarions', 1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Plus className="w-5 h-5" /></button>
+              <button onClick={() => adjustCurrency('assarions', 1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-800 hover:bg-slate-800 text-slate-400 flex items-center justify-center font-black text-xl transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">+</button>
             </div>
           </div>
 
-          <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-sm">
-            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Quadrans</span>
+          {/* QUADRANS */}
+          <div className="bg-slate-900 p-3 rounded-xl border-2 border-slate-700 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+            <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest block mb-2 text-center drop-shadow-sm">Quadrans</span>
             <div className="flex items-center justify-between gap-3">
-              <button onClick={() => adjustCurrency('quadrans', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
+              <button onClick={() => adjustCurrency('quadrans', -1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-800 hover:bg-slate-800 text-slate-400 flex items-center justify-center font-black text-xl transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">-</button>
               <input 
                 type="number" 
                 value={isEditingSilver ? displaySilver : (char.currency?.quadrans || 0)} 
@@ -569,16 +527,17 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                 onChange={(e) => setDisplaySilver(e.target.value)}
                 onBlur={() => { setIsEditingSilver(false); updateField('currency.quadrans', Number(displaySilver)); }}
                 onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
-                className="w-20 bg-transparent text-slate-300 font-black text-2xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                className="w-24 bg-transparent text-slate-300 font-black text-3xl text-center focus:outline-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
               />
-              <button onClick={() => adjustCurrency('quadrans', 1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Plus className="w-5 h-5" /></button>
+              <button onClick={() => adjustCurrency('quadrans', 1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-800 hover:bg-slate-800 text-slate-400 flex items-center justify-center font-black text-xl transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">+</button>
             </div>
           </div>
 
-          <div className="bg-slate-900 p-4 rounded-xl border border-amber-900/30 shadow-sm">
-            <span className="text-amber-700 text-[10px] font-black uppercase tracking-widest block mb-2 text-center">Leptons</span>
+          {/* LEPTONS */}
+          <div className="bg-slate-900 p-3 rounded-xl border-2 border-amber-900 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+            <span className="text-amber-700 text-[10px] font-black uppercase tracking-widest block mb-2 text-center drop-shadow-sm">Leptons</span>
             <div className="flex items-center justify-between gap-3">
-              <button onClick={() => adjustCurrency('leptons', -1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Minus className="w-5 h-5" /></button>
+              <button onClick={() => adjustCurrency('leptons', -1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-800 hover:bg-slate-800 text-slate-400 flex items-center justify-center font-black text-xl transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">-</button>
               <input 
                 type="number" 
                 value={isEditingCopper ? displayCopper : (char.currency?.leptons || 0)} 
@@ -586,9 +545,9 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                 onChange={(e) => setDisplayCopper(e.target.value)}
                 onBlur={() => { setIsEditingCopper(false); updateField('currency.leptons', Number(displayCopper)); }}
                 onKeyDown={(e) => { if(e.key === 'Enter') e.target.blur(); }}
-                className="w-20 bg-transparent text-amber-600 font-black text-2xl text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                className="w-24 bg-transparent text-amber-600 font-black text-3xl text-center focus:outline-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
               />
-              <button onClick={() => adjustCurrency('leptons', 1)} className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 flex items-center justify-center border border-slate-600 transition-colors shadow-sm"><Plus className="w-5 h-5" /></button>
+              <button onClick={() => adjustCurrency('leptons', 1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-800 hover:bg-slate-800 text-slate-400 flex items-center justify-center font-black text-xl transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">+</button>
             </div>
           </div>
 

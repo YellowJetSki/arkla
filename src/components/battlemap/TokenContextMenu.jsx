@@ -25,8 +25,9 @@ const CONDITION_ICONS = {
 
 export default function TokenContextMenu({
   token,
-  activePlayers,
-  activeEnemies,
+  tokenX,
+  mapCols,
+  displayName,
   showMovementRangeFor,
   onUpdateHpLive,
   onDeselect,
@@ -40,81 +41,86 @@ export default function TokenContextMenu({
   onRemoveToken,
   onToggleCondition
 }) {
-  const isEnemy = token.type === 'enemy';
-  const entity = isEnemy ? activeEnemies.find(e => e.id === token.id) : activePlayers.find(p => p.id === token.id);
-  const hpVal = entity ? (entity.currentHp ?? entity.hp ?? 0) : token.hp;
+  
+  // Smart alignment to prevent overflowing the screen
+  const isNearLeft = tokenX < 4;
+  const isNearRight = tokenX > (mapCols - 6);
+  const alignClass = isNearLeft ? 'left-0' : isNearRight ? 'right-0' : 'left-1/2 -translate-x-1/2';
 
   return (
     <div 
-      className="absolute top-[110%] left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-2xl p-3 md:p-4 shadow-[0_0_40px_rgba(0,0,0,0.8)] z-[99999] w-max cursor-default flex flex-col gap-4 animate-in fade-in slide-in-from-top-2"
+      className={`absolute top-full mt-4 bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[8px_8px_0px_rgba(0,0,0,1)] z-[99999] w-max cursor-default flex flex-col gap-4 pointer-events-auto animate-in fade-in slide-in-from-top-2 ${alignClass}`}
       onMouseDown={e => e.stopPropagation()}
       onClick={e => e.stopPropagation()}
     >
-      <div className="flex items-center gap-3 border-b border-slate-700/50 pb-3">
-        <span className="text-sm font-black text-white uppercase tracking-wider drop-shadow-sm pr-4">
-          {token.name}
+      <div className="flex items-center gap-3 border-b-2 border-slate-950 pb-3">
+        <span className="text-sm font-black text-white uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pr-4">
+          {displayName}
         </span>
         
-        <div className="flex items-center gap-1.5 bg-slate-950/80 px-2.5 py-1.5 rounded-lg ml-auto border border-slate-700/50 shadow-inner">
-          <Heart className="w-3.5 h-3.5 text-red-500" />
+        <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl ml-auto border-2 border-slate-900 shadow-inner">
+          <Heart className="w-4 h-4 text-red-500 drop-shadow-sm" />
           <input 
             type="number" 
-            value={hpVal}
+            defaultValue={token.hp}
             onFocus={(e) => e.target.select()}
-            onChange={(e) => onUpdateHpLive(token.id, e.target.value)}
-            className="w-10 bg-transparent text-white text-sm font-black text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            onBlur={(e) => onUpdateHpLive(token.id, e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+            className="w-12 bg-transparent text-white text-lg font-black text-center focus:outline-none focus:text-red-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
         </div>
 
         <button 
+          type="button"
           onClick={onDeselect} 
-          className="ml-1 text-slate-500 hover:text-white p-1.5 bg-slate-800/80 hover:bg-slate-700 rounded-lg transition-colors border border-slate-700/50 shadow-sm"
+          className="ml-2 text-slate-500 hover:text-white p-2 bg-slate-950 hover:bg-slate-800 rounded-lg transition-colors border-2 border-slate-900 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"
         >
-          <X className="w-3.5 h-3.5"/>
+          <X className="w-4 h-4 font-black"/>
         </button>
       </div>
 
-      <div className="flex gap-2 justify-between bg-slate-950/50 p-2 rounded-xl border border-slate-800/80 shadow-inner">
-        <button onClick={() => onToggleSize(token.id)} className="text-indigo-400 hover:text-indigo-200 flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]" title="Size">
-          <Maximize className="w-4 h-4" /> <span className="text-[9px] font-bold uppercase tracking-wider">{token.size || 1}x</span>
+      <div className="flex gap-2 justify-between bg-slate-950 p-2 rounded-xl border-2 border-slate-900 shadow-inner">
+        <button type="button" onClick={() => onToggleSize(token.id)} className="text-indigo-400 hover:text-indigo-300 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Size">
+          <Maximize className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">{token.size || 1}x</span>
         </button>
-        <button onClick={() => onToggleAura(token.id)} className="text-sky-400 hover:text-sky-200 flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]" title="Aura">
-          <CircleDashed className="w-4 h-4" /> <span className="text-[9px] font-bold uppercase tracking-wider">{token.aura ? `${token.aura}ft` : 'Off'}</span>
+        <button type="button" onClick={() => onToggleAura(token.id)} className="text-sky-400 hover:text-sky-300 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Aura">
+          <CircleDashed className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">{token.aura ? `${token.aura}ft` : 'Off'}</span>
         </button>
-        <button onClick={() => onToggleElevation(token.id)} className="text-emerald-400 hover:text-emerald-200 flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]" title="Elevation">
-          <ArrowUpCircle className="w-4 h-4" /> <span className="text-[9px] font-bold uppercase tracking-wider">{token.elevation ? `+${token.elevation}` : 'Gnd'}</span>
+        <button type="button" onClick={() => onToggleElevation(token.id)} className="text-emerald-400 hover:text-emerald-300 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Elevation">
+          <ArrowUpCircle className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">{token.elevation ? `+${token.elevation}` : 'Gnd'}</span>
         </button>
-        <button onClick={() => onToggleConcentration(token.id)} className={`${token.isConcentrating ? 'text-amber-400 drop-shadow-[0_0_5px_rgba(251,191,36,0.5)]' : 'text-slate-400'} hover:text-amber-300 flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]`} title="Concentration">
-          <BrainCircuit className="w-4 h-4" /> <span className="text-[9px] font-bold uppercase tracking-wider">Conc</span>
+        <button type="button" onClick={() => onToggleConcentration(token.id)} className={`${token.isConcentrating ? 'text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'text-slate-400'} hover:text-amber-400 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]`} title="Concentration">
+          <BrainCircuit className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">Conc</span>
         </button>
-        <button onClick={() => onToggleRuler(token.id)} className={`${showMovementRangeFor?.id === token.id ? 'text-fuchsia-400 drop-shadow-[0_0_5px_rgba(217,70,239,0.5)]' : 'text-slate-400'} hover:text-fuchsia-300 flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]`} title="Movement Ruler">
-          <Ruler className="w-4 h-4" /> <span className="text-[9px] font-bold uppercase tracking-wider">Move</span>
+        <button type="button" onClick={() => onToggleRuler(token.id)} className={`${showMovementRangeFor?.id === token.id ? 'text-fuchsia-500 drop-shadow-[0_0_5px_rgba(217,70,239,0.5)]' : 'text-slate-400'} hover:text-fuchsia-400 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]`} title="Movement Ruler">
+          <Ruler className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">Move</span>
         </button>
         
-        <div className="w-px bg-slate-800 mx-1"></div>
+        <div className="w-1 bg-slate-900 mx-1 rounded-full"></div>
         
-        <button onClick={() => onToggleHidden(token.id)} className={`${token.isHidden ? 'text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'text-slate-400'} hover:text-white flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]`} title="Toggle Visibility">
-          {token.isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />} <span className="text-[9px] font-bold uppercase tracking-wider">Hide</span>
+        <button type="button" onClick={() => onToggleHidden(token.id)} className={`${token.isHidden ? 'text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'text-slate-400'} hover:text-white flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]`} title="Toggle Visibility">
+          {token.isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />} <span className="text-[9px] font-black uppercase tracking-widest">Hide</span>
         </button>
-        <button onClick={() => onUpdateImage(token.id)} className="text-slate-400 hover:text-emerald-400 flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]" title="Update Image"><ImageIcon className="w-4 h-4" /><span className="text-[9px] font-bold uppercase tracking-wider">Img</span></button>
-        <button onClick={() => onRemoveToken(token.id)} className="text-slate-400 hover:text-red-400 flex flex-col items-center gap-1 p-1.5 hover:bg-slate-800/80 rounded-lg transition-colors min-w-[36px]" title="Remove from Map"><Trash2 className="w-4 h-4" /><span className="text-[9px] font-bold uppercase tracking-wider">Del</span></button>
+        <button type="button" onClick={() => onUpdateImage(token.id)} className="text-slate-400 hover:text-emerald-400 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Update Image"><ImageIcon className="w-4 h-4" /><span className="text-[9px] font-black uppercase tracking-widest">Img</span></button>
+        <button type="button" onClick={() => onRemoveToken(token.id)} className="text-slate-400 hover:text-red-500 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Remove from Map"><Trash2 className="w-4 h-4" /><span className="text-[9px] font-black uppercase tracking-widest">Del</span></button>
       </div>
 
-      <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-700/50 shadow-inner">
-        <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mb-2.5">Quick Conditions</p>
-        <div className="flex flex-wrap gap-1.5 max-w-[240px]">
+      <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+        <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-3">Quick Conditions</p>
+        <div className="flex flex-wrap gap-2 max-w-[250px]">
           {Object.keys(CONDITION_ICONS).map(cond => {
              const config = CONDITION_ICONS[cond];
              const Icon = config.icon;
              const isActive = token.conditions?.includes(cond);
              return (
                <button 
+                 type="button"
                  key={cond} 
                  onClick={() => onToggleCondition(token.id, cond)}
-                 className={`p-1.5 rounded-lg transition-all border ${isActive ? `${config.color} shadow-[0_0_10px_currentColor]` : 'text-slate-500 border-slate-800 hover:text-slate-300 bg-slate-900 hover:bg-slate-800'}`}
+                 className={`p-2 rounded-lg transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${isActive ? `${config.color} border-slate-950` : 'text-slate-500 border-slate-900 hover:text-white bg-slate-900 hover:bg-slate-800 hover:border-slate-950'}`}
                  title={cond}
                >
-                 <Icon className="w-4 h-4" />
+                 <Icon className="w-4 h-4 font-black" />
                </button>
              )
           })}

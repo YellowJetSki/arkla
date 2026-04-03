@@ -5,16 +5,16 @@ export default function CollapsibleSection({ title, icon: Icon, children, defaul
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden shadow-sm transition-all duration-300">
+    <div className="bg-slate-900 border-2 border-slate-950 rounded-xl overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all duration-300">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-4 flex justify-between items-center bg-slate-800 hover:bg-slate-700/50 transition-colors focus:outline-none"
+        className="w-full p-4 flex justify-between items-center bg-slate-900 hover:bg-slate-800 transition-colors focus:outline-none"
       >
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+        <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
           {Icon && <Icon className="w-5 h-5 text-indigo-400" />} {title}
         </h3>
-        <div className="bg-slate-900/50 p-1.5 rounded-md border border-slate-700">
-          {isOpen ? <ChevronUp className="w-4 h-4 text-indigo-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+        <div className="bg-slate-950 p-1.5 rounded-lg border-2 border-slate-800 shadow-inner">
+          {isOpen ? <ChevronUp className="w-4 h-4 text-indigo-400" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
         </div>
       </button>
       
@@ -25,7 +25,7 @@ export default function CollapsibleSection({ title, icon: Icon, children, defaul
         }`}
       >
         <div className="overflow-hidden">
-          <div className="p-4 md:p-5 border-t border-slate-700/50 bg-slate-800/30">
+          <div className="p-4 md:p-5 border-t-2 border-slate-950 bg-slate-900/50 shadow-inner">
             {children}
           </div>
         </div>

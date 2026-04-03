@@ -8,21 +8,21 @@ export default function QuickTraits({ features = [] }) {
   if (!features || features.length === 0) return null;
 
   return (
-    <div className="bg-slate-900/40 border border-slate-700/50 rounded-xl p-4 mt-4 shadow-inner">
-      <div className="flex items-center gap-2 mb-3">
-        <Sparkles className="w-4 h-4 text-indigo-400" />
-        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Quick Traits & Senses</h4>
+    <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 md:p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+      <div className="flex items-center gap-2 mb-4 border-b-2 border-slate-900 pb-2">
+        <Sparkles className="w-5 h-5 text-indigo-400 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]" />
+        <h4 className="text-sm font-black text-white uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">Quick Traits</h4>
       </div>
       
-      <ScrollableRow className="gap-2 pb-2">
+      <ScrollableRow className="gap-3 pb-2">
         {features.map((feat, idx) => (
           <button
             key={idx}
             onClick={() => setActiveFeature(activeFeature === idx ? null : idx)}
-            className={`shrink-0 snap-start px-3 py-1.5 rounded-lg text-xs font-bold transition-all border outline-none focus:ring-2 focus:ring-indigo-500/50 ${
+            className={`shrink-0 snap-start px-4 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-widest transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] outline-none ${
               activeFeature === idx 
-                ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_10px_rgba(79,70,229,0.5)]' 
-                : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white'
+                ? 'bg-indigo-600 border-slate-950 text-white' 
+                : 'bg-slate-900 border-slate-950 text-slate-400 hover:text-white'
             }`}
           >
             {feat.name}
@@ -31,13 +31,13 @@ export default function QuickTraits({ features = [] }) {
       </ScrollableRow>
 
       {activeFeature !== null && (
-        <div className="mt-2 bg-indigo-950/40 border border-indigo-500/30 p-3 rounded-lg text-sm text-indigo-100 leading-relaxed animate-in fade-in slide-in-from-top-2 flex justify-between items-start gap-3">
+        <div className="mt-4 bg-slate-900 border-2 border-indigo-900 p-4 rounded-xl text-sm text-indigo-100 font-medium leading-relaxed animate-in fade-in slide-in-from-top-2 flex justify-between items-start gap-4 shadow-inner">
           <p className="whitespace-pre-wrap">{features[activeFeature].desc}</p>
           <button 
             onClick={() => setActiveFeature(null)} 
-            className="shrink-0 text-indigo-400 hover:text-white bg-indigo-900/50 hover:bg-indigo-800/80 p-1.5 rounded-md transition-colors"
+            className="shrink-0 text-slate-950 bg-indigo-500 hover:bg-indigo-400 border-2 border-slate-950 p-2 rounded-lg transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"
           >
-            <X className="w-3 h-3" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
