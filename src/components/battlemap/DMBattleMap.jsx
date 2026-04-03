@@ -434,8 +434,8 @@ export default function DMBattleMap() {
             </div>
           </div>
           <div className="flex justify-end border-t-2 border-slate-950 pt-5 mt-2">
-            <button onClick={handleUpdateMapSettings} disabled={isSaving} className="bg-indigo-500 hover:bg-indigo-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 text-[10px] md:text-xs font-black uppercase tracking-widest px-8 py-3.5 rounded-xl border-2 border-slate-950 transition-all flex items-center gap-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none">
-              {isSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating...</> : 'Save Configuration'}
+            <button onClick={handleUpdateMapSettings} disabled={isSavingMap} className="bg-indigo-500 hover:bg-indigo-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 text-[10px] md:text-xs font-black uppercase tracking-widest px-8 py-3.5 rounded-xl border-2 border-slate-950 transition-all flex items-center gap-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none">
+              {isSavingMap ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating...</> : 'Save Configuration'}
             </button>
           </div>
         </div>

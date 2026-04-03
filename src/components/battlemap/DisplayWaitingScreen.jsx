@@ -1,4 +1,4 @@
-import { Shield, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
 export default function DisplayWaitingScreen({ mapData, onLogout }) {
   return (
