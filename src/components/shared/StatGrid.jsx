@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Wrench, MessageSquare, Target, Sword, Activity } from 'lucide-react';
+import { BookOpen, Wrench, MessageSquare, Target, Sword, Activity, ShieldAlert } from 'lucide-react';
 import { getProficiencyBonus, getModifier, getConditionMechanics } from '../../services/arklaEngine';
 
 export default function StatGrid({ char, activeTheme, isEditMode, updateField }) {
@@ -11,33 +11,40 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
   const conditionMechanics = getConditionMechanics(activeConditions);
   
   const STAT_ORDER = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
+  
+  // Safe parsing of saving throw proficiencies (assumes a comma-separated string)
+  const savingThrowProfs = (char?.proficiencies?.savingThrows || '').toLowerCase();
 
   return (
     <div className="space-y-6">
 
-      {/* Core Stats Grid */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-4">
+      {/* Core Stats & Saving Throws Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
         {STAT_ORDER.map((stat) => {
           const score = stats[stat] || 10;
+          const statMod = getModifier(score);
+          const isProficient = savingThrowProfs.includes(stat.toLowerCase());
+          const saveMod = isProficient ? statMod + profBonus : statMod;
+          
           return (
             <div key={stat} className={`relative bg-slate-900 border-2 rounded-xl flex flex-col items-center justify-center p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all ${isEditMode ? 'border-amber-500' : 'border-slate-950'}`}>
               <span className="text-[10px] md:text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5">{stat}</span>
+              
               <div className="relative w-12 h-12 md:w-14 md:h-14 bg-slate-950 rounded-xl border-2 border-slate-800 shadow-inner flex items-center justify-center mb-2">
                 <span className={`text-2xl md:text-3xl font-black drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] ${conditionMechanics.autoFailStrDex && (stat === 'STR' || stat === 'DEX') ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-                  {getModifier(score) >= 0 ? `+${getModifier(score)}` : getModifier(score)}
+                  {statMod >= 0 ? `+${statMod}` : statMod}
                 </span>
               </div>
-              <div className={`bg-slate-950 px-3 py-1 rounded shadow-inner border-2 ${isEditMode ? 'border-amber-500/50 bg-amber-900/20' : 'border-slate-900'}`}>
-                {isEditMode ? (
-                  <input 
-                    type="number" 
-                    defaultValue={score}
-                    onBlur={(e) => updateField('stats', { ...stats, [stat]: Number(e.target.value) })}
-                    className="w-8 bg-transparent text-center text-xs font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
-                  />
-                ) : (
-                  <span className="text-[10px] md:text-xs font-black text-slate-400">{score}</span>
-                )}
+
+              {/* SAVING THROW DISPLAY */}
+              <div className={`w-full flex items-center justify-between bg-slate-950 px-2 py-1 rounded shadow-inner border border-slate-800 mt-1`}>
+                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Save</span>
+                 <div className="flex items-center gap-1">
+                   {isProficient && <div className={`w-1.5 h-1.5 rounded-full ${activeTheme.bg} shadow-[0_0_5px_currentColor]`}></div>}
+                   <span className={`text-[10px] font-black ${isProficient ? activeTheme.text : 'text-slate-400'}`}>
+                     {saveMod >= 0 ? `+${saveMod}` : saveMod}
+                   </span>
+                 </div>
               </div>
             </div>
           );
@@ -61,7 +68,10 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border-2 border-slate-950 shadow-inner">
             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Sword className="w-3 h-3"/> Weapons & Armor</h4>
-            <p className="text-xs font-bold text-slate-300 leading-relaxed">{char?.proficiencies?.weapons || 'None'}</p>
+            <p className="text-xs font-bold text-slate-300 leading-relaxed">
+              Weapons: {char?.proficiencies?.weapons || 'None'}<br/>
+              Armor: {char?.proficiencies?.armor || 'None'}
+            </p>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border-2 border-slate-950 shadow-inner">
             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Wrench className="w-3 h-3"/> Tools</h4>

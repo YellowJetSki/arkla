@@ -16,16 +16,15 @@ const AppendingInput = ({ label, value, onChange, placeholder, dataset, color='e
     const val = e.target.value;
     onChange(val);
     const parts = val.split(',').map(s => s.trim());
-    const lastPart = parts[parts.length - 1]; // Look only at the current word being typed
+    const lastPart = parts[parts.length - 1]; 
 
     if (lastPart.length >= 1) {
       const matches = dataset.filter(item => {
-        // Strip out D&D API category prefixes for a cleaner look
         const cleanName = item.name.replace(/^Skill: |^Tool: |^Weapon: |^Armor: |^Saving Throw: /, '');
         return cleanName.toLowerCase().includes(lastPart.toLowerCase());
       });
       matches.sort((a, b) => a.name.localeCompare(b.name));
-      setFiltered(matches.slice(0, 15)); // Keep dropdown clean
+      setFiltered(matches.slice(0, 15)); 
       setShowDropdown(matches.length > 0);
     } else {
       setShowDropdown(false);
@@ -35,8 +34,8 @@ const AppendingInput = ({ label, value, onChange, placeholder, dataset, color='e
   const handleSelect = (itemName) => {
     const cleanName = itemName.replace(/^Skill: |^Tool: |^Weapon: |^Armor: |^Saving Throw: /, '');
     const parts = value.split(',').map(s => s.trim());
-    parts.pop(); // Remove the partial string the user was typing
-    if (cleanName) parts.push(cleanName); // Add the full SRD name
+    parts.pop(); 
+    if (cleanName) parts.push(cleanName); 
     
     onChange(parts.join(', ') + (parts.length > 0 ? ', ' : ''));
     setShowDropdown(false);
@@ -147,10 +146,13 @@ export default function StepTraits({
       <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner space-y-4">
         <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 pb-2">Class & Background Proficiencies</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <AppendingInput label="Saving Throws" value={customProfs.savingThrows || ''} onChange={v => updateProf('savingThrows', v)} placeholder="e.g. STR, CON" dataset={srdProfsList} />
           <AppendingInput label="Skills" value={customProfs.skills} onChange={v => updateProf('skills', v)} placeholder="e.g. Athletics" dataset={srdProfsList} />
           <AppendingInput label="Tools" value={customProfs.tools} onChange={v => updateProf('tools', v)} placeholder="e.g. Thieves' Tools" dataset={srdProfsList} />
-          <AppendingInput label="Weapons" value={customProfs.weapons} onChange={v => updateProf('weapons', v)} placeholder="e.g. Simple Weapons" dataset={srdProfsList} />
-          <AppendingInput label="Armor" value={customProfs.armor} onChange={v => updateProf('armor', v)} placeholder="e.g. Light Armor" dataset={srdProfsList} />
+          <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-3">
+             <AppendingInput label="Weapons" value={customProfs.weapons} onChange={v => updateProf('weapons', v)} placeholder="e.g. Simple Weapons" dataset={srdProfsList} />
+             <AppendingInput label="Armor" value={customProfs.armor} onChange={v => updateProf('armor', v)} placeholder="e.g. Light Armor" dataset={srdProfsList} />
+          </div>
         </div>
       </div>
 

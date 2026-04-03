@@ -4,7 +4,7 @@ import { doc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'fir
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
-  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, ChevronDown, ChevronUp
+  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, ChevronDown, ChevronUp, ShieldPlus
 } from 'lucide-react';
 
 import StatGrid from './shared/StatGrid';
@@ -23,6 +23,7 @@ import ShortRestModal from './ShortRestModal';
 import LongRestModal from './LongRestModal'; 
 import Spellbook from './Spellbook'; 
 import OnboardingWizard from './OnboardingWizard'; 
+import DMCharacterBuilder from './DMCharacterBuilder';
 
 import InventoryTab from './tabs/InventoryTab'; 
 import CombatTab from './tabs/CombatTab';
@@ -100,6 +101,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   
   // Default to edit mode directly if opening from the DM dashboard
   const [isEditMode, setIsEditMode] = useState(isDM);
+  const [showBuilder, setShowBuilder] = useState(false);
   
   const [isImageOpen, setIsImageOpen] = useState(false); 
   const [activeLoot, setActiveLoot] = useState(null); 
@@ -237,7 +239,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     const newFeat = { 
       id: `feat_${Date.now()}`,
       name: customFeat.name, 
-      desc: customFeat.desc
+      desc: customFeat.desc,
+      isDefensive: false
     };
 
     let updates = { features: arrayUnion(newFeat) };
@@ -365,8 +368,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             <div className="flex justify-between items-center mb-4 border-b-2 border-slate-950 pb-4 shrink-0">
               <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><User className="w-6 h-6 text-indigo-400" /> {char.name || 'Unknown'} (DM)</h2>
               <div className="flex items-center gap-2">
-                <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center gap-2 transition-all px-3 py-1.5 rounded-lg border-2 text-xs uppercase tracking-widest font-black shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isEditMode ? 'bg-amber-600 text-slate-950 border-amber-900' : 'text-indigo-400 bg-slate-900 border-slate-950 hover:bg-slate-800'}`}>
-                  <Edit3 className="w-3 h-3" /> {isEditMode ? 'Exit Edit' : 'Edit Live'}
+                <button onClick={() => setShowBuilder(true)} className={`flex items-center gap-2 transition-all px-3 py-1.5 rounded-lg border-2 text-xs uppercase tracking-widest font-black shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] text-amber-400 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
+                  <Edit3 className="w-3 h-3" /> Edit Stats
                 </button>
                 <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-900 p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]"><X className="w-4 h-4" /></button>
               </div>
@@ -394,7 +397,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                   <h4 className="font-black uppercase tracking-widest text-sm leading-none">Level Up!</h4>
                 </div>
               </div>
-              <button onClick={() => setIsEditMode(true)} className="bg-slate-950 text-amber-400 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded border-2 border-amber-900 transition-colors">
+              <button onClick={() => setShowBuilder(true)} className="bg-slate-950 text-amber-400 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded border-2 border-amber-900 transition-colors">
                 Resolve
               </button>
             </div>
@@ -540,12 +543,21 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                          <CollapsibleSection 
                            key={`feat-${i}`} 
                            title={
-                             <div className="flex items-center gap-2">
+                             <div className="flex items-center gap-2 w-full justify-between pr-2">
                                <span className="font-black uppercase tracking-widest">{feat.name}</span>
                                {(isDM || isEditMode) && (
-                                 <button onClick={(e) => { e.stopPropagation(); removeFeature(feat); }} className="text-slate-500 hover:text-red-400 bg-slate-950 border-2 border-slate-800 p-1.5 rounded transition-all ml-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]" title="Delete Feature">
-                                   <Trash2 className="w-3.5 h-3.5" />
-                                 </button>
+                                 <div className="flex items-center gap-1">
+                                   <button onClick={async (e) => { 
+                                     e.stopPropagation(); 
+                                     const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isDefensive: !f.isDefensive } : f);
+                                     await updateDoc(doc(db, 'characters', currentUser.charId), { features: updatedFeatures });
+                                   }} className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${feat.isDefensive ? 'bg-indigo-900 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-indigo-300'}`} title={feat.isDefensive ? "Tagged as Defensive" : "Tag as Defensive"}>
+                                     <ShieldPlus className="w-3.5 h-3.5" />
+                                   </button>
+                                   <button onClick={(e) => { e.stopPropagation(); removeFeature(feat); }} className="text-slate-500 hover:text-red-400 bg-slate-950 border-2 border-slate-800 p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]" title="Delete Feature">
+                                     <Trash2 className="w-3.5 h-3.5" />
+                                   </button>
+                                 </div>
                                )}
                              </div>
                            } 
@@ -571,6 +583,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         </div>
 
         {/* Outer Modals rendered at root container depth */}
+        {showBuilder && <DMCharacterBuilder initialData={char} charId={currentUser.charId} onClose={() => setShowBuilder(false)} />}
         {isLevelUpOpen && <LevelUpModal char={char} charId={currentUser.charId} onClose={() => setIsLevelUpOpen(false)} />}
         {isShortRestOpen && <ShortRestModal char={char} charId={currentUser.charId} onClose={() => setIsShortRestOpen(false)} />}
         {isLongRestOpen && <LongRestModal char={char} charId={currentUser.charId} onClose={() => setIsLongRestOpen(false)} />}
