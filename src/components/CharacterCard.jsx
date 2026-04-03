@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { doc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { 
@@ -71,7 +72,14 @@ const THEMES = {
 
 export default function CharacterCard({ currentUser, onLogout, isDM = false, onClose = null }) {
   const CardWrapper = isDM ? 
-    ({ children }) => <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300"><div className="bg-slate-900 border-2 border-indigo-500 rounded-2xl w-full max-w-5xl shadow-[8px_8px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500 overflow-y-auto custom-scrollbar relative">{children}</div></div> 
+    ({ children }) => createPortal(
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
+        <div className="bg-slate-900 border-[3px] border-indigo-500 rounded-3xl w-full max-w-5xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500 overflow-y-auto custom-scrollbar relative">
+          {children}
+        </div>
+      </div>,
+      document.body
+    ) 
     : ({ children }) => <>{children}</>;
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -402,7 +410,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           />
 
           {/* Collapsible Math (Core Stats) to save space on mobile */}
-          <div className="mb-4">
+          <div className="mb-4 pt-2">
             <button 
               onClick={() => setShowCoreStats(!showCoreStats)}
               className="w-full flex items-center justify-between bg-slate-900 border-2 border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:bg-slate-800 transition-all active:shadow-[0px_0px_0px_rgba(0,0,0,1)] active:translate-y-[4px]"

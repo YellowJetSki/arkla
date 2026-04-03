@@ -20,9 +20,9 @@ export default function DMThreatsPanel({
            <Skull className="w-5 h-5"/> Threats
          </h2>
          <div className="flex gap-2">
-            <button onClick={() => setActiveManager('encounters')} className="text-[10px] font-black uppercase tracking-widest bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-1 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all" title="Stage Encounters"><MapIcon className="w-3 h-3"/> Stag</button>
-            <button onClick={() => setIsForgingSpell(true)} className="text-[10px] font-black uppercase tracking-widest bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-950 px-3 py-1.5 rounded-lg flex items-center gap-1 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all" title="Forge Spell"><Wand2 className="w-3 h-3"/> Spl</button>
-            <button onClick={() => setIsForgingEnemy(true)} className="text-[10px] font-black uppercase tracking-widest bg-slate-950 text-red-500 hover:bg-slate-800 hover:text-white px-3 py-1.5 rounded-lg flex items-center gap-1 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all" title="Forge Monster"><Hammer className="w-3 h-3"/> Mon</button>
+            <button onClick={() => setActiveManager('encounters')} className="bg-slate-900 hover:bg-slate-800 text-white p-2 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all" title="Stage Encounters"><MapIcon className="w-4 h-4"/></button>
+            <button onClick={() => setIsForgingSpell(true)} className="bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-950 p-2 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all" title="Forge Spell"><Wand2 className="w-4 h-4"/></button>
+            <button onClick={() => setIsForgingEnemy(true)} className="bg-slate-950 text-red-500 hover:bg-slate-800 hover:text-white p-2 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all" title="Forge Monster"><Hammer className="w-4 h-4"/></button>
          </div>
       </div>
 

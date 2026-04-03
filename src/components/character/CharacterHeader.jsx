@@ -48,11 +48,13 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
   const initScore = char.initiative !== '--' ? char.initiative : (getModifier(char.stats?.DEX || 10) >= 0 ? `+${getModifier(char.stats?.DEX || 10)}` : getModifier(char.stats?.DEX || 10));
 
   return (
-    <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 relative flex flex-col overflow-hidden shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+    <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 relative flex flex-col shadow-[6px_6px_0px_rgba(0,0,0,1)]">
       
       {/* Cinematic Portrait Area */}
-      <div className="w-full h-32 md:h-40 relative group shrink-0 overflow-hidden block bg-slate-950">
-        <div className={`w-full h-full relative ${char.isConcentrating ? `ring-[4px] ring-inset ${activeTheme.ring} animate-pulse z-20` : ''} ${isFrightened ? 'ring-[4px] ring-inset ring-fuchsia-600 animate-pulse z-20' : ''}`}>
+      <div className="w-full h-32 md:h-40 relative group shrink-0 block bg-slate-950 rounded-t-xl z-10">
+        
+        {/* Strictly confined image layer so it doesn't clip the overlapping badges below */}
+        <div className={`absolute inset-0 overflow-hidden rounded-t-xl ${char.isConcentrating ? `ring-[4px] ring-inset ${activeTheme.ring} animate-pulse z-20` : ''} ${isFrightened ? 'ring-[4px] ring-inset ring-fuchsia-600 animate-pulse z-20' : ''}`}>
           <img 
             src={char.imageUrl || `/${charId}.png`} 
             alt={char.name || 'Unknown'} 
@@ -62,23 +64,22 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
                e.currentTarget.src = '/icon.png'; 
             }} 
           />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent pointer-events-none z-10"></div>
+          {isUnconscious && <div className="absolute inset-0 flex items-center justify-center bg-red-950/60 backdrop-blur-[1px] pointer-events-none z-10"><Skull className="w-12 h-12 text-white drop-shadow-md animate-pulse" /></div>}
         </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent pointer-events-none z-10"></div>
         
         <button onClick={(e) => { e.stopPropagation(); onOpenImage(); }} className="absolute top-2 right-2 p-1.5 bg-slate-950/80 border-2 border-slate-700 backdrop-blur-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer pointer-events-auto shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Maximize className="w-4 h-4 text-white" /></button>
         
-        {isUnconscious && <div className="absolute inset-0 flex items-center justify-center bg-red-950/60 backdrop-blur-[1px] pointer-events-none z-10"><Skull className="w-12 h-12 text-white drop-shadow-md animate-pulse" /></div>}
-        
         {/* Name & Class Lockup */}
-        <div className="absolute bottom-2 left-3 right-3 text-left pointer-events-none z-10 flex justify-between items-end">
-          <div>
+        <div className="absolute bottom-2 left-3 right-3 text-left pointer-events-none z-20 flex justify-between items-end">
+          <div className="w-2/3">
             <div className="flex items-center gap-2 mb-0.5">
               {isEditMode ? (
                 <input 
                   type="text" 
                   defaultValue={char.name || ''} 
                   onBlur={(e) => updateField('name', e.target.value)}
-                  className={`text-2xl font-black leading-none bg-slate-900/80 border-2 border-amber-500 rounded px-2 py-0.5 focus:outline-none w-48 pointer-events-auto shadow-[2px_2px_0px_rgba(0,0,0,1)] ${isUnconscious ? 'text-red-400' : 'text-white'}`}
+                  className={`text-2xl font-black leading-none bg-slate-900/80 border-2 border-amber-500 rounded px-2 py-0.5 focus:outline-none w-full max-w-xs pointer-events-auto shadow-[2px_2px_0px_rgba(0,0,0,1)] ${isUnconscious ? 'text-red-400' : 'text-white'}`}
                 />
               ) : (
                 <h2 className={`text-2xl font-black leading-none uppercase tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] text-balance ${isUnconscious ? 'text-red-400' : 'text-white'}`}>{char.name || 'Unknown'}</h2>
@@ -88,53 +89,60 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
               </div>
             </div>
             {isEditMode ? (
-              <div className="flex gap-1.5 mt-1.5 pointer-events-auto">
+              <div className="flex flex-wrap gap-1.5 mt-1.5 pointer-events-auto">
                   <input type="number" defaultValue={char.level || 1} onBlur={e => updateField('level', Number(e.target.value))} className={`w-10 bg-slate-900/80 border-2 border-amber-500 shadow-[2px_2px_0px_rgba(0,0,0,1)] rounded px-1.5 py-0.5 text-xs font-black ${activeTheme.text} focus:outline-none`} />
                   <input type="text" defaultValue={char.species || char.race || ''} onBlur={e => updateField('species', e.target.value)} className={`w-20 bg-slate-900/80 border-2 border-amber-500 shadow-[2px_2px_0px_rgba(0,0,0,1)] rounded px-1.5 py-0.5 text-xs font-black ${activeTheme.text} focus:outline-none`} />
                   <input type="text" defaultValue={char.class || ''} onBlur={e => updateField('class', e.target.value)} className={`w-24 bg-slate-900/80 border-2 border-amber-500 shadow-[2px_2px_0px_rgba(0,0,0,1)] rounded px-1.5 py-0.5 text-xs font-black ${activeTheme.text} focus:outline-none`} />
               </div>
             ) : (
-              <p className={`${activeTheme.text} font-black text-[10px] uppercase tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]`}>LVL {char.level || 1} {char.species || char.race || ''} {(char.class || '').split(' ')[0]}</p>
+              <p className={`${activeTheme.text} font-black text-[10px] uppercase tracking-widest drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)] truncate`}>LVL {char.level || 1} {char.species || char.race || ''} {(char.class || '').split(' ')[0]}</p>
             )}
           </div>
+        </div>
 
-          {/* Graphic Novel Badges (Moved to bottom right of portrait) */}
-          <div className="flex gap-2 pointer-events-auto translate-y-6">
-            <div className={`w-10 h-11 rounded-t-xl rounded-b-md border-[3px] border-slate-950 flex flex-col items-center justify-center shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden ${acBuffTotal > 0 ? 'bg-emerald-500' : acBuffTotal < 0 ? 'bg-red-500' : 'bg-slate-800'}`}>
-              <Shield className="w-3 h-3 text-white/30 absolute top-1" />
-              {isEditMode ? (
-                <input type="number" defaultValue={char.ac || 10} onBlur={(e) => updateField('ac', Number(e.target.value))} className="w-8 mt-2 bg-transparent text-center text-sm font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none z-10" />
-              ) : (
-                <span className="text-sm font-black text-white mt-1.5">{displayAc}</span>
-              )}
-              <span className="text-[7px] font-black uppercase text-slate-950 absolute bottom-0.5">AC</span>
+        {/* Graphic Novel Badges - Overlapping the bottom boundary cleanly */}
+        <div className="absolute -bottom-6 right-3 flex gap-2 pointer-events-auto z-30">
+          
+          <div className={`w-12 h-14 rounded-lg border-[3px] border-slate-950 flex flex-col items-center justify-start shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden pt-1 ${acBuffTotal > 0 ? 'bg-emerald-500' : acBuffTotal < 0 ? 'bg-red-500' : 'bg-slate-800'}`}>
+            <Shield className="w-3 h-3 text-white/30 absolute top-1" />
+            {isEditMode ? (
+              <input type="number" defaultValue={char.ac || 10} onBlur={(e) => updateField('ac', Number(e.target.value))} className="w-8 mt-1.5 bg-transparent text-center text-sm font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none z-10 relative" />
+            ) : (
+              <span className="text-sm font-black text-white mt-1.5 relative z-10">{displayAc}</span>
+            )}
+            <div className="absolute bottom-0 left-0 w-full bg-slate-950 text-center py-0.5">
+               <span className="text-[8px] font-black uppercase text-white tracking-widest block">AC</span>
             </div>
-            
-            <div className="w-10 h-11 rounded-t-xl rounded-b-md bg-slate-800 border-[3px] border-slate-950 flex flex-col items-center justify-center shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden">
-              <Wind className="w-3 h-3 text-white/30 absolute top-1" />
-              {isEditMode ? (
-                <input type="number" defaultValue={char.speed || 30} onBlur={(e) => updateField('speed', Number(e.target.value))} className="w-8 mt-2 bg-transparent text-center text-sm font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none z-10" />
-              ) : (
-                <span className="text-sm font-black text-white mt-1.5">{displaySpeed}</span>
-              )}
-              <span className="text-[7px] font-black uppercase text-slate-950 absolute bottom-0.5">SPD</span>
+          </div>
+          
+          <div className="w-12 h-14 rounded-lg bg-slate-800 border-[3px] border-slate-950 flex flex-col items-center justify-start shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden pt-1">
+            <Wind className="w-3 h-3 text-white/30 absolute top-1" />
+            {isEditMode ? (
+              <input type="number" defaultValue={char.speed || 30} onBlur={(e) => updateField('speed', Number(e.target.value))} className="w-8 mt-1.5 bg-transparent text-center text-sm font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none z-10 relative" />
+            ) : (
+              <span className="text-sm font-black text-white mt-1.5 relative z-10">{displaySpeed}</span>
+            )}
+            <div className="absolute bottom-0 left-0 w-full bg-slate-950 text-center py-0.5">
+               <span className="text-[8px] font-black uppercase text-white tracking-widest block">SPD</span>
             </div>
+          </div>
 
-            <div className="w-10 h-11 rounded-t-xl rounded-b-md bg-slate-800 border-[3px] border-slate-950 flex flex-col items-center justify-center shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden">
-              <Zap className="w-3 h-3 text-white/30 absolute top-1" />
-              {isEditMode ? (
-                <input type="text" defaultValue={char.initiative !== '--' ? char.initiative : ''} placeholder="Auto" onBlur={(e) => updateField('initiative', e.target.value || '--')} className="w-8 mt-2 bg-transparent text-center text-xs font-black text-white focus:outline-none z-10" />
-              ) : (
-                <span className="text-sm font-black text-white mt-1.5">{initScore}</span>
-              )}
-              <span className="text-[7px] font-black uppercase text-slate-950 absolute bottom-0.5">INIT</span>
+          <div className="w-12 h-14 rounded-lg bg-slate-800 border-[3px] border-slate-950 flex flex-col items-center justify-start shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden pt-1">
+            <Zap className="w-3 h-3 text-white/30 absolute top-1" />
+            {isEditMode ? (
+              <input type="text" defaultValue={char.initiative !== '--' ? char.initiative : ''} placeholder="Auto" onBlur={(e) => updateField('initiative', e.target.value || '--')} className="w-8 mt-1.5 bg-transparent text-center text-xs font-black text-white focus:outline-none z-10 relative" />
+            ) : (
+              <span className="text-sm font-black text-white mt-1.5 relative z-10">{initScore}</span>
+            )}
+            <div className="absolute bottom-0 left-0 w-full bg-slate-950 text-center py-0.5">
+               <span className="text-[8px] font-black uppercase text-white tracking-widest block">INIT</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Vitals Control Panel */}
-      <div className="p-3 bg-slate-800 space-y-3 pt-6">
+      <div className="p-3 bg-slate-800 space-y-3 pt-8 rounded-b-2xl relative z-0">
         
         {/* Giant Graphic HP Bar */}
         <div className="relative bg-slate-950 border-[3px] border-slate-900 rounded-xl overflow-hidden shadow-[inset_0_4px_10px_rgba(0,0,0,0.5)] flex items-center justify-between p-2 h-14">
@@ -172,14 +180,14 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
               </div>
 
               <div className="relative z-20 flex items-center gap-2 pr-1">
-                <button onClick={() => adjustHp(-1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-900 hover:bg-slate-900 text-white font-black text-xl flex items-center justify-center cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)]">-</button>
+                <button onClick={() => adjustHp(-1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-900 hover:bg-slate-900 text-white font-black text-xl flex items-center justify-center cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">-</button>
                 <div className="flex items-center gap-1 text-white bg-slate-950/80 border-2 border-slate-900 rounded-lg px-2 h-10 shadow-[2px_2px_0px_rgba(0,0,0,1)] backdrop-blur-sm">
                   <Heart className={`w-4 h-4 hidden sm:block ${isPoisoned ? 'text-lime-400' : 'text-emerald-400'}`} />
                   <input type="number" value={isEditingHp ? displayHp : (char.hp ?? 0)} onFocus={(e) => { setDisplayHp(char.hp ?? 0); setIsEditingHp(true); e.target.select(); }} onChange={(e) => setDisplayHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingHp(false); submitHpUpdate(e.target.value, char.tempHp); }} className={`w-10 bg-transparent focus:outline-none text-right font-black text-xl md:text-2xl [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingHp ? activeTheme.text : ''}`} />
                   <span className="text-slate-500 font-black text-lg">/</span>
                   <input type="number" value={isEditingMaxHp ? displayMaxHp : (char.maxHp || 10)} onFocus={(e) => { setDisplayMaxHp(char.maxHp || 10); setIsEditingMaxHp(true); e.target.select(); }} onChange={(e) => setDisplayMaxHp(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }} onBlur={(e) => { setIsEditingMaxHp(false); const parsedMax = parseInt(e.target.value, 10); updateField('maxHp', isNaN(parsedMax) ? (char.maxHp || 10) : parsedMax); }} className={`w-8 bg-transparent focus:outline-none text-left text-slate-400 text-sm font-black [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isEditingMaxHp ? activeTheme.text : ''}`} />
                 </div>
-                <button onClick={() => adjustHp(1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-900 hover:bg-slate-900 text-white font-black text-xl flex items-center justify-center cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)]">+</button>
+                <button onClick={() => adjustHp(1)} className="w-10 h-10 rounded-lg bg-slate-950 border-2 border-slate-900 hover:bg-slate-900 text-white font-black text-xl flex items-center justify-center cursor-pointer shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">+</button>
               </div>
             </>
           )}

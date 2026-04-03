@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Target, Sword, AlertTriangle, X, Droplets, Droplet, Backpack, ShieldPlus, Zap } from 'lucide-react';
-import { getConditionMechanics, parseAndScaleAttack } from '../../services/arklaEngine';
+import { Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, X, Droplets, Droplet, Backpack, ShieldPlus, Zap } from 'lucide-react';
+import { getModifier, parseAndScaleAttack, getConditionMechanics } from '../../services/arklaEngine';
+import VitalStats from '../shared/VitalStats';
 import { CONDITIONS_LIST, CONDITION_EFFECTS } from '../../data/campaignData';
 import TempBuffsModal from '../TempBuffsModal';
 
@@ -22,8 +23,11 @@ export default function CombatTab({
 
   let displaySpeed = mechanics.speedOverride !== null ? mechanics.speedOverride : Math.floor((char.speed || 30) * mechanics.speedMultiplier);
   const isEncumbered = (char.inventory || '').length > 500 && char.stats?.STR < 15;
+  if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
 
   const tempBuffs = char.tempBuffs || [];
+  const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
+  const displayAc = (char.ac || 10) + acBuffTotal;
 
   const inventoryWeapons = (char.inventory || []).filter(item => item.category === 'Weapon').map(w => {
     let propsStr = '';
@@ -45,11 +49,80 @@ export default function CombatTab({
   const allAttacks = [...(char.attacks || []), ...inventoryWeapons];
   const resources = char.resources || [];
 
+  // Parse Class/Species Features for Combat Keywords
   const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
   const combatFeatures = (char.features || []).filter(f => {
       const text = `${f.name} ${f.desc}`.toLowerCase();
       return combatKeywords.some(kw => text.includes(kw));
   });
+
+  // Action Categorization Logic (The D&D Beyond approach)
+  const categorizedActions = {
+    action: [],
+    bonus: [],
+    reaction: [],
+    special: []
+  };
+
+  allAttacks.forEach(atk => {
+    const scaled = parseAndScaleAttack(atk, char.stats, char.level, char.class);
+    // Weapons generally default to 1 Action unless specified in notes
+    if ((scaled.notes || '').toLowerCase().includes('bonus action')) {
+      categorizedActions.bonus.push({ ...scaled, isWeapon: true });
+    } else if ((scaled.notes || '').toLowerCase().includes('reaction')) {
+      categorizedActions.reaction.push({ ...scaled, isWeapon: true });
+    } else {
+      categorizedActions.action.push({ ...scaled, isWeapon: true });
+    }
+  });
+
+  combatFeatures.forEach(f => {
+    const text = `${f.name} ${f.desc}`.toLowerCase();
+    if (text.includes('bonus action')) {
+      categorizedActions.bonus.push({ ...f, isWeapon: false });
+    } else if (text.includes('reaction')) {
+      categorizedActions.reaction.push({ ...f, isWeapon: false });
+    } else if (text.includes('action')) {
+      categorizedActions.action.push({ ...f, isWeapon: false });
+    } else {
+      categorizedActions.special.push({ ...f, isWeapon: false });
+    }
+  });
+
+  // Render helper for Weapons vs Traits inside the Action economy blocks
+  const renderActionItem = (item, idx) => {
+    if (item.isWeapon) {
+      return (
+        <div key={idx} className={`bg-slate-900/80 backdrop-blur-sm border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 group ${activeTheme.hoverBorder || ''} transition-colors shadow-[4px_4px_0px_rgba(0,0,0,1)] border-slate-950`}>
+          <div className="flex-1">
+            <h4 className="font-black text-white text-base md:text-lg mb-1 drop-shadow-sm flex items-center gap-2">
+               <Sword className={`w-4 h-4 ${activeTheme.text}`} /> {item.name}
+            </h4>
+            {item.notes && <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black bg-slate-950 border border-slate-800 inline-block px-2 py-1 rounded shadow-inner truncate max-w-full">{item.notes}</p>}
+          </div>
+          
+          <div className="flex gap-2 shrink-0">
+            <div className="bg-slate-950 border-2 border-slate-900 rounded-lg p-2.5 flex flex-col items-center min-w-[70px] shadow-inner">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">To Hit</span>
+              <span className={`font-black text-xl leading-none drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${mechanics.attackDisadvantage ? 'text-red-500' : mechanics.attackAdvantage ? 'text-emerald-400' : activeTheme.text}`}>{item.hit}</span>
+            </div>
+            <div className="bg-slate-950 border-2 border-slate-900 rounded-lg p-2.5 flex flex-col items-center min-w-[90px] shadow-inner">
+              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Damage</span>
+              <span className="font-black text-white text-xl leading-none drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">{item.damage}</span>
+              <span className="text-[8px] uppercase tracking-widest text-slate-500 font-black mt-1">{item.type}</span>
+            </div>
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <div key={idx} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+           <span className={`font-black text-white text-xs uppercase tracking-wider block mb-1`}>{item.name}</span>
+           <p className="text-[10px] font-bold text-slate-300 leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">{item.desc}</p>
+        </div>
+      );
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -71,13 +144,13 @@ export default function CombatTab({
             <Target className={`w-4 h-4 ${mechanics.attackDisadvantage ? 'text-red-500' : mechanics.attackAdvantage ? 'text-emerald-400' : 'text-slate-500'}`} />
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Attack Status</span>
           </div>
-          <span className={`text-lg font-black uppercase tracking-wider leading-none ${mechanics.attackDisadvantage ? 'text-red-500' : mechanics.attackAdvantage ? 'text-emerald-400' : 'text-white'}`}>
+          <span className={`text-lg font-black uppercase tracking-wider leading-none drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${mechanics.attackDisadvantage ? 'text-red-500' : mechanics.attackAdvantage ? 'text-emerald-400' : 'text-white'}`}>
              {mechanics.attackDisadvantage ? 'Disadvantage' : mechanics.attackAdvantage ? 'Advantage' : 'Normal'}
           </span>
         </div>
 
         <button onClick={() => setShowBuffsModal(true)} className={`bg-slate-900 border-2 border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col items-center justify-center transition-all active:shadow-none active:translate-y-[4px] hover:bg-slate-800 ${tempBuffs.length > 0 ? 'bg-indigo-900/50 border-indigo-500' : ''}`}>
-          <ShieldPlus className={`w-6 h-6 mb-1 ${tempBuffs.length > 0 ? 'text-indigo-400' : 'text-slate-400'}`} />
+          <ShieldPlus className={`w-6 h-6 mb-1 ${tempBuffs.length > 0 ? 'text-indigo-400 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'text-slate-400'}`} />
           <span className={`text-[10px] font-black uppercase tracking-widest ${tempBuffs.length > 0 ? 'text-indigo-300' : 'text-slate-500'}`}>
             {tempBuffs.length > 0 ? `${tempBuffs.length} Buffs` : 'Add Buff'}
           </span>
@@ -117,46 +190,7 @@ export default function CombatTab({
         </div>
       )}
 
-      <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden">
-        <div className={`absolute top-0 right-0 w-32 h-32 ${activeTheme.bg} opacity-20 blur-[50px] rounded-full pointer-events-none`}></div>
-        
-        <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] mb-4 border-b-2 border-slate-900 pb-2 relative z-10">
-          <Sword className={`w-6 h-6 ${activeTheme.text}`} /> Weapons & Actions
-        </h3>
-        
-        <div className="space-y-4 relative z-10">
-          {allAttacks.length === 0 ? (
-            <div className="text-center p-6 bg-slate-900/50 rounded-xl border-2 border-slate-900 border-dashed shadow-inner">
-              <p className="text-xs font-black uppercase tracking-widest text-slate-500">No weapons in bags or actions assigned.</p>
-            </div>
-          ) : (
-            allAttacks.map((atk, idx) => {
-              const scaledAtk = parseAndScaleAttack(atk, char.stats, char.level, char.class);
-              return (
-                <div key={idx} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-                  <div className="flex-1">
-                    <h4 className="font-black text-white text-lg leading-none mb-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">{scaledAtk.name}</h4>
-                    {scaledAtk.notes && <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black bg-slate-950 border border-slate-800 inline-block px-2 py-1 rounded shadow-inner truncate max-w-full">{scaledAtk.notes}</p>}
-                  </div>
-                  
-                  <div className="flex gap-2 shrink-0">
-                    <div className="bg-slate-950 border-2 border-slate-900 rounded-lg p-2 flex flex-col items-center min-w-[70px] shadow-inner">
-                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">To Hit</span>
-                      <span className={`font-black text-xl leading-none ${mechanics.attackDisadvantage ? 'text-red-500' : mechanics.attackAdvantage ? 'text-emerald-400' : activeTheme.text}`}>{scaledAtk.hit}</span>
-                    </div>
-                    <div className="bg-slate-950 border-2 border-slate-900 rounded-lg p-2 flex flex-col items-center min-w-[90px] shadow-inner">
-                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Damage</span>
-                      <span className="font-black text-white text-xl leading-none">{scaledAtk.damage}</span>
-                      <span className="text-[8px] uppercase tracking-widest text-slate-500 font-black mt-1">{scaledAtk.type}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
+      {/* TRACKERS */}
       {resources.length > 0 && (
         <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
           <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 mb-4 border-b-2 border-slate-900 pb-2">
@@ -175,7 +209,7 @@ export default function CombatTab({
                   {res.isPool ? (
                     <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border-2 border-slate-900 shadow-inner">
                       <button onClick={() => handleResourceToggle(idx, Math.max(0, res.current - 1))} className="w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 text-white font-black flex items-center justify-center border border-slate-700 shadow-sm">-</button>
-                      <span className={`flex-1 text-center font-black text-xl ${res.current > 0 ? activeTheme.text : 'text-slate-600'}`}>{res.current} <span className="text-sm text-slate-600">/ {res.max}</span></span>
+                      <span className={`flex-1 text-center font-black text-xl drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${res.current > 0 ? activeTheme.text : 'text-slate-600'}`}>{res.current} <span className="text-sm text-slate-600">/ {res.max}</span></span>
                       <button onClick={() => handleResourceToggle(idx, Math.min(res.max, res.current + 1))} className="w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 text-white font-black flex items-center justify-center border border-slate-700 shadow-sm">+</button>
                     </div>
                   ) : (
@@ -198,21 +232,61 @@ export default function CombatTab({
         </div>
       )}
 
-      {combatFeatures.length > 0 && (
+      {/* ACTION ECONOMY PANELS */}
+      <div className="space-y-6">
+        
+        {/* ACTIONS */}
         <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden">
-          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] mb-4 border-b-2 border-slate-900 pb-2 relative z-10">
-            <Zap className={`w-5 h-5 ${activeTheme.text}`} /> Trait Quick Ref
+          <div className={`absolute top-0 right-0 w-32 h-32 ${activeTheme.bg} opacity-20 blur-[50px] rounded-full pointer-events-none`}></div>
+          <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] mb-4 border-b-2 border-slate-900 pb-2 relative z-10">
+            <span className={`w-3 h-3 rounded-full ${activeTheme.bg} border border-slate-950 shadow-sm inline-block`} /> Actions
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-            {combatFeatures.map((f, i) => (
-              <div key={i} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-                 <span className={`font-black text-xs uppercase tracking-wider block mb-1 ${activeTheme.text}`}>{f.name}</span>
-                 <p className="text-[10px] font-bold text-slate-300 leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">{f.desc}</p>
-              </div>
-            ))}
+          <div className="space-y-3 relative z-10">
+             {categorizedActions.action.length === 0 ? (
+                <p className="text-center p-6 bg-slate-900/50 rounded-xl border-2 border-slate-900 border-dashed shadow-inner text-xs font-black uppercase tracking-widest text-slate-500">No standard actions available.</p>
+             ) : (
+                categorizedActions.action.map((item, idx) => renderActionItem(item, idx))
+             )}
           </div>
         </div>
-      )}
+
+        {/* BONUS ACTIONS */}
+        {categorizedActions.bonus.length > 0 && (
+          <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden">
+            <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] mb-4 border-b-2 border-slate-900 pb-2 relative z-10">
+              <span className={`w-3 h-3 ${activeTheme.bg} rotate-45 border border-slate-950 shadow-sm inline-block`} /> Bonus Actions
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+               {categorizedActions.bonus.map((item, idx) => renderActionItem(item, idx))}
+            </div>
+          </div>
+        )}
+
+        {/* REACTIONS */}
+        {categorizedActions.reaction.length > 0 && (
+          <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden">
+            <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] mb-4 border-b-2 border-slate-900 pb-2 relative z-10">
+              <Zap className={`w-5 h-5 ${activeTheme.text} drop-shadow-sm`} /> Reactions
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+               {categorizedActions.reaction.map((item, idx) => renderActionItem(item, idx))}
+            </div>
+          </div>
+        )}
+
+        {/* PASSIVE / SPECIAL TRAITS */}
+        {categorizedActions.special.length > 0 && (
+          <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden">
+            <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] mb-4 border-b-2 border-slate-900 pb-2 relative z-10">
+              <Activity className={`w-5 h-5 text-slate-400 drop-shadow-sm`} /> Other Combat Traits
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+               {categorizedActions.special.map((item, idx) => renderActionItem(item, idx))}
+            </div>
+          </div>
+        )}
+
+      </div>
 
       <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
         <div className="flex justify-between items-center mb-4 border-b-2 border-slate-900 pb-2">

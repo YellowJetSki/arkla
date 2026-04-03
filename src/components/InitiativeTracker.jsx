@@ -4,7 +4,7 @@ import { db } from '../services/firebase';
 import { Swords, Trash2, ArrowDown, Play, Users, X, RotateCcw, Plus, AlertTriangle, Dices, ChevronUp, ChevronDown } from 'lucide-react';
 import { getModifier } from '../services/arklaEngine';
 
-export default function InitiativeTracker({ unlockedCharacters, activeEnemies, isBattleMode, onLaunchBattle, onExitBattle }) {
+export default function InitiativeTracker({ unlockedCharacters, activeEnemies }) {
   const [initiative, setInitiative] = useState([]);
   const [activeTurn, setActiveTurn] = useState(-1); 
   const [round, setRound] = useState(1);
@@ -228,7 +228,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
   return (
     <div className={`flex flex-col bg-slate-900 border-t-[3px] border-slate-950 shadow-[0_-8px_0px_rgba(0,0,0,1)] transition-all duration-300 ease-in-out z-40 w-full ${isExpanded ? 'h-[45vh] md:h-[40vh]' : 'h-14'}`}>
       
-      {/* COMPACT HEADER (Always visible) */}
+      {/* COMPACT HEADER */}
       <div 
         className="h-14 px-3 md:px-4 flex items-center justify-between shrink-0 border-b-[3px] border-slate-950 bg-slate-800 cursor-pointer hover:bg-slate-700 transition-colors" 
         onClick={() => setIsExpanded(!isExpanded)}
@@ -246,7 +246,6 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
             {activeTurn === -1 ? 'Pre-Combat' : `R${round} • T${activeTurn + 1}`}
           </span>
           
-          {/* Minimized Active Actor Info */}
           {!isExpanded && activeActorData && (
             <div className="flex items-center gap-2 ml-1 sm:ml-2 pl-2 sm:pl-3 border-l-2 border-slate-950 truncate">
                <Play className="w-3 h-3 text-fuchsia-400 fill-current shrink-0 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]" />
@@ -281,16 +280,6 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, i
             <button onClick={() => setShowCustomForm(!showCustomForm)} className="bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none border-2 border-slate-900">
               <Plus className="w-3 h-3" /> Lair Action
             </button>
-
-            {!isBattleMode ? (
-              <button onClick={() => { if(onLaunchBattle) onLaunchBattle(); }} className="bg-emerald-500 hover:bg-emerald-400 border-2 border-slate-950 text-slate-950 p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all flex items-center gap-1.5">
-                <Users className="w-3 h-3" /> Show Map
-              </button>
-            ) : (
-              <button onClick={() => { if(onExitBattle) onExitBattle(); }} className="bg-slate-950 hover:bg-slate-800 border-2 border-slate-900 text-slate-300 hover:text-white p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all flex items-center gap-1.5">
-                <X className="w-3 h-3" /> Hide Map
-              </button>
-            )}
             <button onClick={resetValues} className="bg-slate-950 hover:bg-slate-800 border-2 border-slate-900 text-amber-500 hover:text-amber-400 p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
               <RotateCcw className="w-3 h-3" /> Reset
             </button>

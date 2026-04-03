@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
@@ -297,7 +297,6 @@ export default function DMBattleMap() {
     await batch.commit();
   };
 
-  // Click-to-Move Handler. Does NOT deselect the token, allowing fluid multiple moves.
   const handleTileClick = async (x, y) => {
     if (!selectedTokenId || !tokens[selectedTokenId]) return;
     await updateDoc(doc(db, 'campaign', 'battlemap'), { 
@@ -360,24 +359,43 @@ export default function DMBattleMap() {
 
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
-      {/* Control Bar */}
-      <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-3 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0 z-20">
-        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pl-2"><Map className="w-5 h-5" /> Battlefield</h2>
+      {/* Control Bar - Refactored to wrap and fit nicely on mobile/laptop */}
+      <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-3 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 shrink-0 z-20">
+        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pl-2">
+          <Map className="w-5 h-5" /> Battlefield
+        </h2>
         
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto overflow-x-auto custom-scrollbar pb-1 md:pb-0">
-          
+        <div className="flex flex-wrap items-center gap-y-2 gap-x-2 w-full xl:w-auto">
           <button 
             onClick={toggleFogOfWar} 
-            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 ${mapData.fogOfWar ? 'bg-slate-400 border-slate-950 text-slate-950' : 'bg-slate-950 border-slate-900 text-slate-500 hover:text-white'}`}
+            className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 ${mapData.fogOfWar ? 'bg-slate-400 border-slate-950 text-slate-950' : 'bg-slate-950 border-slate-900 text-slate-500 hover:text-white'}`}
           >
             <Eye className="w-4 h-4" /> Fog
           </button>
 
-          <button onClick={launchDisplayTab} className="bg-indigo-600 hover:bg-indigo-500 text-slate-950 border-2 border-slate-950 px-4 py-2 rounded-lg font-black text-[10px] flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 uppercase tracking-widest"><MonitorPlay className="w-4 h-4" /> Cast</button>
-          <button onClick={() => setIsPresetsOpen(true)} className="bg-amber-500 hover:bg-amber-400 text-slate-950 border-2 border-slate-950 px-4 py-2 rounded-lg font-black text-[10px] flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 uppercase tracking-widest"><Save className="w-4 h-4" /> Presets</button>
-          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border-2 border-slate-950 px-4 py-2 rounded-lg font-black text-[10px] flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 uppercase tracking-widest"><Settings className="w-4 h-4" /> Config</button>
-          <button onClick={togglePublish} className={`px-4 py-2 rounded-lg font-black text-[10px] flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 uppercase tracking-widest ${mapData.isPublished ? 'bg-emerald-500 text-slate-950 border-slate-950' : 'bg-slate-950 text-slate-500 border-slate-900 hover:text-white hover:bg-slate-900'}`}>
-            {mapData.isPublished ? <><Send className="w-4 h-4"/> LIVE</> : <><EyeOff className="w-4 h-4"/> HIDDEN</>}
+          <div className="flex items-center bg-slate-950 p-1 rounded-xl border-2 border-slate-900 shadow-inner shrink-0 mr-1 overflow-x-auto custom-scrollbar">
+            <button onClick={() => setIsDrawingMode(!isDrawingMode)} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 border-2 ${isDrawingMode ? 'bg-red-500 text-slate-950 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none' : 'border-transparent text-slate-500 hover:text-red-400 hover:bg-slate-900'}`}><PenTool className="w-3.5 h-3.5" /> Pen</button>
+            {isDrawingMode && (
+              <div className="flex items-center gap-1.5 px-2 border-l-2 border-slate-900 ml-1 pl-2">
+                <button onClick={() => setDrawingShape('freehand')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'freehand' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><PenTool className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('line')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'line' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><div className="w-3 h-0.5 bg-current rotate-45" /></button>
+                <button onClick={() => setDrawingShape('circle')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'circle' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><Circle className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('cone')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'cone' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><Triangle className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('reveal')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'reveal' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`} title="Reveal Fog"><Eye className="w-3 h-3" /></button>
+                <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
+                {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
+                  <button key={c} onClick={() => setDrawingColor(c)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${drawingColor === c ? 'scale-110 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'border-transparent opacity-50 hover:opacity-100'}`} style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            )}
+            <button onClick={handleClearDrawings} className="text-slate-500 hover:text-red-500 hover:bg-slate-900 p-2 ml-1 border-l-2 border-slate-900 transition-colors rounded-lg"><Eraser className="w-4 h-4" /></button>
+          </div>
+
+          <button onClick={launchDisplayTab} className="bg-indigo-600 hover:bg-indigo-500 text-slate-950 border-2 border-slate-950 px-3 py-2 rounded-lg font-black text-[10px] flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 uppercase tracking-widest"><MonitorPlay className="w-4 h-4" /> Cast</button>
+          <button onClick={() => setIsPresetsOpen(true)} className="bg-amber-500 hover:bg-amber-400 text-slate-950 border-2 border-slate-950 px-3 py-2 rounded-lg font-black text-[10px] flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 uppercase tracking-widest"><Save className="w-4 h-4" /> Presets</button>
+          <button onClick={() => setIsEditingMap(!isEditingMap)} className="bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border-2 border-slate-950 px-3 py-2 rounded-lg font-black text-[10px] flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 uppercase tracking-widest"><Settings className="w-4 h-4" /> Config</button>
+          <button onClick={togglePublish} className={`px-3 py-2 rounded-lg font-black text-[10px] flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 uppercase tracking-widest ${mapData.isPublished ? 'bg-emerald-500 text-slate-950 border-slate-950' : 'bg-slate-950 text-slate-500 border-slate-900 hover:text-white hover:bg-slate-900'}`}>
+            {mapData.isPublished ? <><Send className="w-4 h-4"/> Player TV: LIVE</> : <><EyeOff className="w-4 h-4"/> Player TV: HIDDEN</>}
           </button>
         </div>
       </div>
