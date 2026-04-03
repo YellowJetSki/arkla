@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, updateDoc, writeBatch, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Shield, Activity, Heart, Eye, Target, Sparkles, Plus, Minus, PawPrint, Droplets, Flame, UserMinus } from 'lucide-react';
+import { Shield, Activity, Heart, Eye, Target, Sparkles, Plus, Minus, PawPrint, Droplets, Flame, UserMinus, Star } from 'lucide-react';
 import CharacterCard from './CharacterCard';
 
 export default function DMPlayerCard({ charId }) {
@@ -18,12 +18,16 @@ export default function DMPlayerCard({ charId }) {
   const updateHp = async (amount) => {
     if (!char) return;
     const newHp = Math.max(0, Math.min(char.maxHp, char.hp + amount));
-    
     const batch = writeBatch(db);
     batch.update(doc(db, 'characters', charId), { hp: newHp });
     batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${charId}.hp`]: newHp });
-    
     await batch.commit().catch(e => console.error("Map sync error:", e));
+  };
+
+  const updateXp = async (amount) => {
+    if (!char) return;
+    const newXp = Math.max(0, (char.exp || 0) + amount);
+    await updateDoc(doc(db, 'characters', charId), { exp: newXp });
   };
 
   const handleResourceToggle = async (resourceIndex, newCurrentValue) => {
@@ -103,30 +107,39 @@ export default function DMPlayerCard({ charId }) {
         </div>
       </div>
 
-      {/* Vitals Grid */}
-      <div className="grid grid-cols-4 gap-3 mb-4 relative z-10">
+      {/* Vitals Grid - Expanded to 5 columns for XP */}
+      <div className="grid grid-cols-5 gap-2 mb-4 relative z-10">
         <div className="col-span-2 bg-slate-950 border-2 border-slate-900 rounded-xl p-2 flex flex-col items-center justify-center shadow-inner relative overflow-hidden">
           <div className="absolute bottom-0 left-0 h-1.5 transition-all duration-500 w-full bg-slate-800">
              <div className={`h-full ${hpColor} transition-all duration-500`} style={{ width: `${hpPercentage}%` }}></div>
           </div>
           <div className="flex justify-between items-center w-full mb-1 px-1">
-             <button onClick={() => updateHp(-1)} className="text-white hover:text-red-400 bg-slate-800 rounded p-0.5 border border-slate-700 shadow-sm active:translate-y-[1px]"><Minus className="w-3.5 h-3.5"/></button>
+             <button onClick={() => updateHp(-1)} className="text-white hover:text-red-400 bg-slate-800 rounded p-0.5 border border-slate-700 shadow-sm active:translate-y-[1px]"><Minus className="w-3 h-3"/></button>
              <span className="text-[10px] text-red-500 font-black uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">HP</span>
-             <button onClick={() => updateHp(1)} className="text-white hover:text-emerald-400 bg-slate-800 rounded p-0.5 border border-slate-700 shadow-sm active:translate-y-[1px]"><Plus className="w-3.5 h-3.5"/></button>
+             <button onClick={() => updateHp(1)} className="text-white hover:text-emerald-400 bg-slate-800 rounded p-0.5 border border-slate-700 shadow-sm active:translate-y-[1px]"><Plus className="w-3 h-3"/></button>
           </div>
           <span className="text-xl font-black text-white leading-none">
             {char.hp} <span className="text-[10px] text-slate-500">/ {char.maxHp}</span>
           </span>
         </div>
         
-        <div className={`bg-slate-950 border-2 rounded-xl p-2 flex flex-col items-center justify-center shadow-inner transition-colors ${acBuffTotal > 0 ? 'border-emerald-500' : acBuffTotal < 0 ? 'border-red-500' : 'border-slate-900'}`}>
-          <span className={`text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1 ${acBuffTotal > 0 ? 'text-emerald-500' : acBuffTotal < 0 ? 'text-red-500' : 'text-amber-500'}`}><Shield className="w-3 h-3"/> AC</span>
-          <span className={`text-lg font-black leading-none ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-white'}`}>{displayAc}</span>
+        <div className={`col-span-1 bg-slate-950 border-2 rounded-xl p-1.5 flex flex-col items-center justify-center shadow-inner transition-colors ${acBuffTotal > 0 ? 'border-emerald-500' : acBuffTotal < 0 ? 'border-red-500' : 'border-slate-900'}`}>
+          <span className={`text-[9px] font-black uppercase tracking-widest mb-1 flex items-center gap-0.5 ${acBuffTotal > 0 ? 'text-emerald-500' : acBuffTotal < 0 ? 'text-red-500' : 'text-amber-500'}`}><Shield className="w-3 h-3"/> AC</span>
+          <span className={`text-base font-black leading-none ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-white'}`}>{displayAc}</span>
         </div>
         
-        <div className="bg-slate-950 border-2 border-slate-900 rounded-xl p-2 flex flex-col items-center justify-center shadow-inner">
-          <span className="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Target className="w-3 h-3"/> PP</span>
-          <span className="text-lg font-black text-white leading-none">{passivePerception}</span>
+        <div className="col-span-1 bg-slate-950 border-2 border-slate-900 rounded-xl p-1.5 flex flex-col items-center justify-center shadow-inner">
+          <span className="text-[9px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-0.5"><Target className="w-3 h-3"/> PP</span>
+          <span className="text-base font-black text-white leading-none">{passivePerception}</span>
+        </div>
+
+        <div className="col-span-1 bg-slate-950 border-2 border-slate-900 rounded-xl p-1 flex flex-col items-center justify-center shadow-inner">
+          <div className="flex justify-between items-center w-full mb-1">
+             <button onClick={() => updateXp(-10)} className="text-slate-400 hover:text-indigo-400 bg-slate-800 rounded p-0.5 border border-slate-700 active:translate-y-[1px]"><Minus className="w-2.5 h-2.5"/></button>
+             <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest leading-none" title="Experience Points">XP</span>
+             <button onClick={() => updateXp(10)} className="text-slate-400 hover:text-indigo-400 bg-slate-800 rounded p-0.5 border border-slate-700 active:translate-y-[1px]"><Plus className="w-2.5 h-2.5"/></button>
+          </div>
+          <span className="text-sm font-black text-white leading-none truncate w-full text-center px-1">{char.exp || 0}</span>
         </div>
       </div>
 

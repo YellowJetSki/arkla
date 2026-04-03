@@ -77,6 +77,16 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     ({ children }) => createPortal(
       <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 md:p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
         <div className="bg-slate-900 border-[3px] border-indigo-500 rounded-3xl w-full max-w-6xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col h-[95dvh] md:h-[90dvh] max-h-[95dvh] animate-in zoom-in-95 duration-500 overflow-hidden relative">
+          
+          {/* Absolutely Positioned Global DM Close Button */}
+          <button 
+            onClick={onClose} 
+            className="absolute top-4 right-4 z-[999999] bg-slate-950 text-slate-400 hover:text-white p-2 rounded-xl border-2 border-slate-800 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-500 hover:border-red-950 transition-all active:translate-y-[2px] active:shadow-none"
+            title="Close Sheet"
+          >
+             <X className="w-5 h-5" />
+          </button>
+          
           {children}
         </div>
       </div>,
@@ -365,13 +375,12 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         <div className={`w-full md:w-[350px] lg:w-[400px] shrink-0 flex flex-col ${isDM ? 'p-4 md:p-6 h-full overflow-y-auto border-r-[3px] border-slate-950 bg-slate-900/50' : 'p-3 md:p-6 bg-transparent md:h-full md:overflow-y-auto'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} custom-scrollbar z-20`}>
           
           {isDM ? (
-            <div className="flex justify-between items-center mb-4 border-b-2 border-slate-950 pb-4 shrink-0">
+            <div className="flex justify-between items-center mb-4 border-b-2 border-slate-950 pb-4 shrink-0 pr-8">
               <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><User className="w-6 h-6 text-indigo-400" /> {char.name || 'Unknown'} (DM)</h2>
               <div className="flex items-center gap-2">
                 <button onClick={() => setShowBuilder(true)} className={`flex items-center gap-2 transition-all px-3 py-1.5 rounded-lg border-2 text-xs uppercase tracking-widest font-black shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] text-amber-400 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
                   <Edit3 className="w-3 h-3" /> Edit Stats
                 </button>
-                <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-900 p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]"><X className="w-4 h-4" /></button>
               </div>
             </div>
           ) : (

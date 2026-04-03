@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, doc, setDoc, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { ShieldAlert, X, Plus, Play, Trash2, Map, Users } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
@@ -61,8 +61,10 @@ export default function DMEncounterManager({ onClose }) {
       return;
     }
     
+    // Convert to object structure strictly
+    let currentPresets = Array.isArray(encounters) ? { ...encounters } : encounters;
     const updatedEncounters = {
-      ...encounters,
+      ...currentPresets,
       [Date.now().toString()]: {
         name: newEncounterName,
         enemies: draftEnemies
@@ -81,9 +83,15 @@ export default function DMEncounterManager({ onClose }) {
       message: 'Are you sure you want to permanently delete this saved encounter?',
       type: 'confirm',
       onConfirm: async () => {
-        const updatedEncounters = { ...encounters };
-        delete updatedEncounters[encounterKey];
-        await setDoc(doc(db, 'campaign', 'encounters'), { presets: updatedEncounters });
+        let newPresets;
+        // Handle gracefully if the old data was accidentally saved as an Array
+        if (Array.isArray(encounters)) {
+          newPresets = encounters.filter((_, idx) => idx.toString() !== encounterKey.toString());
+        } else {
+          newPresets = { ...encounters };
+          delete newPresets[encounterKey];
+        }
+        await updateDoc(doc(db, 'campaign', 'encounters'), { presets: newPresets });
         closeDialog();
       }
     });
@@ -101,14 +109,19 @@ export default function DMEncounterManager({ onClose }) {
             const uniqueId = `${draftEnemy.id}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
             const enemyRef = doc(db, 'active_enemies', uniqueId);
             
-            const enemyDex = draftEnemy.fullData.stats?.DEX || 10;
+            // Safeguard for broken old data
+            const enemyData = draftEnemy.fullData || {};
+            const enemyDex = enemyData.stats?.DEX || 10;
             const dexMod = Math.floor((enemyDex - 10) / 2);
             const rolledInitiative = Math.floor(Math.random() * 20) + 1 + dexMod;
 
             await setDoc(enemyRef, {
-              ...draftEnemy.fullData,
+              ...enemyData,
+              name: draftEnemy.name || 'Unknown Entity',
               id: uniqueId, 
-              currentHp: draftEnemy.fullData.hp || draftEnemy.fullData.maxHp || 10,
+              currentHp: enemyData.hp || enemyData.maxHp || 10,
+              maxHp: enemyData.maxHp || enemyData.hp || 10,
+              img: enemyData.tokenUrl || enemyData.imageUrl || '/icon.png', // Strict fallback to prevent map crashes
               conditions: [],
               encounterName: encounter.name,
               initiative: rolledInitiative 

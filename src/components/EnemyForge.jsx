@@ -37,6 +37,26 @@ export default function EnemyForge({ onClose }) {
     fetchAllSpells().then(setSrdSpells);
   }, []);
 
+  // API Search Debouncer
+  useEffect(() => {
+    const delayFn = setTimeout(async () => {
+      if (searchQuery.trim().length > 1) {
+        setIsSearching(true);
+        try {
+          const res = await fetch(`https://www.dnd5eapi.co/api/monsters/?name=${encodeURIComponent(searchQuery.trim())}`);
+          const data = await res.json();
+          setSrdEnemies(data.results || []);
+        } catch (err) {
+          console.error(err);
+        }
+        setIsSearching(false);
+      } else {
+        setSrdEnemies([]);
+      }
+    }, 500); 
+    return () => clearTimeout(delayFn);
+  }, [searchQuery]);
+
   const handleSpellSearchChange = (e) => {
     const val = e.target.value;
     setSpellSearch(val);
@@ -102,20 +122,6 @@ export default function EnemyForge({ onClose }) {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const searchApi = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    setIsSearching(true);
-    try {
-      const res = await fetch(`https://www.dnd5eapi.co/api/monsters/?name=${encodeURIComponent(searchQuery.trim())}`);
-      const data = await res.json();
-      setSrdEnemies(data.results || []);
-    } catch (err) {
-      setDialog({ isOpen: true, title: 'API Error', message: 'Failed to search bestiary.', type: 'alert' });
-    }
-    setIsSearching(false);
   };
 
   const loadApiEnemyIntoForge = async (url) => {
@@ -331,11 +337,16 @@ export default function EnemyForge({ onClose }) {
               </form>
             ) : (
               <div className="space-y-6 animate-in fade-in">
-                <form onSubmit={searchApi} className="relative">
+                <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 font-black" />
-                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search API for Monsters (e.g. Goblin)..." className="w-full bg-slate-950 border-[3px] border-slate-900 rounded-2xl pl-12 pr-4 py-4 text-white font-black focus:outline-none focus:border-red-500 shadow-inner" />
-                  <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 bg-red-600 hover:bg-red-500 px-5 py-2 rounded-xl text-slate-950 font-black text-xs uppercase tracking-widest border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all">Search</button>
-                </form>
+                  <input 
+                    type="text" 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    placeholder="Search API for Monsters (e.g. Goblin)..." 
+                    className="w-full bg-slate-950 border-[3px] border-slate-900 rounded-2xl pl-12 pr-4 py-4 text-white font-black focus:outline-none focus:border-red-500 shadow-inner" 
+                  />
+                </div>
                 
                 {isSearching ? (
                   <div className="flex justify-center p-8"><Loader2 className="w-10 h-10 text-red-500 animate-spin" /></div>

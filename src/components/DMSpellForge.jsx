@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Wand2, X, Target, Search, Loader2, Plus, BookOpen, Flame } from 'lucide-react';
@@ -20,6 +20,26 @@ export default function DMSpellForge({ onClose }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [srdSpells, setSrdSpells] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // API Search Debouncer
+  useEffect(() => {
+    const delayFn = setTimeout(async () => {
+      if (searchQuery.trim().length > 1) {
+        setIsSearching(true);
+        try {
+          const res = await fetch(`https://www.dnd5eapi.co/api/spells/?name=${encodeURIComponent(searchQuery.trim())}`);
+          const data = await res.json();
+          setSrdSpells(data.results || []);
+        } catch (err) {
+          console.error(err);
+        }
+        setIsSearching(false);
+      } else {
+        setSrdSpells([]);
+      }
+    }, 500);
+    return () => clearTimeout(delayFn);
+  }, [searchQuery]);
 
   const handleComponentChange = (comp) => {
     setSpell(prev => ({
@@ -50,21 +70,6 @@ export default function DMSpellForge({ onClose }) {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const searchApi = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    setIsSearching(true);
-    try {
-      const res = await fetch(`https://www.dnd5eapi.co/api/spells/?name=${encodeURIComponent(searchQuery.trim())}`);
-      const data = await res.json();
-      setSrdSpells(data.results || []);
-    } catch (err) {
-      console.error(err);
-      setDialog({ isOpen: true, title: 'API Error', message: 'Failed to search archives.', type: 'alert' });
-    }
-    setIsSearching(false);
   };
 
   const loadApiSpellIntoForge = async (url) => {
@@ -198,13 +203,16 @@ export default function DMSpellForge({ onClose }) {
               </form>
             ) : (
               <div className="space-y-6 animate-in fade-in">
-                <form onSubmit={searchApi} className="relative bg-slate-900 p-4 rounded-2xl border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 font-black" />
-                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search API for Spells (e.g. Fireball)..." className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl pl-10 pr-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" />
-                  </div>
-                  <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 px-6 py-3 rounded-xl text-slate-950 font-black text-xs uppercase tracking-widest border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all">Search</button>
-                </form>
+                <div className="relative bg-slate-900 p-4 rounded-2xl border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+                  <Search className="absolute left-7 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 font-black" />
+                  <input 
+                    type="text" 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    placeholder="Search API for Spells (e.g. Fireball)..." 
+                    className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl pl-12 pr-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" 
+                  />
+                </div>
                 
                 {isSearching ? (
                   <div className="flex justify-center p-12"><Loader2 className="w-10 h-10 text-fuchsia-500 animate-spin" /></div>
