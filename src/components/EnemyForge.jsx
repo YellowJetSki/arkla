@@ -99,6 +99,7 @@ export default function EnemyForge({ onClose }) {
       if (enemy.size === 'Huge') tokenSize = 3;
       if (enemy.size === 'Gargantuan') tokenSize = 4;
 
+      // Force string text areas into proper array objects to prevent DMEnemyCard .map() crashes
       const newEnemy = {
         ...enemy,
         flavor: `${enemy.size} ${enemy.type}, ${enemy.alignment}`,
@@ -109,8 +110,10 @@ export default function EnemyForge({ onClose }) {
         challenge_rating: Number(enemy.challenge_rating),
         size: tokenSize,
         conditions: [],
-        features: enemy.traits ? [{ name: 'Traits', desc: enemy.traits }] : [],
-        parsedActions: enemy.actions ? [{ name: 'Actions', desc: enemy.actions }] : [],
+        actions: enemy.actions ? [{ name: 'Actions', desc: enemy.actions }] : [],
+        reactions: enemy.reactions ? [{ name: 'Reactions', desc: enemy.reactions }] : [],
+        special_abilities: enemy.traits ? [{ name: 'Traits', desc: enemy.traits }] : [],
+        features: enemy.traits ? [{ name: 'Traits', desc: enemy.traits }] : [], // backwards fallback
         isHomebrew: true
       };
 
