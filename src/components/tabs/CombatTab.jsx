@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, X, Droplets, Droplet, Backpack, ShieldPlus, Zap } from 'lucide-react';
 import { getModifier, parseAndScaleAttack, getConditionMechanics } from '../../services/arklaEngine';
-import VitalStats from '../shared/VitalStats';
 import { CONDITIONS_LIST, CONDITION_EFFECTS } from '../../data/campaignData';
 import TempBuffsModal from '../TempBuffsModal';
 
