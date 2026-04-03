@@ -28,7 +28,6 @@ export default function CombatTab({
   const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
   const displayAc = (char.ac || 10) + acBuffTotal;
 
-  // Render ALL weapons in the inventory as attacks
   const inventoryWeapons = (char.inventory || []).filter(item => item.category === 'Weapon').map(w => {
     let propsStr = '';
     if (Array.isArray(w.properties)) {
@@ -37,19 +36,36 @@ export default function CombatTab({
       propsStr = w.properties;
     }
 
+    let rangeStr = '';
+    if (w.range) {
+      if (typeof w.range === 'string') {
+        rangeStr = w.range;
+      } else if (w.range.normal) {
+        rangeStr = `${w.range.normal}${w.range.long ? `/${w.range.long}` : ''} ft.`;
+      }
+    }
+
     return {
       name: w.name,
-      hit: '--', // Will be parsed below
+      hit: '--',
       damage: w.damageDice || w.damage?.damage_dice || '1d4',
       type: w.damageType || w.damage?.damage_type?.name || 'Slashing',
-      notes: propsStr || (typeof w.desc === 'string' ? w.desc : '')
+      notes: propsStr || (typeof w.desc === 'string' ? w.desc : ''),
+      range: rangeStr
     };
   });
 
   const allAttacks = [...(char.attacks || []), ...inventoryWeapons];
   const resources = char.resources || [];
 
-  // Categorization Logic
+  // Parse Class/Species Features for Combat Keywords
+  const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
+  const combatFeatures = (char.features || []).filter(f => {
+      const text = `${f.name} ${f.desc}`.toLowerCase();
+      return combatKeywords.some(kw => text.includes(kw));
+  });
+
+  // Action Categorization Logic
   const categorizedActions = {
     action: [],
     bonus: [],
@@ -59,6 +75,7 @@ export default function CombatTab({
 
   allAttacks.forEach(atk => {
     const scaled = parseAndScaleAttack(atk, char.stats, char.level, char.class);
+    // Weapons generally default to 1 Action unless specified in notes
     if ((scaled.notes || '').toLowerCase().includes('bonus action')) {
       categorizedActions.bonus.push({ ...scaled, isWeapon: true });
     } else if ((scaled.notes || '').toLowerCase().includes('reaction')) {
@@ -66,15 +83,6 @@ export default function CombatTab({
     } else {
       categorizedActions.action.push({ ...scaled, isWeapon: true });
     }
-  });
-
-  // Automatically pull features tagged explicitly as isDefensive OR matching keywords
-  const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
-  
-  const combatFeatures = (char.features || []).filter(f => {
-      if (f.isDefensive) return true; // Explicit DM override
-      const text = `${f.name} ${f.desc}`.toLowerCase();
-      return combatKeywords.some(kw => text.includes(kw));
   });
 
   combatFeatures.forEach(f => {
@@ -90,6 +98,7 @@ export default function CombatTab({
     }
   });
 
+  // Render helper for Weapons vs Traits inside the Action economy blocks
   const renderActionItem = (item, idx) => {
     if (item.isWeapon) {
       return (
@@ -98,7 +107,18 @@ export default function CombatTab({
             <h4 className="font-black text-white text-base md:text-lg mb-1 drop-shadow-sm flex items-center gap-2">
                <Sword className={`w-4 h-4 ${activeTheme.text}`} /> {item.name}
             </h4>
-            {item.notes && <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black bg-slate-950 border border-slate-800 inline-block px-2 py-1 rounded shadow-inner truncate max-w-full">{item.notes}</p>}
+            <div className="flex flex-wrap gap-1 mt-1">
+              {item.range && (
+                <span className="text-[9px] text-sky-400 uppercase tracking-widest font-black bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner flex items-center gap-1">
+                  <Target className="w-2.5 h-2.5" /> {item.range}
+                </span>
+              )}
+              {item.notes && (
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner truncate max-w-full">
+                  {item.notes}
+                </p>
+              )}
+            </div>
           </div>
           
           <div className="flex gap-2 shrink-0">
@@ -116,12 +136,9 @@ export default function CombatTab({
       );
     } else {
       return (
-        <div key={idx} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex gap-2 items-start">
-           {item.isDefensive && <ShieldPlus className={`w-4 h-4 mt-0.5 shrink-0 ${activeTheme.text}`} title="Defensive Trait" />}
-           <div>
-             <span className={`font-black text-white text-xs uppercase tracking-wider block mb-1`}>{item.name}</span>
-             <p className="text-[10px] font-bold text-slate-300 leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">{item.desc}</p>
-           </div>
+        <div key={idx} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+           <span className={`font-black text-white text-xs uppercase tracking-wider block mb-1`}>{item.name}</span>
+           <p className="text-[10px] font-bold text-slate-300 leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">{item.desc}</p>
         </div>
       );
     }
@@ -160,7 +177,6 @@ export default function CombatTab({
         </button>
       </div>
 
-      {/* WARNINGS & ENCUMBRANCE (Unchanged) */}
       {combatWarnings.length > 0 && (
         <div className="bg-red-500 border-2 border-red-950 rounded-xl p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
           <h4 className="text-red-950 font-black flex items-center gap-2 mb-2 text-sm uppercase tracking-wider"><AlertTriangle className="w-5 h-5" /> Active Detriments</h4>
@@ -194,7 +210,7 @@ export default function CombatTab({
         </div>
       )}
 
-      {/* TRACKERS (Unchanged) */}
+      {/* TRACKERS */}
       {resources.length > 0 && (
         <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
           <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 mb-4 border-b-2 border-slate-900 pb-2">
@@ -292,7 +308,6 @@ export default function CombatTab({
 
       </div>
 
-      {/* CONDITIONS MODULE (Unchanged) */}
       <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
         <div className="flex justify-between items-center mb-4 border-b-2 border-slate-900 pb-2">
           <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><AlertTriangle className="w-5 h-5 text-amber-500" /> Conditions</h3>
