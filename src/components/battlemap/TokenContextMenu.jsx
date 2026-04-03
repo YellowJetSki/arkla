@@ -25,8 +25,9 @@ const CONDITION_ICONS = {
 
 export default function TokenContextMenu({
   token,
-  activePlayers,
-  activeEnemies,
+  tokenX,
+  mapCols,
+  displayName,
   showMovementRangeFor,
   onUpdateHpLive,
   onDeselect,
@@ -40,28 +41,31 @@ export default function TokenContextMenu({
   onRemoveToken,
   onToggleCondition
 }) {
-  const isEnemy = token.type === 'enemy';
-  const entity = isEnemy ? activeEnemies.find(e => e.id === token.id) : activePlayers.find(p => p.id === token.id);
-  const hpVal = entity ? (entity.currentHp ?? entity.hp ?? 0) : token.hp;
+  
+  // Smart alignment to prevent overflowing the screen
+  const isNearLeft = tokenX < 4;
+  const isNearRight = tokenX > (mapCols - 6);
+  const alignClass = isNearLeft ? 'left-0' : isNearRight ? 'right-0' : 'left-1/2 -translate-x-1/2';
 
   return (
     <div 
-      className="absolute top-full left-1/2 -translate-x-1/2 mt-8 bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[8px_8px_0px_rgba(0,0,0,1)] z-[99999] w-max cursor-default flex flex-col gap-4 pointer-events-auto animate-in fade-in slide-in-from-top-2"
+      className={`absolute top-full mt-4 bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[8px_8px_0px_rgba(0,0,0,1)] z-[99999] w-max cursor-default flex flex-col gap-4 pointer-events-auto animate-in fade-in slide-in-from-top-2 ${alignClass}`}
       onMouseDown={e => e.stopPropagation()}
       onClick={e => e.stopPropagation()}
     >
       <div className="flex items-center gap-3 border-b-2 border-slate-950 pb-3">
         <span className="text-sm font-black text-white uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pr-4">
-          {token.name}
+          {displayName}
         </span>
         
         <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl ml-auto border-2 border-slate-900 shadow-inner">
           <Heart className="w-4 h-4 text-red-500 drop-shadow-sm" />
           <input 
             type="number" 
-            value={hpVal}
+            defaultValue={token.hp}
             onFocus={(e) => e.target.select()}
-            onChange={(e) => onUpdateHpLive(token.id, e.target.value)}
+            onBlur={(e) => onUpdateHpLive(token.id, e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
             className="w-12 bg-transparent text-white text-lg font-black text-center focus:outline-none focus:text-red-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
         </div>

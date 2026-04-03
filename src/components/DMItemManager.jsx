@@ -8,7 +8,6 @@ import { fetchAllEquipment, fetchEquipmentDetails } from '../services/srdApi';
 export default function DMItemManager({ onClose, activePlayers }) {
   const [stashedItems, setStashedItems] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState('');
-  
   const [playerMap, setPlayerMap] = useState({});
   
   const [newItem, setNewItem] = useState({ 
@@ -190,193 +189,195 @@ export default function DMItemManager({ onClose, activePlayers }) {
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
-        <div className="bg-slate-900 border border-indigo-500/50 rounded-2xl w-full max-w-5xl shadow-[0_0_40px_rgba(99,102,241,0.2)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500">
+        <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl w-full max-w-5xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500 relative overflow-hidden">
           
-          <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/90 rounded-t-2xl shrink-0">
-            <h2 className="text-xl font-bold text-indigo-400 flex items-center gap-2">
+          {/* Solid Color Header */}
+          <div className="p-4 border-b-[3px] border-slate-950 flex justify-between items-center bg-emerald-500 rounded-t-xl shrink-0 relative z-10">
+            <h2 className="text-xl font-black text-slate-950 flex items-center gap-2 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,0.3)]">
               <PackagePlus className="w-6 h-6" /> DM Item Vault
             </h2>
-            <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-800 p-2 rounded-xl border border-slate-700">
-              <X className="w-5 h-5" />
+            <button onClick={onClose} className="text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition-colors p-2 rounded-xl border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+              <X className="w-5 h-5 font-black" />
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto custom-scrollbar flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 bg-slate-800/30">
+          <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 bg-slate-950 relative z-10">
             
             {/* LEFT: Unified Item Forge */}
             <div className="space-y-6">
-              <h3 className="font-bold text-white border-b border-slate-700/50 pb-2 flex items-center gap-2 uppercase tracking-widest text-sm">
-                <Hammer className="w-4 h-4 text-indigo-400" /> 1. Forge Artifact
-              </h3>
-              
-              <form onSubmit={handleForgeItem} className="bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-inner space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Search className="w-3 h-3"/> Item Name (SRD Search)
+              <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+                <h3 className="font-black text-emerald-400 border-b-2 border-slate-950 pb-3 mb-5 flex items-center gap-2 uppercase tracking-widest text-sm drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
+                  <Hammer className="w-5 h-5 text-emerald-500" /> 1. Forge Artifact
+                </h3>
+                
+                <form onSubmit={handleForgeItem} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="relative">
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-1">
+                        <Search className="w-3 h-3"/> SRD Search
+                      </label>
+                      <input 
+                        type="text" 
+                        value={newItem.name} 
+                        onChange={handleItemNameChange} 
+                        required 
+                        className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-emerald-500 shadow-inner" 
+                        placeholder="e.g. Longsword or Potion" 
+                      />
+                      
+                      {showEquipDropdown && filteredEquip.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-2 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border-2 border-slate-950 rounded-xl shadow-[6px_6px_0px_rgba(0,0,0,1)] z-50">
+                          {filteredEquip.map(item => (
+                            <div 
+                              key={item.url || item.index} 
+                              onClick={() => handleSelectSrdItem(item.url || item.index)} 
+                              className="px-3 py-2.5 text-sm font-bold text-slate-300 hover:bg-emerald-500 hover:text-slate-950 cursor-pointer border-b-2 border-slate-950 last:border-0 transition-colors"
+                            >
+                              {item.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Category</label>
+                      <select 
+                        value={newItem.category} 
+                        onChange={e => setNewItem({...newItem, category: e.target.value})} 
+                        className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-emerald-500 shadow-inner"
+                      >
+                        <option value="Wondrous Item">Wondrous Item</option>
+                        <option value="Weapon">Weapon</option>
+                        <option value="Armor">Armor</option>
+                        <option value="Consumable">Consumable</option>
+                        <option value="Potion">Potion</option>
+                        <option value="Adventuring Gear">Adventuring Gear</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {newItem.category === 'Weapon' && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5"><Sword className="w-3 h-3 inline"/> Damage</label>
+                        <input 
+                          type="text" 
+                          value={newItem.damageDice} 
+                          onChange={e => setNewItem({...newItem, damageDice: e.target.value})} 
+                          className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-emerald-500" 
+                          placeholder="1d8" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Type</label>
+                        <input 
+                          type="text" 
+                          value={newItem.damageType} 
+                          onChange={e => setNewItem({...newItem, damageType: e.target.value})} 
+                          className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-emerald-500" 
+                          placeholder="Slashing" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5"><Crosshair className="w-3 h-3 inline"/> Range</label>
+                        <input 
+                          type="text" 
+                          value={newItem.range || ''} 
+                          onChange={e => setNewItem({...newItem, range: e.target.value})} 
+                          className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-emerald-500" 
+                          placeholder="5 ft" 
+                        />
+                      </div>
+                      <div className="col-span-2 sm:col-span-1">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Properties</label>
+                        <input 
+                          type="text" 
+                          value={newItem.properties} 
+                          onChange={e => setNewItem({...newItem, properties: e.target.value})} 
+                          className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold text-xs focus:outline-none focus:border-emerald-500" 
+                          placeholder="Finesse, Light" 
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {newItem.category === 'Armor' && (
+                    <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5"><Shield className="w-3 h-3 inline"/> Armor Class (AC)</label>
+                      <input 
+                        type="number" 
+                        value={newItem.ac} 
+                        onChange={e => setNewItem({...newItem, ac: e.target.value})} 
+                        className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-emerald-500" 
+                      />
+                    </div>
+                  )}
+
+                  {(newItem.category === 'Consumable' || newItem.category === 'Potion') && (
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">HP Recovery (Dice or Flat Value)</label>
+                      <input 
+                        type="text" 
+                        value={newItem.hpRecovery} 
+                        onChange={e => setNewItem({...newItem, hpRecovery: e.target.value})} 
+                        className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-emerald-500 shadow-inner" 
+                        placeholder="e.g. 2d4+2 or 10" 
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="flex items-center gap-1 block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                      <ImageIcon className="w-4 h-4" /> Image URL (Optional)
                     </label>
                     <input 
-                      type="text" 
-                      value={newItem.name} 
-                      onChange={handleItemNameChange} 
-                      required 
-                      className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
-                      placeholder="e.g. Longsword or Potion" 
+                      type="url" 
+                      value={newItem.imageUrl} 
+                      onChange={e => setNewItem({...newItem, imageUrl: e.target.value})} 
+                      className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-emerald-500 shadow-inner" 
+                      placeholder="https://..." 
                     />
-                    
-                    {showEquipDropdown && filteredEquip.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-950 border border-slate-600 rounded-lg shadow-2xl z-50">
-                        {filteredEquip.map(item => (
-                          <div 
-                            key={item.url || item.index} 
-                            onClick={() => handleSelectSrdItem(item.url || item.index)} 
-                            className="px-3 py-2 text-sm text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors"
-                          >
-                            {item.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Category</label>
-                    <select 
-                      value={newItem.category} 
-                      onChange={e => setNewItem({...newItem, category: e.target.value})} 
-                      className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none"
-                    >
-                      <option value="Wondrous Item">Wondrous Item</option>
-                      <option value="Weapon">Weapon</option>
-                      <option value="Armor">Armor</option>
-                      <option value="Consumable">Consumable</option>
-                      <option value="Potion">Potion</option>
-                      <option value="Adventuring Gear">Adventuring Gear</option>
-                    </select>
-                  </div>
-                </div>
 
-                {newItem.category === 'Weapon' && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-3 rounded-lg border border-slate-800">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Sword className="w-3 h-3 inline"/> Damage</label>
+                  <div className="flex gap-4">
+                    <div className="w-24">
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Qty</label>
                       <input 
-                        type="text" 
-                        value={newItem.damageDice} 
-                        onChange={e => setNewItem({...newItem, damageDice: e.target.value})} 
-                        className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" 
-                        placeholder="1d8" 
+                        type="number" 
+                        value={newItem.quantity} 
+                        onChange={e => setNewItem({...newItem, quantity: e.target.value})} 
+                        className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-2 py-3 text-center text-white font-bold text-sm focus:outline-none focus:border-emerald-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" 
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Type</label>
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label>
                       <input 
                         type="text" 
-                        value={newItem.damageType} 
-                        onChange={e => setNewItem({...newItem, damageType: e.target.value})} 
-                        className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" 
-                        placeholder="Slashing" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Crosshair className="w-3 h-3 inline"/> Range</label>
-                      <input 
-                        type="text" 
-                        value={newItem.range || ''} 
-                        onChange={e => setNewItem({...newItem, range: e.target.value})} 
-                        className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" 
-                        placeholder="5 ft" 
-                      />
-                    </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Properties</label>
-                      <input 
-                        type="text" 
-                        value={newItem.properties} 
-                        onChange={e => setNewItem({...newItem, properties: e.target.value})} 
-                        className="w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-white text-xs focus:outline-none" 
-                        placeholder="Finesse, Light" 
+                        value={newItem.desc} 
+                        onChange={e => setNewItem({...newItem, desc: e.target.value})} 
+                        className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-emerald-500 shadow-inner" 
+                        placeholder="Short description..." 
                       />
                     </div>
                   </div>
-                )}
-
-                {newItem.category === 'Armor' && (
-                  <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1"><Shield className="w-3 h-3 inline"/> Armor Class (AC)</label>
-                    <input 
-                      type="number" 
-                      value={newItem.ac} 
-                      onChange={e => setNewItem({...newItem, ac: e.target.value})} 
-                      className="w-full bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-white text-sm focus:outline-none" 
-                    />
-                  </div>
-                )}
-
-                {(newItem.category === 'Consumable' || newItem.category === 'Potion') && (
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">HP Recovery (Dice or Flat Value)</label>
-                    <input 
-                      type="text" 
-                      value={newItem.hpRecovery} 
-                      onChange={e => setNewItem({...newItem, hpRecovery: e.target.value})} 
-                      className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none" 
-                      placeholder="e.g. 2d4+2 or 10" 
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="flex items-center gap-1 block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    <ImageIcon className="w-3 h-3" /> Image URL (Optional)
-                  </label>
-                  <input 
-                    type="url" 
-                    value={newItem.imageUrl} 
-                    onChange={e => setNewItem({...newItem, imageUrl: e.target.value})} 
-                    className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
-                    placeholder="https://..." 
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <div className="w-20">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Qty</label>
-                    <input 
-                      type="number" 
-                      value={newItem.quantity} 
-                      onChange={e => setNewItem({...newItem, quantity: e.target.value})} 
-                      className="w-full bg-slate-950 border border-slate-600 rounded-lg px-2 py-2 text-center text-white text-sm focus:outline-none" 
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Description</label>
-                    <input 
-                      type="text" 
-                      value={newItem.desc} 
-                      onChange={e => setNewItem({...newItem, desc: e.target.value})} 
-                      className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none" 
-                      placeholder="Short description..." 
-                    />
-                  </div>
-                </div>
-                
-                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs py-3 rounded-lg flex justify-center items-center gap-2 transition-colors">
-                  <Plus className="w-4 h-4"/> Store in Vault
-                </button>
-              </form>
+                  
+                  <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black uppercase tracking-widest text-xs py-4 rounded-xl flex justify-center items-center gap-2 transition-all border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none mt-2">
+                    <Plus className="w-4 h-4 font-black"/> Store in Vault
+                  </button>
+                </form>
+              </div>
             </div>
 
             {/* RIGHT: The Stash & Assignment */}
-            <div className="space-y-4 lg:border-l lg:border-slate-700 lg:pl-8">
-              <h3 className="font-bold text-white border-b border-slate-700/50 pb-2 flex items-center justify-between uppercase tracking-widest text-sm">
-                <span className="flex items-center gap-2"><Backpack className="w-4 h-4 text-emerald-400" /> 2. Your Vault</span>
+            <div className="space-y-5 lg:border-l-[3px] lg:border-slate-900 lg:pl-8">
+              <h3 className="font-black text-white border-b-[3px] border-slate-900 pb-3 flex items-center justify-between uppercase tracking-widest text-lg drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
+                <span className="flex items-center gap-2"><Backpack className="w-6 h-6 text-emerald-500" /> 2. Your Vault</span>
               </h3>
               
               {/* Single Player Assignment */}
-              <div className="bg-slate-900 p-3 rounded-lg border border-slate-700 shadow-inner mb-2 flex gap-2">
-                <select value={selectedPlayer} onChange={e => setSelectedPlayer(e.target.value)} className="flex-1 bg-slate-950 text-white border border-slate-600 rounded-lg p-2.5 text-sm focus:outline-none focus:border-emerald-500 shadow-inner">
-                  <option value="">-- Select a Player --</option>
-                  {/* Safely map over activePlayers ensuring we only show ones that actually exist in the DB */}
+              <div className="bg-slate-900 p-4 rounded-xl border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] mb-4 flex gap-2">
+                <select value={selectedPlayer} onChange={e => setSelectedPlayer(e.target.value)} className="flex-1 bg-slate-950 text-white font-bold border-2 border-slate-900 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 shadow-inner">
+                  <option value="">-- Target Player --</option>
                   {activePlayers?.filter(id => playerMap[id]).map(id => (
                     <option key={id} value={id}>{playerMap[id]}</option>
                   ))}
@@ -384,38 +385,38 @@ export default function DMItemManager({ onClose, activePlayers }) {
               </div>
 
               {stashedItems.length === 0 ? (
-                <p className="text-sm text-slate-500 italic bg-slate-900/50 p-6 rounded-xl border border-slate-700 border-dashed text-center">Your vault is empty. Forge items to store them here.</p>
+                <p className="text-sm text-slate-500 font-bold uppercase tracking-widest bg-slate-900 p-8 rounded-2xl border-2 border-slate-950 border-dashed text-center shadow-inner mt-4">Your vault is empty. Forge items to store them here.</p>
               ) : (
-                <div className="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2 mt-4">
                   {stashedItems.map((item) => (
-                    <div key={item.id} className="bg-slate-900/80 border border-slate-700 rounded-xl p-4 shadow-sm relative group hover:border-emerald-500/50 transition-colors">
-                      <button onClick={() => removeStashedItem(item.id)} className="absolute top-2 right-2 text-slate-500 hover:text-red-400 transition-colors bg-slate-950 p-1 rounded z-10"><X className="w-3 h-3" /></button>
+                    <div key={item.id} className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative group hover:border-emerald-500 transition-colors">
+                      <button onClick={() => removeStashedItem(item.id)} className="absolute top-3 right-3 text-slate-950 bg-slate-500 hover:bg-red-500 hover:text-white transition-colors p-1.5 rounded-lg z-10 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><X className="w-4 h-4 font-black" /></button>
                       
-                      <div className="flex gap-3 mb-3">
+                      <div className="flex gap-4 mb-4 pr-10">
                         {item.imageUrl && (
-                          <div className="w-12 h-12 shrink-0 rounded bg-slate-950 border border-slate-700 overflow-hidden">
+                          <div className="w-16 h-16 shrink-0 rounded-xl bg-slate-950 border-2 border-slate-900 overflow-hidden shadow-inner">
                             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                           </div>
                         )}
                         <div>
-                          <h4 className="font-black text-white text-sm pr-6 mb-0.5 leading-tight">{item.quantity}x {item.name}</h4>
-                          <span className="text-[9px] uppercase tracking-widest text-emerald-400 font-bold block">{item.category}</span>
+                          <h4 className="font-black text-white text-lg leading-none mb-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">{item.quantity}x {item.name}</h4>
+                          <span className="text-[10px] uppercase tracking-widest text-emerald-400 font-black block">{item.category}</span>
                         </div>
                       </div>
                       
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {item.damageDice && <span className="bg-slate-950 border border-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded shadow-inner">Dmg: {item.damageDice}</span>}
-                        {item.range && <span className="bg-slate-950 border border-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded shadow-inner">Rng: {item.range}</span>}
-                        {item.ac && <span className="bg-slate-950 border border-slate-800 text-slate-300 text-[10px] px-1.5 py-0.5 rounded shadow-inner">AC: {item.ac}</span>}
-                        {item.hpRecovery && <span className="bg-slate-950 border border-slate-800 text-emerald-300 text-[10px] px-1.5 py-0.5 rounded shadow-inner">Heal: {item.hpRecovery}</span>}
+                      <div className="flex flex-wrap gap-2 mb-5">
+                        {item.damageDice && <span className="bg-slate-950 border-2 border-slate-900 text-slate-300 font-black text-[10px] px-2 py-1 rounded-md shadow-inner uppercase tracking-widest">Dmg: {item.damageDice}</span>}
+                        {item.range && <span className="bg-slate-950 border-2 border-slate-900 text-slate-300 font-black text-[10px] px-2 py-1 rounded-md shadow-inner uppercase tracking-widest">Rng: {item.range}</span>}
+                        {item.ac && <span className="bg-slate-950 border-2 border-slate-900 text-slate-300 font-black text-[10px] px-2 py-1 rounded-md shadow-inner uppercase tracking-widest">AC: {item.ac}</span>}
+                        {item.hpRecovery && <span className="bg-slate-950 border-2 border-slate-900 text-emerald-400 font-black text-[10px] px-2 py-1 rounded-md shadow-inner uppercase tracking-widest">Heal: {item.hpRecovery}</span>}
                       </div>
 
-                      <div className="flex gap-2">
-                        <button onClick={() => sendToPlayer(item)} className="flex-1 bg-emerald-900/40 border border-emerald-500/50 hover:bg-emerald-600 text-emerald-400 hover:text-white font-black text-[10px] uppercase tracking-widest py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all">
-                          <Send className="w-3 h-3" /> Grant to Target
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button onClick={() => sendToPlayer(item)} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-1.5 transition-all border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+                          <Send className="w-4 h-4 font-black" /> Grant
                         </button>
-                        <button onClick={() => sendToAllPlayers(item)} className="flex-1 bg-indigo-900/40 border border-indigo-500/50 hover:bg-indigo-600 text-indigo-400 hover:text-white font-black text-[10px] uppercase tracking-widest py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all">
-                          <Users className="w-3 h-3" /> Grant to All
+                        <button onClick={() => sendToAllPlayers(item)} className="flex-1 bg-indigo-500 hover:bg-indigo-400 text-slate-950 font-black text-[10px] uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-1.5 transition-all border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+                          <Users className="w-4 h-4 font-black" /> Grant All
                         </button>
                       </div>
                     </div>
