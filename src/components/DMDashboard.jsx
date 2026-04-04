@@ -214,6 +214,7 @@ export default function DMDashboard({ onLogout }) {
       )}
 
       {isForgingEnemy && <EnemyForge onClose={() => setIsForgingEnemy(false)} />}
+      {isForgingSpell && <DMSpellForge onClose={() => setIsForgingSpell(false)} />}
       {isBuildingCharacter && <DMCharacterBuilder onClose={() => setIsBuildingCharacter(false)} />}
       
       {activeManager === 'encounters' && <DMEncounterManager onClose={() => setActiveManager(null)} />}
@@ -275,18 +276,19 @@ export default function DMDashboard({ onLogout }) {
         </div>
 
         {/* COLUMN 2: Command Center & Initiative */}
-        <div className={`${mobileTab === 'initiative' ? 'flex' : 'hidden'} lg:flex bg-slate-950 flex-col p-4 md:p-6 overflow-hidden lg:border-r-2 border-slate-900 h-full w-full`}>
-          <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 shrink-0">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/20 via-transparent to-transparent pointer-events-none"></div>
-            <Map className="w-12 h-12 text-emerald-500/50 mb-3" />
-            <h2 className="text-xl font-black text-white uppercase tracking-widest mb-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">War Table</h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-5 max-w-sm">Launch the dedicated battlemap interface in a new window for multi-monitor setups.</p>
-            
+        <div className={`${mobileTab === 'initiative' ? 'flex' : 'hidden'} lg:flex bg-slate-950 flex-col p-3 md:p-4 overflow-hidden lg:border-r-2 border-slate-900 h-full w-full`}>
+          
+          <div className="bg-slate-900 border-[3px] border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-row items-center justify-between relative overflow-hidden mb-3 shrink-0">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_left,_var(--tw-gradient-stops))] from-emerald-900/20 via-transparent to-transparent pointer-events-none"></div>
+            <div className="flex items-center gap-3 relative z-10 pl-2">
+                <Map className="w-6 h-6 text-emerald-500" />
+                <h2 className="text-sm font-black text-white uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] hidden sm:block">War Table</h2>
+            </div>
             <button 
               onClick={launchDMBattleMap} 
-              className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black uppercase tracking-widest px-6 py-3 rounded-xl border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-2"
+              className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 text-[10px] md:text-xs font-black uppercase tracking-widest px-4 py-2 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all flex items-center gap-2 relative z-10"
             >
-              <Map className="w-4 h-4 font-black" /> Open Dual-Monitor Map
+              <Map className="w-3 h-3 md:w-4 md:h-4 font-black" /> Open Map Tab
             </button>
           </div>
 
