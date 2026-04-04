@@ -19,14 +19,22 @@ export default function CombatTab({
   const [showBuffsModal, setShowBuffsModal] = useState(false);
 
   const mechanics = getConditionMechanics(activeConditions);
+  const tempBuffs = char.tempBuffs || [];
 
+  // Parse dynamic speed buffs (e.g. Haste or Longstrider)
+  const speedBuffTotal = tempBuffs.filter(b => b.target === 'Speed').reduce((sum, b) => sum + b.value, 0);
   let displaySpeed = mechanics.speedOverride !== null ? mechanics.speedOverride : Math.floor((char.speed || 30) * mechanics.speedMultiplier);
+  displaySpeed += speedBuffTotal;
+
   const isEncumbered = (char.inventory || '').length > 500 && char.stats?.STR < 15;
   if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
 
-  const tempBuffs = char.tempBuffs || [];
   const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
   const displayAc = (char.ac || 10) + acBuffTotal;
+
+  // Grab attack/damage buffs to display visually on the attacks
+  const attackBuffs = tempBuffs.filter(b => b.target === 'Attack');
+  const damageBuffs = tempBuffs.filter(b => b.target === 'Damage');
 
   const inventoryWeapons = (char.inventory || []).filter(item => item.category === 'Weapon').map(w => {
     let propsStr = '';
@@ -58,14 +66,12 @@ export default function CombatTab({
   const allAttacks = [...(char.attacks || []), ...inventoryWeapons];
   const resources = char.resources || [];
 
-  // Parse Class/Species Features for Combat Keywords
   const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
   const combatFeatures = (char.features || []).filter(f => {
       const text = `${f.name} ${f.desc}`.toLowerCase();
       return combatKeywords.some(kw => text.includes(kw));
   });
 
-  // Action Categorization Logic
   const categorizedActions = {
     action: [],
     bonus: [],
@@ -75,8 +81,6 @@ export default function CombatTab({
 
   allAttacks.forEach(atk => {
     const scaled = parseAndScaleAttack(atk, char.stats, char.level, char.class);
-    
-    // Explicitly preserve the range property since parsing strips it
     const finalAtk = { ...scaled, range: atk.range || scaled.range, isWeapon: true };
 
     if ((scaled.notes || '').toLowerCase().includes('bonus action')) {
@@ -101,7 +105,6 @@ export default function CombatTab({
     }
   });
 
-  // Render helper for Weapons vs Traits inside the Action economy blocks
   const renderActionItem = (item, idx) => {
     if (item.isWeapon) {
       return (
@@ -125,14 +128,19 @@ export default function CombatTab({
           </div>
           
           <div className="flex gap-2 shrink-0">
-            <div className="bg-slate-950 border-2 border-slate-900 rounded-lg p-2.5 flex flex-col items-center min-w-[70px] shadow-inner">
+            <div className={`bg-slate-950 border-2 rounded-lg p-2.5 flex flex-col items-center min-w-[70px] shadow-inner ${attackBuffs.length > 0 ? 'border-emerald-500' : 'border-slate-900'}`}>
               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">To Hit</span>
               <span className={`font-black text-xl leading-none drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${mechanics.attackDisadvantage ? 'text-red-500' : mechanics.attackAdvantage ? 'text-emerald-400' : activeTheme.text}`}>{item.hit}</span>
+              {attackBuffs.length > 0 && <span className="text-[8px] uppercase tracking-widest text-emerald-400 font-black mt-1">+{attackBuffs.reduce((a,b)=>a+b.value,0)} Buff</span>}
             </div>
-            <div className="bg-slate-950 border-2 border-slate-900 rounded-lg p-2.5 flex flex-col items-center min-w-[90px] shadow-inner">
+            <div className={`bg-slate-950 border-2 rounded-lg p-2.5 flex flex-col items-center min-w-[90px] shadow-inner ${damageBuffs.length > 0 ? 'border-emerald-500' : 'border-slate-900'}`}>
               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Damage</span>
               <span className="font-black text-white text-xl leading-none drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">{item.damage}</span>
-              <span className="text-[8px] uppercase tracking-widest text-slate-500 font-black mt-1">{item.type}</span>
+              {damageBuffs.length > 0 ? (
+                <span className="text-[8px] uppercase tracking-widest text-emerald-400 font-black mt-1">+{damageBuffs.reduce((a,b)=>a+b.value,0)} Buff</span>
+              ) : (
+                <span className="text-[8px] uppercase tracking-widest text-slate-500 font-black mt-1">{item.type}</span>
+              )}
             </div>
           </div>
         </div>

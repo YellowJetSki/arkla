@@ -12,12 +12,10 @@ export default function useCharacterVitals(char, charId, isDM) {
   const updateDeathSaves = async (type, value) => { 
     let updates = { [`deathSaves.${type}`]: value };
 
-    // 5e Rule: Stabilizing instantly clears all death save failures.
     if (type === 'successes' && value >= 3) {
       updates['deathSaves.failures'] = 0;
     }
     
-    // 5e Rule: Taking damage (a failure) while stable immediately puts you back into dying state.
     if (type === 'failures' && value > 0 && (char.deathSaves?.successes || 0) >= 3) {
       updates['deathSaves.successes'] = 0;
     }
@@ -48,7 +46,6 @@ export default function useCharacterVitals(char, charId, isDM) {
     
     let updatedConditions = [...(char.conditions || [])];
 
-    // Wake Up Logic: Healed above 0 HP
     if (boundedHp > 0 && char.hp === 0) {
       updates['deathSaves.successes'] = 0;
       updates['deathSaves.failures'] = 0;
@@ -56,7 +53,6 @@ export default function useCharacterVitals(char, charId, isDM) {
       updates.conditions = updatedConditions;
     }
     
-    // Knock Out Logic: Dropped to 0 HP
     if (boundedHp === 0 && char.hp > 0) {
        if (!updatedConditions.includes('Unconscious')) updatedConditions.push('Unconscious');
        if (!updatedConditions.includes('Prone')) updatedConditions.push('Prone');
@@ -89,13 +85,27 @@ export default function useCharacterVitals(char, charId, isDM) {
     let currentTemp = char.tempHp || 0;
     const maxHp = char.maxHp || 10;
     let updatedConditions = [...(char.conditions || [])];
+    let newFailures = char.deathSaves?.failures || 0;
 
     if (amount < 0) {
       const damage = Math.abs(amount);
+      
+      // 5e Rule: Instant Death via Massive Damage
+      const rolloverDamage = damage - currentTemp;
+      if (rolloverDamage >= currentHp + maxHp) {
+          newFailures = 3;
+          alert("☠️ MASSIVE DAMAGE! You took single-hit damage exceeding your max HP. You are instantly killed.");
+      }
+
+      // 5e Rule: Taking Damage while at 0 HP causes a Death Save Failure
+      if (currentHp === 0 && newFailures < 3) {
+          newFailures += 1;
+          alert("⚠️ DAMAGE WHILE DYING! You suffered a Death Save Failure.\n(Note: If this was a melee attack from 5ft, manually add a 2nd failure for the auto-crit).");
+      }
+
       if (currentTemp >= damage) {
         currentTemp -= damage; 
       } else {
-        const rolloverDamage = damage - currentTemp;
         currentTemp = 0;
         currentHp = Math.max(0, currentHp - rolloverDamage);
       }
@@ -105,7 +115,11 @@ export default function useCharacterVitals(char, charId, isDM) {
 
     let updates = { hp: currentHp, tempHp: currentTemp };
     
-    // Wake Up Logic
+    if (newFailures !== (char.deathSaves?.failures || 0)) {
+        updates['deathSaves.failures'] = newFailures;
+        updates['deathSaves.successes'] = 0; 
+    }
+
     if (currentHp > 0 && char.hp === 0) {
       updates['deathSaves.successes'] = 0;
       updates['deathSaves.failures'] = 0;
@@ -113,7 +127,6 @@ export default function useCharacterVitals(char, charId, isDM) {
       updates.conditions = updatedConditions;
     }
 
-    // Knock Out Logic
     if (currentHp === 0 && char.hp > 0) {
        if (!updatedConditions.includes('Unconscious')) updatedConditions.push('Unconscious');
        if (!updatedConditions.includes('Prone')) updatedConditions.push('Prone');
@@ -131,7 +144,6 @@ export default function useCharacterVitals(char, charId, isDM) {
       if (updates.conditions) mapUpdates[`tokens.${charId}.conditions`] = updates.conditions;
 
       batch.update(doc(db, 'campaign', 'battlemap'), mapUpdates);
-      
       await batch.commit();
     } catch (err) {
       console.error("HP Update Failed:", err);
@@ -157,7 +169,6 @@ export default function useCharacterVitals(char, charId, isDM) {
   const activeConditions = char.conditions || [];
   const isUnconscious = (char.hp || 0) <= 0;
   
-  // Death State Derivations
   const isDead = (char.deathSaves?.failures || 0) >= 3;
   const isStable = (char.deathSaves?.successes || 0) >= 3;
 

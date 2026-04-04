@@ -40,15 +40,21 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
   const mechanics = getConditionMechanics(activeConditions);
   
   const tempBuffs = char.tempBuffs || [];
+  
+  // Calculate Dynamic Buffs
   const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
   const displayAc = (char.ac || 10) + acBuffTotal;
+
+  const initBuffTotal = tempBuffs.filter(b => b.target === 'Initiative').reduce((sum, b) => sum + b.value, 0);
+  let baseInit = char.initiative !== '--' ? parseInt(char.initiative, 10) : getModifier(char.stats?.DEX || 10);
+  if (isNaN(baseInit)) baseInit = getModifier(char.stats?.DEX || 10);
+  const displayInit = baseInit + initBuffTotal;
+  const initScore = displayInit >= 0 ? `+${displayInit}` : `${displayInit}`;
 
   let displaySpeed = mechanics.speedOverride !== null ? mechanics.speedOverride : Math.floor((char.speed || 30) * mechanics.speedMultiplier);
   const isEncumbered = (char.inventory || '').length > 500 && char.stats?.STR < 15;
   if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
   
-  const initScore = char.initiative !== '--' ? char.initiative : (getModifier(char.stats?.DEX || 10) >= 0 ? `+${getModifier(char.stats?.DEX || 10)}` : getModifier(char.stats?.DEX || 10));
-
   return (
     <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 relative flex flex-col shadow-[6px_6px_0px_rgba(0,0,0,1)]">
       
@@ -102,7 +108,7 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
           </div>
         </div>
 
-        {/* Graphic Novel Badges - Overlapping the bottom boundary cleanly */}
+        {/* Graphic Novel Badges */}
         <div className="absolute -bottom-6 right-3 flex gap-2 pointer-events-auto z-30">
           
           <div className={`w-12 h-14 rounded-lg border-[3px] border-slate-950 flex flex-col items-center justify-start shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden pt-1 ${acBuffTotal > 0 ? 'bg-emerald-500' : acBuffTotal < 0 ? 'bg-red-500' : 'bg-slate-800'}`}>
@@ -129,7 +135,7 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
             </div>
           </div>
 
-          <div className="w-12 h-14 rounded-lg bg-slate-800 border-[3px] border-slate-950 flex flex-col items-center justify-start shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden pt-1">
+          <div className={`w-12 h-14 rounded-lg border-[3px] border-slate-950 flex flex-col items-center justify-start shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden pt-1 ${initBuffTotal !== 0 ? 'bg-amber-600' : 'bg-slate-800'}`}>
             <Zap className="w-3 h-3 text-white/30 absolute top-1" />
             {isEditMode ? (
               <input type="text" defaultValue={char.initiative !== '--' ? char.initiative : ''} placeholder="Auto" onBlur={(e) => updateField('initiative', e.target.value || '--')} className="w-8 mt-1.5 bg-transparent text-center text-xs font-black text-white focus:outline-none z-10 relative" />
@@ -147,7 +153,7 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
       <div className="p-3 bg-slate-800 space-y-3 pt-8 rounded-b-2xl relative z-0">
         
         {/* Giant Graphic HP Bar */}
-        <div className="relative bg-slate-950 border-[3px] border-slate-900 rounded-xl overflow-hidden shadow-[inset_0_4px_10px_rgba(0,0,0,0.5)] flex items-center justify-between p-2 h-14">
+        <div className="relative bg-slate-950 border-[3px] border-slate-900 rounded-xl overflow-hidden shadow-[inset_0_4px_10px_rgba(0,0,0,0.5)] flex items-center justify-between p-2 min-h-[3.5rem]">
           <div className={`absolute left-0 top-0 bottom-0 ${hpColor} transition-all duration-500 z-0`} style={{ width: `${hpPercent}%` }}></div>
           
           {(char.tempHp > 0) && (
@@ -158,37 +164,44 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
           )}
 
           {isUnconscious ? (
-            <div className="relative z-20 flex items-center justify-between px-4 w-full">
+            <div className="relative z-20 flex items-center justify-between px-2 sm:px-4 w-full">
               
               {isDead ? (
-                <div className="w-full flex items-center justify-center">
+                <div className="w-full flex items-center justify-between">
                    <span className="text-xl font-black text-red-500 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">Deceased</span>
+                   <button onClick={() => { const amt = parseInt(window.prompt("Revive HP:"), 10); if(amt > 0) adjustHp(amt); }} className="bg-emerald-500 text-slate-950 px-3 py-1.5 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-px active:shadow-none font-black text-[10px] uppercase border-[3px] border-slate-950 hover:bg-emerald-400">Revive</button>
                 </div>
               ) : isStable ? (
                 <div className="w-full flex items-center justify-between">
                    <span className="text-xl font-black text-emerald-500 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pl-4">Stable</span>
-                   <div className="flex flex-col items-center">
-                    <span className="text-[10px] font-black text-slate-950 bg-red-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">FAIL (Damage)</span>
-                    <div className="flex gap-1.5">
-                      {[1, 2, 3].map(num => <button key={`fail-${num}`} onClick={() => updateDeathSaves('failures', (char.deathSaves?.failures || 0) === num ? num - 1 : num)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.failures || 0) >= num ? 'bg-red-600 border-red-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'}`} />)}
+                   <div className="flex items-center gap-3">
+                    <button onClick={() => { const amt = parseInt(window.prompt("Heal HP:"), 10); if(amt > 0) adjustHp(amt); }} className="bg-emerald-500 text-slate-950 px-3 py-1.5 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-px active:shadow-none font-black text-[10px] uppercase border-[3px] border-slate-950 hover:bg-emerald-400 shrink-0">Heal</button>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] font-black text-slate-950 bg-red-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">FAIL (Damage)</span>
+                      <div className="flex gap-1.5">
+                        {[1, 2, 3].map(num => <button key={`fail-${num}`} onClick={() => updateDeathSaves('failures', (char.deathSaves?.failures || 0) === num ? num - 1 : num)} className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.failures || 0) >= num ? 'bg-red-600 border-red-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'}`} />)}
+                      </div>
                     </div>
-                  </div>
+                   </div>
                 </div>
               ) : (
-                <>
+                <div className="flex items-center justify-between w-full">
                   <div className="flex flex-col items-center">
                     <span className="text-[10px] font-black text-slate-950 bg-emerald-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">PASS</span>
                     <div className="flex gap-1.5">
-                      {[1, 2, 3].map(num => <button key={`pass-${num}`} disabled={isDead} onClick={() => updateDeathSaves('successes', (char.deathSaves?.successes || 0) === num ? num - 1 : num)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.successes || 0) >= num ? 'bg-emerald-500 border-emerald-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'} disabled:cursor-not-allowed`} />)}
+                      {[1, 2, 3].map(num => <button key={`pass-${num}`} onClick={() => updateDeathSaves('successes', (char.deathSaves?.successes || 0) === num ? num - 1 : num)} className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.successes || 0) >= num ? 'bg-emerald-500 border-emerald-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'}`} />)}
                     </div>
                   </div>
+                  
+                  <button onClick={() => { const amt = parseInt(window.prompt("Heal HP:"), 10); if(amt > 0) adjustHp(amt); }} className="bg-emerald-500 text-slate-950 px-2 py-1.5 sm:px-3 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-px active:shadow-none font-black text-[10px] uppercase border-[3px] border-slate-950 hover:bg-emerald-400 shrink-0">Heal</button>
+                  
                   <div className="flex flex-col items-center">
                     <span className="text-[10px] font-black text-slate-950 bg-red-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">FAIL</span>
                     <div className="flex gap-1.5">
-                      {[1, 2, 3].map(num => <button key={`fail-${num}`} disabled={isDead} onClick={() => updateDeathSaves('failures', (char.deathSaves?.failures || 0) === num ? num - 1 : num)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.failures || 0) >= num ? 'bg-red-600 border-red-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'} disabled:cursor-not-allowed`} />)}
+                      {[1, 2, 3].map(num => <button key={`fail-${num}`} onClick={() => updateDeathSaves('failures', (char.deathSaves?.failures || 0) === num ? num - 1 : num)} className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.failures || 0) >= num ? 'bg-red-600 border-red-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'}`} />)}
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
           ) : (
@@ -216,17 +229,17 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
 
         {/* Action Row */}
         <div className="flex gap-2">
-          <button onClick={handleSpendHitDie} className="flex-1 bg-slate-950 border-2 border-slate-900 rounded-lg flex items-center justify-center flex-col px-2 py-1.5 transition-colors cursor-pointer group shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]">
+          <button onClick={handleSpendHitDie} disabled={isDead} className="flex-1 bg-slate-950 border-2 border-slate-900 rounded-lg flex items-center justify-center flex-col px-2 py-1.5 transition-colors cursor-pointer group shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] disabled:opacity-50 disabled:cursor-not-allowed">
             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5 group-hover:text-slate-300">Hit Dice</span>
             <span className="text-sm font-black text-emerald-400">{char.hitDice?.current ?? (char.level || 1)}/{char.hitDice?.max ?? (char.level || 1)}</span>
           </button>
 
-          <button onClick={onOpenShortRest} className="flex-1 bg-slate-950 text-slate-300 rounded-lg border-2 border-slate-900 flex flex-col items-center justify-center transition-colors py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] hover:bg-slate-900">
+          <button onClick={onOpenShortRest} disabled={isDead} className="flex-1 bg-slate-950 text-slate-300 rounded-lg border-2 border-slate-900 flex flex-col items-center justify-center transition-colors py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed">
             <Tent className="w-4 h-4 text-emerald-400 mb-0.5" />
             <span className="text-[9px] font-black uppercase tracking-widest">Short</span>
           </button>
           
-          <button onClick={onOpenLongRest} className={`flex-1 bg-slate-950 ${activeTheme.text} rounded-lg border-2 border-slate-900 flex flex-col items-center justify-center transition-colors py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] hover:bg-slate-900`}>
+          <button onClick={onOpenLongRest} disabled={isDead} className={`flex-1 bg-slate-950 ${activeTheme.text} rounded-lg border-2 border-slate-900 flex flex-col items-center justify-center transition-colors py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed`}>
             <Moon className="w-4 h-4 mb-0.5" />
             <span className="text-[9px] font-black uppercase tracking-widest">Long</span>
           </button>
