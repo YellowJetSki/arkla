@@ -74,8 +74,8 @@ const THEMES = {
 export default function CharacterCard({ currentUser, onLogout, isDM = false, onClose = null }) {
   const CardWrapper = isDM ? 
     ({ children }) => createPortal(
-      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
-        <div className="bg-slate-900 border-[3px] border-indigo-500 rounded-3xl w-full max-w-5xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500 overflow-y-auto custom-scrollbar relative">
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
+        <div className="bg-slate-900 border-[3px] border-indigo-500 rounded-3xl w-full max-w-[98vw] xl:max-w-7xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col h-[95dvh] animate-in zoom-in-95 duration-500 relative overflow-hidden">
           
           <button 
             onClick={onClose} 
@@ -349,7 +349,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
       )}
 
       {/* Main Container - Padded at bottom to account for fixed Mobile Nav */}
-      <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} pb-28 md:pb-12 relative h-full flex flex-col md:flex-row`}>
+      <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} ${isDM ? 'h-full overflow-hidden rounded-3xl' : 'pb-28 md:pb-12 relative h-full'} flex flex-col md:flex-row w-full`}>
         
         <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} inputPlaceholder={dialog.inputPlaceholder} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
@@ -376,7 +376,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         <ImageModal isOpen={!!activeLoot} url={activeLoot?.url} alt={activeLoot?.name} onClose={() => setActiveLoot(null)} />
 
         {/* LEFT ANCHOR PANEL (Desktop) / TOP HEADER (Mobile) */}
-        <div className={`w-full md:w-[350px] lg:w-[400px] shrink-0 ${isDM ? 'p-4 md:p-6' : 'p-3 md:p-6'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} md:sticky md:top-0 md:h-screen md:overflow-y-auto custom-scrollbar`}>
+        <div className={`w-full md:w-[350px] lg:w-[400px] shrink-0 ${isDM ? 'p-4 md:p-6 border-r-[3px] border-slate-950 bg-slate-900/50 h-full overflow-y-auto' : 'p-3 md:p-6 md:sticky md:top-0 md:h-screen md:overflow-y-auto'} transition-all duration-700 custom-scrollbar z-20`}>
           
           {isDM ? (
             <div className="flex justify-between items-center mb-4 border-b-2 border-slate-950 pb-4 pr-8">
@@ -449,150 +449,153 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         </div>
 
         {/* RIGHT DYNAMIC PANEL (Desktop) / MAIN CONTENT (Mobile) */}
-        <div className={`flex-1 ${isDM ? 'p-4 md:p-6' : 'p-3 md:p-6 pt-0 md:pt-6'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} overflow-x-hidden`}>
+        <div className={`flex-1 flex flex-col min-w-0 ${isDM ? 'bg-slate-900 h-full overflow-hidden' : 'pt-0 md:pt-6'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} overflow-x-hidden`}>
           
-          <div className="space-y-6 animate-in fade-in duration-500">
-            {activeTab === 'combat' && (
-              <CombatTab 
-                char={char} charId={currentUser.charId} 
-                isDM={isDM} isEditMode={isEditMode} activeTheme={activeTheme} 
-                combatWarnings={combatWarnings} activeConditions={activeConditions}
-                handleAddCondition={(e) => handleAddCondition(e.target.value)}
-                handleRemoveCondition={handleRemoveCondition} handleResourceToggle={handleResourceToggle} showDialog={showDialog}
-              />
-            )}
+          {/* FLOATING APP-STYLE NAV BAR */}
+          <div className={`${isDM ? 'shrink-0 bg-slate-950 border-b-[3px] border-slate-900 p-2 sm:p-3 z-40 w-full' : 'fixed bottom-0 left-0 w-full z-40 bg-slate-950 border-t-[3px] border-slate-900 shadow-[0_-4px_20px_rgba(0,0,0,0.8)] pb-safe md:sticky md:bottom-auto md:top-0 md:w-auto md:bg-transparent md:border-none md:shadow-none md:z-30 md:-mx-8 md:px-8 md:mb-6'}`}>
+              <div className={`bg-slate-900 md:bg-slate-900/80 p-2 md:rounded-xl md:border-2 md:border-slate-950 md:shadow-[6px_6px_0px_rgba(0,0,0,1)] flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-2 snap-x snap-mandatory md:backdrop-blur-md`}>
+                {availableTabs.map(tab => (
+                  <button 
+                    key={tab.id} id={`tab-btn-${tab.id}`} onClick={() => setActiveTab(tab.id)} 
+                    className={`snap-center shrink-0 min-w-fit px-4 flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 py-2 md:py-2.5 rounded-lg transition-all relative ${activeTab === tab.id ? `${activeTheme.bg} text-white border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]` : 'bg-slate-950 border-2 border-slate-900 text-slate-400 hover:text-slate-200 shadow-[2px_2px_0px_rgba(0,0,0,0.5)]'}`}
+                  >
+                    <tab.icon className={`w-4 h-4 md:w-4 md:h-4 ${activeTab === tab.id ? 'animate-bounce' : ''}`} /> 
+                    <span className={`text-[9px] md:text-xs font-black uppercase tracking-widest ${activeTab === tab.id ? 'block' : 'hidden sm:block'}`}>{tab.label}</span>
+                    {tab.id === 'partyLoot' && partyLoot.length > 0 && activeTab !== 'partyLoot' && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border border-slate-950"></span>}
+                  </button>
+                ))}
+              </div>
+          </div>
 
-            {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} showDialog={showDialog} />}
+          <div className={`flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar ${isDM ? 'p-4 md:p-6' : 'p-3 md:p-6 pb-32 md:pb-12 pt-4 md:pt-0'}`}>
+            <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto">
+              {activeTab === 'combat' && (
+                <CombatTab 
+                  char={char} charId={currentUser.charId} 
+                  isDM={isDM} isEditMode={isEditMode} activeTheme={activeTheme} 
+                  combatWarnings={combatWarnings} activeConditions={activeConditions}
+                  handleAddCondition={(e) => handleAddCondition(e.target.value)}
+                  handleRemoveCondition={handleRemoveCondition} handleResourceToggle={handleResourceToggle} showDialog={showDialog}
+                />
+              )}
 
-            {activeTab === 'features' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center px-1 border-b-2 border-slate-950 pb-2">
-                  <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
-                  {(isDM || isEditMode) && (
-                    <button onClick={() => setIsForgingFeat(!isForgingFeat)} className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingFeat ? 'bg-amber-600 border-amber-950 text-slate-950' : `bg-slate-900 border-slate-950 ${activeTheme.text} hover:bg-slate-800`}`}>
-                      <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Close' : 'Forge'}
-                    </button>
+              {activeTab === 'spells' && <Spellbook char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} showDialog={showDialog} />}
+
+              {activeTab === 'features' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center px-1 border-b-2 border-slate-950 pb-2">
+                    <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
+                    {(isDM || isEditMode) && (
+                      <button onClick={() => setIsForgingFeat(!isForgingFeat)} className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingFeat ? 'bg-amber-600 border-amber-950 text-slate-950' : `bg-slate-900 border-slate-950 ${activeTheme.text} hover:bg-slate-800`}`}>
+                        <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Close' : 'Forge'}
+                      </button>
+                    )}
+                  </div>
+
+                  {(isDM || isEditMode) && isForgingFeat && (
+                    <form onSubmit={handleForgeCustomFeat} className="bg-slate-900 border-2 border-indigo-950 p-5 rounded-2xl mb-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 space-y-4">
+                      <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b-2 border-indigo-950/50 pb-2"><Hammer className="w-4 h-4" /> Feature Forge</h4>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div className="relative">
+                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> SRD Search</label>
+                          <input type="text" required value={customFeat.name} onChange={handleFeatNameChange} className="w-full bg-slate-950 border-2 border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 font-bold" placeholder="e.g. Action Surge" />
+                          
+                          {showFeatDropdown && filteredFeats.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border-2 border-slate-950 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] z-50">
+                              {filteredFeats.map(item => (
+                                <div key={item.index} onClick={() => handleSelectSrdFeat(item)} className="px-3 py-2.5 text-sm font-bold text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors">
+                                  {item.name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900">
+                          <label className="flex items-center gap-2 cursor-pointer mb-3">
+                            <input type="checkbox" checked={customFeat.hasTracker} onChange={(e) => setCustomFeat({...customFeat, hasTracker: e.target.checked})} className="w-4 h-4 rounded border-slate-600 text-amber-500 bg-slate-800 focus:ring-amber-500" />
+                            <span className="text-sm font-black text-slate-300 uppercase tracking-widest">Needs Tracker?</span>
+                          </label>
+                          
+                          {customFeat.hasTracker && (
+                            <div className="flex gap-4 animate-in fade-in">
+                              <div className="flex-1">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Max Slots</label>
+                                <input type="number" value={customFeat.trackerMax} onChange={(e) => setCustomFeat({...customFeat, trackerMax: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Recharges On</label>
+                                <select value={customFeat.trackerRecharge} onChange={(e) => setCustomFeat({...customFeat, trackerRecharge: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
+                                  <option value="short">Short Rest</option>
+                                  <option value="long">Long Rest</option>
+                                  <option value="none">Never</option>
+                                </select>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description & Effects</label>
+                          <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border-2 border-slate-800 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 resize-y font-medium leading-relaxed" placeholder="Describe the mechanics..." />
+                        </div>
+                      </div>
+                      <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl border-2 border-indigo-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center gap-2 mt-4">
+                        <Plus className="w-4 h-4" /> Inject Feature
+                      </button>
+                    </form>
+                  )}
+
+                  {(!char.features || char.features.length === 0) ? (
+                     <div className="text-center p-8 bg-slate-900 border-[3px] border-slate-950 border-dashed rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                        <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">No features assigned yet.</p>
+                     </div>
+                  ) : (
+                     <div className="space-y-4">
+                       {char.features.map((feat, i) => (
+                         <CollapsibleSection 
+                           key={`feat-${i}`} 
+                           title={
+                             <div className="flex items-center gap-2 w-full justify-between pr-2">
+                               <span className="font-black uppercase tracking-widest">{feat.name}</span>
+                               {(isDM || isEditMode) && (
+                                 <div className="flex items-center gap-1">
+                                   <button onClick={async (e) => { 
+                                     e.stopPropagation(); 
+                                     const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isDefensive: !f.isDefensive } : f);
+                                     await updateDoc(doc(db, 'characters', currentUser.charId), { features: updatedFeatures });
+                                   }} className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${feat.isDefensive ? 'bg-indigo-900 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-indigo-300'}`} title={feat.isDefensive ? "Tagged as Defensive" : "Tag as Defensive"}>
+                                     <ShieldPlus className="w-3.5 h-3.5" />
+                                   </button>
+                                   <button onClick={(e) => { e.stopPropagation(); removeFeature(feat); }} className="text-slate-500 hover:text-red-400 bg-slate-950 border-2 border-slate-800 p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]" title="Delete Feature">
+                                     <Trash2 className="w-3.5 h-3.5" />
+                                   </button>
+                                 </div>
+                               )}
+                             </div>
+                           } 
+                           defaultOpen={i === 0}
+                         >
+                           <p className="text-slate-300 font-medium text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
+                         </CollapsibleSection>
+                       ))}
+                     </div>
                   )}
                 </div>
+              )}
 
-                {(isDM || isEditMode) && isForgingFeat && (
-                  <form onSubmit={handleForgeCustomFeat} className="bg-slate-900 border-2 border-indigo-950 p-5 rounded-2xl mb-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 space-y-4">
-                    <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b-2 border-indigo-950/50 pb-2"><Hammer className="w-4 h-4" /> Feature Forge</h4>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="relative">
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> SRD Search</label>
-                        <input type="text" required value={customFeat.name} onChange={handleFeatNameChange} className="w-full bg-slate-950 border-2 border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 font-bold" placeholder="e.g. Action Surge" />
-                        
-                        {showFeatDropdown && filteredFeats.length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto custom-scrollbar bg-slate-900 border-2 border-slate-950 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] z-50">
-                            {filteredFeats.map(item => (
-                              <div key={item.index} onClick={() => handleSelectSrdFeat(item)} className="px-3 py-2.5 text-sm font-bold text-slate-300 hover:bg-indigo-600 hover:text-white cursor-pointer border-b border-slate-800 last:border-0 transition-colors">
-                                {item.name}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900">
-                        <label className="flex items-center gap-2 cursor-pointer mb-3">
-                          <input type="checkbox" checked={customFeat.hasTracker} onChange={(e) => setCustomFeat({...customFeat, hasTracker: e.target.checked})} className="w-4 h-4 rounded border-slate-600 text-amber-500 bg-slate-800 focus:ring-amber-500" />
-                          <span className="text-sm font-black text-slate-300 uppercase tracking-widest">Needs Tracker?</span>
-                        </label>
-                        
-                        {customFeat.hasTracker && (
-                          <div className="flex gap-4 animate-in fade-in">
-                            <div className="flex-1">
-                              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Max Slots</label>
-                              <input type="number" value={customFeat.trackerMax} onChange={(e) => setCustomFeat({...customFeat, trackerMax: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
-                            </div>
-                            <div className="flex-1">
-                              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Recharges On</label>
-                              <select value={customFeat.trackerRecharge} onChange={(e) => setCustomFeat({...customFeat, trackerRecharge: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
-                                <option value="short">Short Rest</option>
-                                <option value="long">Long Rest</option>
-                                <option value="none">Never</option>
-                              </select>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description & Effects</label>
-                        <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border-2 border-slate-800 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 resize-y font-medium leading-relaxed" placeholder="Describe the mechanics..." />
-                      </div>
-                    </div>
-                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl border-2 border-indigo-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] flex items-center justify-center gap-2 mt-4 transition-all">
-                      <Plus className="w-4 h-4" /> Inject Feature
-                    </button>
-                  </form>
-                )}
-
-                {(!char.features || char.features.length === 0) ? (
-                   <div className="text-center p-8 bg-slate-900 border-[3px] border-slate-950 border-dashed rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-                      <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">No features assigned yet.</p>
-                   </div>
-                ) : (
-                   <div className="space-y-4">
-                     {char.features.map((feat, i) => (
-                       <CollapsibleSection 
-                         key={`feat-${i}`} 
-                         title={
-                           <div className="flex items-center gap-2 w-full justify-between pr-2">
-                             <span className="font-black uppercase tracking-widest">{feat.name}</span>
-                             {(isDM || isEditMode) && (
-                               <div className="flex items-center gap-1">
-                                 <button onClick={async (e) => { 
-                                   e.stopPropagation(); 
-                                   const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isDefensive: !f.isDefensive } : f);
-                                   await updateDoc(doc(db, 'characters', currentUser.charId), { features: updatedFeatures });
-                                 }} className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${feat.isDefensive ? 'bg-indigo-900 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-indigo-300'}`} title={feat.isDefensive ? "Tagged as Defensive" : "Tag as Defensive"}>
-                                   <ShieldPlus className="w-3.5 h-3.5" />
-                                 </button>
-                                 <button onClick={(e) => { e.stopPropagation(); removeFeature(feat); }} className="text-slate-500 hover:text-red-400 bg-slate-950 border-2 border-slate-800 p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]" title="Delete Feature">
-                                   <Trash2 className="w-3.5 h-3.5" />
-                                 </button>
-                               </div>
-                             )}
-                           </div>
-                         } 
-                         defaultOpen={i === 0}
-                       >
-                         <p className="text-slate-300 font-medium text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
-                       </CollapsibleSection>
-                     ))}
-                   </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'companion' && <CompanionTab char={char} activeTheme={activeTheme} />}
-            {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
-            {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} charId={currentUser.charId} />}
-            {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} />}
-            {activeTab === 'journal' && <JournalTab char={char} updateField={updateField} activeTheme={activeTheme} />}
-            {activeTab === 'settings' && <SettingsTab char={char} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
-            
+              {activeTab === 'companion' && <CompanionTab char={char} activeTheme={activeTheme} />}
+              {activeTab === 'inventory' && <InventoryTab char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} updateField={updateField} activeTheme={activeTheme} showDialog={showDialog} />}
+              {activeTab === 'partyLoot' && <PartyLootTab partyLoot={partyLoot} setActiveLoot={setActiveLoot} showDialog={showDialog} charId={currentUser.charId} />}
+              {activeTab === 'bio' && <BioTab char={char} charId={currentUser.charId} isDM={isDM && !isEditMode} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} />}
+              {activeTab === 'journal' && <JournalTab char={char} updateField={updateField} activeTheme={activeTheme} />}
+              {activeTab === 'settings' && <SettingsTab char={char} updateField={updateField} activeTheme={activeTheme} THEMES={THEMES} restoreCharacter={restoreCharacter} />}
+            </div>
           </div>
         </div>
 
-        {/* FLOATING APP-STYLE NAV BAR (Sticky to bottom on mobile) */}
-        <div className={`fixed bottom-0 left-0 w-full z-40 bg-slate-950 border-t-[3px] border-slate-900 shadow-[0_-4px_20px_rgba(0,0,0,0.8)] pb-safe md:sticky md:bottom-auto md:top-0 md:w-auto md:bg-transparent md:border-none md:shadow-none md:z-30 md:-mx-8 md:px-8 md:mb-6`}>
-            <div className={`bg-slate-900 md:bg-slate-900/80 p-2 md:rounded-xl md:border-2 md:border-slate-950 md:shadow-[6px_6px_0px_rgba(0,0,0,1)] flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-2 snap-x snap-mandatory md:backdrop-blur-md`}>
-              {availableTabs.map(tab => (
-                <button 
-                  key={tab.id} id={`tab-btn-${tab.id}`} onClick={() => setActiveTab(tab.id)} 
-                  className={`snap-center shrink-0 min-w-fit px-4 flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 py-2 md:py-2.5 rounded-lg transition-all relative ${activeTab === tab.id ? `${activeTheme.bg} text-white border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]` : 'bg-slate-950 border-2 border-slate-900 text-slate-400 hover:text-slate-200 shadow-[2px_2px_0px_rgba(0,0,0,0.5)]'}`}
-                >
-                  <tab.icon className={`w-4 h-4 md:w-4 md:h-4 ${activeTab === tab.id ? 'animate-bounce' : ''}`} /> 
-                  <span className={`text-[9px] md:text-xs font-black uppercase tracking-widest ${activeTab === tab.id ? 'block' : 'hidden sm:block'}`}>{tab.label}</span>
-                  {tab.id === 'partyLoot' && partyLoot.length > 0 && activeTab !== 'partyLoot' && <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border border-slate-950"></span>}
-                </button>
-              ))}
-            </div>
-        </div>
-
+        {/* Outer Modals rendered at root container depth */}
+        {showBuilder && <DMCharacterBuilder initialData={char} charId={currentUser.charId} onClose={() => setShowBuilder(false)} />}
         {isLevelUpOpen && <LevelUpModal char={char} charId={currentUser.charId} onClose={() => setIsLevelUpOpen(false)} />}
         {isShortRestOpen && <ShortRestModal char={char} charId={currentUser.charId} onClose={() => setIsShortRestOpen(false)} />}
         {isLongRestOpen && <LongRestModal char={char} charId={currentUser.charId} onClose={() => setIsLongRestOpen(false)} />}

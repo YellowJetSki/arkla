@@ -49,7 +49,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
 
-  // RE-HYDRATION LOGIC (If editing an existing character)
+  // RE-HYDRATION LOGIC
   useEffect(() => {
     if (initialData) {
       setFormData({
@@ -65,7 +65,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
 
       if (initialData.proficiencies) setCustomProfs(initialData.proficiencies);
       if (initialData.features) {
-        // Split features back into traits and class features loosely based on naming
         setSpeciesTraits(initialData.features.filter(f => !f.name.includes('Class Feature')));
         setClassFeatures(initialData.features.filter(f => f.name.includes('Class Feature')));
       }
@@ -206,7 +205,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
       const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
       const totalMaxHp = levelOneHp + higherLevelHp;
 
-      // Merge existing spell slots with new meta if editing
       const slots = initialData?.spellSlots || {};
       if (spellcastingMeta) {
          Object.keys(spellcastingMeta).forEach(key => {
@@ -240,10 +238,8 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
       };
 
       if (initialData) {
-        // Safe Update (preserves current HP, resources, map location, etc)
         await updateDoc(doc(db, 'characters', finalCharId), payload);
       } else {
-        // Full Create
         const newChar = {
           ...payload,
           exp: 0, hp: totalMaxHp, tempHp: 0, initiative: '--',
@@ -272,6 +268,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/10 blur-[150px] rounded-full pointer-events-none -z-10"></div>
 
         <div className="bg-slate-900 border border-indigo-500/50 rounded-3xl w-full max-w-3xl shadow-[0_0_60px_rgba(99,102,241,0.2)] flex flex-col h-[90dvh] relative overflow-hidden animate-in zoom-in-95 duration-300">
+          
           <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 relative z-10 shrink-0">
             <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest">
                 {initialData ? <><Edit3 className="w-5 h-5 text-amber-400" /> Edit Character</> : <><UserPlus className="w-5 h-5 text-indigo-400" /> Construct Character</>}
@@ -279,8 +276,16 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
             <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-800 p-2 rounded-xl border border-slate-700"><X className="w-4 h-4" /></button>
           </div>
 
-          <div className="flex h-1.5 bg-slate-800 shrink-0">
-             <div className="h-full bg-indigo-500 transition-all duration-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]" style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}></div>
+          <div className="flex bg-slate-950 border-b-[3px] border-slate-900 shrink-0 overflow-x-auto custom-scrollbar p-3 gap-2">
+            {steps.map((step, idx) => (
+              <button 
+                key={step}
+                onClick={() => setStepIndex(idx)}
+                className={`px-4 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${stepIndex === idx ? 'bg-indigo-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 border-slate-950 hover:bg-slate-800 hover:text-white'}`}
+              >
+                {step}
+              </button>
+            ))}
           </div>
 
           <div className="p-6 overflow-y-auto custom-scrollbar flex-1">

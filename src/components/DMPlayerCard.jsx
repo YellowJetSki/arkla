@@ -29,6 +29,12 @@ export default function DMPlayerCard({ charId }) {
     await batch.commit().catch(e => console.error("Map sync error:", e));
   };
 
+  const updateXp = async (amount) => {
+    if (!char) return;
+    const newXp = Math.max(0, (char.exp || 0) + amount);
+    await updateDoc(doc(db, 'characters', charId), { exp: newXp });
+  };
+
   const handleResourceToggle = async (resourceIndex, newCurrentValue) => {
     if (!char || !char.resources) return;
     const updatedResources = [...char.resources];
@@ -114,8 +120,8 @@ export default function DMPlayerCard({ charId }) {
         </div>
       </div>
 
-      {/* Vitals Grid */}
-      <div className="grid grid-cols-4 gap-3 mb-4 relative z-10">
+      {/* Vitals Grid - Core Stats */}
+      <div className="grid grid-cols-4 gap-3 mb-3 relative z-10">
         <div className="col-span-2 bg-slate-950 border-2 border-slate-900 rounded-xl p-2 flex flex-col items-center justify-center shadow-inner relative overflow-hidden">
           <div className="absolute bottom-0 left-0 h-1.5 transition-all duration-500 w-full bg-slate-800">
              <div className={`h-full ${hpColor} transition-all duration-500`} style={{ width: `${hpPercentage}%` }}></div>
@@ -138,6 +144,16 @@ export default function DMPlayerCard({ charId }) {
         <div className="bg-slate-950 border-2 border-slate-900 rounded-xl p-2 flex flex-col items-center justify-center shadow-inner">
           <span className="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Target className="w-3 h-3"/> PP</span>
           <span className="text-lg font-black text-white leading-none">{passivePerception}</span>
+        </div>
+      </div>
+
+      {/* Experience Row */}
+      <div className="bg-slate-950 border-2 border-slate-900 rounded-xl p-2 flex items-center justify-between shadow-inner relative z-10 mb-4">
+        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none pl-2 flex items-center gap-1.5"><Sparkles className="w-3 h-3"/> Experience</span>
+        <div className="flex items-center gap-2">
+          <button onClick={() => updateXp(-10)} className="text-slate-400 hover:text-indigo-400 bg-slate-800 rounded p-1 border border-slate-700 active:translate-y-[1px]"><Minus className="w-3 h-3"/></button>
+          <span className="text-sm font-black text-white leading-none w-12 text-center">{char.exp || 0}</span>
+          <button onClick={() => updateXp(10)} className="text-slate-400 hover:text-indigo-400 bg-slate-800 rounded p-1 border border-slate-700 active:translate-y-[1px]"><Plus className="w-3 h-3"/></button>
         </div>
       </div>
 
