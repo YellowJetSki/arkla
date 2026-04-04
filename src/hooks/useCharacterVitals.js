@@ -10,7 +10,19 @@ export default function useCharacterVitals(char, charId, isDM) {
   };
 
   const updateDeathSaves = async (type, value) => { 
-    await updateField(`deathSaves.${type}`, value); 
+    let updates = { [`deathSaves.${type}`]: value };
+
+    // 5e Rule: Stabilizing instantly clears all death save failures.
+    if (type === 'successes' && value >= 3) {
+      updates['deathSaves.failures'] = 0;
+    }
+    
+    // 5e Rule: Taking damage (a failure) while stable immediately puts you back into dying state.
+    if (type === 'failures' && value > 0 && (char.deathSaves?.successes || 0) >= 3) {
+      updates['deathSaves.successes'] = 0;
+    }
+
+    await updateDoc(doc(db, 'characters', charId), updates);
   };
 
   const toggleInspiration = async (e) => { 
@@ -33,19 +45,31 @@ export default function useCharacterVitals(char, charId, isDM) {
     const boundedHp = Math.max(0, Math.min(parseInt(newHpVal, 10) || 0, char.maxHp || 10));
     let updates = { hp: boundedHp };
     if (newTempVal !== null) updates.tempHp = Math.max(0, parseInt(newTempVal, 10) || 0);
+    
+    let updatedConditions = [...(char.conditions || [])];
 
+    // Wake Up Logic: Healed above 0 HP
     if (boundedHp > 0 && char.hp === 0) {
       updates['deathSaves.successes'] = 0;
       updates['deathSaves.failures'] = 0;
+      updatedConditions = updatedConditions.filter(c => c !== 'Unconscious');
+      updates.conditions = updatedConditions;
+    }
+    
+    // Knock Out Logic: Dropped to 0 HP
+    if (boundedHp === 0 && char.hp > 0) {
+       if (!updatedConditions.includes('Unconscious')) updatedConditions.push('Unconscious');
+       if (!updatedConditions.includes('Prone')) updatedConditions.push('Prone');
+       updates.conditions = updatedConditions;
     }
     
     try {
-      // INSTANT DUAL-SYNC
       const batch = writeBatch(db);
       batch.update(doc(db, 'characters', charId), updates);
       
       const mapUpdates = { [`tokens.${charId}.hp`]: boundedHp };
       if (newTempVal !== null) mapUpdates[`tokens.${charId}.tempHp`] = updates.tempHp;
+      if (updates.conditions) mapUpdates[`tokens.${charId}.conditions`] = updates.conditions;
       batch.update(doc(db, 'campaign', 'battlemap'), mapUpdates);
       
       await batch.commit();
@@ -64,6 +88,7 @@ export default function useCharacterVitals(char, charId, isDM) {
     let currentHp = char.hp || 0;
     let currentTemp = char.tempHp || 0;
     const maxHp = char.maxHp || 10;
+    let updatedConditions = [...(char.conditions || [])];
 
     if (amount < 0) {
       const damage = Math.abs(amount);
@@ -79,19 +104,33 @@ export default function useCharacterVitals(char, charId, isDM) {
     }
 
     let updates = { hp: currentHp, tempHp: currentTemp };
+    
+    // Wake Up Logic
     if (currentHp > 0 && char.hp === 0) {
       updates['deathSaves.successes'] = 0;
       updates['deathSaves.failures'] = 0;
+      updatedConditions = updatedConditions.filter(c => c !== 'Unconscious');
+      updates.conditions = updatedConditions;
+    }
+
+    // Knock Out Logic
+    if (currentHp === 0 && char.hp > 0) {
+       if (!updatedConditions.includes('Unconscious')) updatedConditions.push('Unconscious');
+       if (!updatedConditions.includes('Prone')) updatedConditions.push('Prone');
+       updates.conditions = updatedConditions;
     }
     
     try {
-      // INSTANT DUAL-SYNC
       const batch = writeBatch(db);
       batch.update(doc(db, 'characters', charId), updates);
-      batch.update(doc(db, 'campaign', 'battlemap'), { 
+      
+      const mapUpdates = { 
          [`tokens.${charId}.hp`]: currentHp,
          [`tokens.${charId}.tempHp`]: currentTemp
-      });
+      };
+      if (updates.conditions) mapUpdates[`tokens.${charId}.conditions`] = updates.conditions;
+
+      batch.update(doc(db, 'campaign', 'battlemap'), mapUpdates);
       
       await batch.commit();
     } catch (err) {
@@ -117,6 +156,11 @@ export default function useCharacterVitals(char, charId, isDM) {
 
   const activeConditions = char.conditions || [];
   const isUnconscious = (char.hp || 0) <= 0;
+  
+  // Death State Derivations
+  const isDead = (char.deathSaves?.failures || 0) >= 3;
+  const isStable = (char.deathSaves?.successes || 0) >= 3;
+
   const isPoisoned = activeConditions.includes('Poisoned');
   const isFrightened = activeConditions.includes('Frightened');
 
@@ -140,6 +184,8 @@ export default function useCharacterVitals(char, charId, isDM) {
     handleSpendHitDie,
     activeConditions,
     isUnconscious,
+    isDead,
+    isStable,
     isPoisoned,
     isFrightened,
     hpPercent,

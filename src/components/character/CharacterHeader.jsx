@@ -23,6 +23,8 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
     adjustHp,
     handleSpendHitDie,
     isUnconscious,
+    isDead,
+    isStable,
     isPoisoned,
     isFrightened,
     hpPercent,
@@ -58,14 +60,14 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
           <img 
             src={char.imageUrl || `/${charId}.png`} 
             alt={char.name || 'Unknown'} 
-            className={`w-full h-full object-cover object-[center_20%] transition-transform duration-500 group-hover:scale-105 ${isUnconscious ? 'grayscale' : ''}`} 
+            className={`w-full h-full object-cover object-[center_20%] transition-transform duration-500 group-hover:scale-105 ${isUnconscious || isDead ? 'grayscale' : ''}`} 
             onError={(e) => { 
                e.currentTarget.onerror = null; 
                e.currentTarget.src = '/icon.png'; 
             }} 
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent pointer-events-none z-10"></div>
-          {isUnconscious && <div className="absolute inset-0 flex items-center justify-center bg-red-950/60 backdrop-blur-[1px] pointer-events-none z-10"><Skull className="w-12 h-12 text-white drop-shadow-md animate-pulse" /></div>}
+          {(isUnconscious || isDead) && <div className={`absolute inset-0 flex items-center justify-center ${isDead ? 'bg-red-950/80' : 'bg-red-950/60'} backdrop-blur-[1px] pointer-events-none z-10`}><Skull className={`w-12 h-12 ${isDead ? 'text-red-500 scale-125' : 'text-white'} drop-shadow-md ${!isDead ? 'animate-pulse' : ''}`} /></div>}
         </div>
         
         <button onClick={(e) => { e.stopPropagation(); onOpenImage(); }} className="absolute top-2 right-2 p-1.5 bg-slate-950/80 border-2 border-slate-700 backdrop-blur-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 cursor-pointer pointer-events-auto shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Maximize className="w-4 h-4 text-white" /></button>
@@ -79,10 +81,10 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
                   type="text" 
                   defaultValue={char.name || ''} 
                   onBlur={(e) => updateField('name', e.target.value)}
-                  className={`text-2xl font-black leading-none bg-slate-900/80 border-2 border-amber-500 rounded px-2 py-0.5 focus:outline-none w-full max-w-xs pointer-events-auto shadow-[2px_2px_0px_rgba(0,0,0,1)] ${isUnconscious ? 'text-red-400' : 'text-white'}`}
+                  className={`text-2xl font-black leading-none bg-slate-900/80 border-2 border-amber-500 rounded px-2 py-0.5 focus:outline-none w-full max-w-xs pointer-events-auto shadow-[2px_2px_0px_rgba(0,0,0,1)] ${(isUnconscious || isDead) ? 'text-red-400' : 'text-white'}`}
                 />
               ) : (
-                <h2 className={`text-2xl font-black leading-none uppercase tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] text-balance ${isUnconscious ? 'text-red-400' : 'text-white'}`}>{char.name || 'Unknown'}</h2>
+                <h2 className={`text-2xl font-black leading-none uppercase tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] text-balance ${(isUnconscious || isDead) ? 'text-red-400' : 'text-white'}`}>{char.name || 'Unknown'}</h2>
               )}
               <div className="flex items-center pointer-events-auto">
                 <button onClick={isDM ? toggleInspiration : undefined} className={`shrink-0 transition-all z-10 flex items-center justify-center ${isDM ? 'cursor-pointer hover:scale-110' : 'pointer-events-none'} ${char.inspiration ? 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,1)] scale-110' : (isDM ? 'text-slate-400 hover:text-yellow-400/50' : 'text-slate-600')}`}><Star className="w-5 h-5 fill-current pointer-events-none" /></button>
@@ -157,18 +159,37 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
 
           {isUnconscious ? (
             <div className="relative z-20 flex items-center justify-between px-4 w-full">
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-black text-slate-950 bg-emerald-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">PASS</span>
-                <div className="flex gap-1.5">
-                  {[1, 2, 3].map(num => <button key={`pass-${num}`} onClick={() => updateDeathSaves('successes', (char.deathSaves?.successes || 0) === num ? num - 1 : num)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.successes || 0) >= num ? 'bg-emerald-500 border-emerald-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'}`} />)}
+              
+              {isDead ? (
+                <div className="w-full flex items-center justify-center">
+                   <span className="text-xl font-black text-red-500 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">Deceased</span>
                 </div>
-              </div>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-black text-slate-950 bg-red-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">FAIL</span>
-                <div className="flex gap-1.5">
-                  {[1, 2, 3].map(num => <button key={`fail-${num}`} onClick={() => updateDeathSaves('failures', (char.deathSaves?.failures || 0) === num ? num - 1 : num)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.failures || 0) >= num ? 'bg-red-600 border-red-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'}`} />)}
+              ) : isStable ? (
+                <div className="w-full flex items-center justify-between">
+                   <span className="text-xl font-black text-emerald-500 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pl-4">Stable</span>
+                   <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-black text-slate-950 bg-red-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">FAIL (Damage)</span>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3].map(num => <button key={`fail-${num}`} onClick={() => updateDeathSaves('failures', (char.deathSaves?.failures || 0) === num ? num - 1 : num)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.failures || 0) >= num ? 'bg-red-600 border-red-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'}`} />)}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-black text-slate-950 bg-emerald-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">PASS</span>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3].map(num => <button key={`pass-${num}`} disabled={isDead} onClick={() => updateDeathSaves('successes', (char.deathSaves?.successes || 0) === num ? num - 1 : num)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.successes || 0) >= num ? 'bg-emerald-500 border-emerald-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'} disabled:cursor-not-allowed`} />)}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-black text-slate-950 bg-red-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">FAIL</span>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3].map(num => <button key={`fail-${num}`} disabled={isDead} onClick={() => updateDeathSaves('failures', (char.deathSaves?.failures || 0) === num ? num - 1 : num)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.failures || 0) >= num ? 'bg-red-600 border-red-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'} disabled:cursor-not-allowed`} />)}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <>
