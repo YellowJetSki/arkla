@@ -196,15 +196,29 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
 
           const charSnap = await getDoc(charRef);
           if (charSnap.exists()) {
-            const currentHp = charSnap.data().hp || 0;
-            const maxHp = charSnap.data().maxHp || 10;
+            const charData = charSnap.data();
+            const currentHp = charData.hp || 0;
+            const maxHp = charData.maxHp || 10;
             const newHp = Math.min(maxHp, currentHp + healAmount);
+            
+            let updates = { hp: newHp };
+            let mapUpdates = { [`tokens.${charId}.hp`]: newHp };
 
-            batch.update(charRef, { hp: newHp });
+            // 5e Rule: Potion Wake Up Logic
+            if (newHp > 0 && currentHp === 0) {
+              updates['deathSaves.successes'] = 0;
+              updates['deathSaves.failures'] = 0;
+              if (charData.conditions) {
+                  updates.conditions = charData.conditions.filter(c => c !== 'Unconscious');
+                  mapUpdates[`tokens.${charId}.conditions`] = updates.conditions;
+              }
+            }
+
+            batch.update(charRef, updates);
 
             const mapSnap = await getDoc(mapRef);
             if (mapSnap.exists() && mapSnap.data().tokens && mapSnap.data().tokens[charId]) {
-              batch.update(mapRef, { [`tokens.${charId}.hp`]: newHp });
+              batch.update(mapRef, mapUpdates);
             }
 
             await batch.commit();
