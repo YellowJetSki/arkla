@@ -39,6 +39,7 @@ export default function ShortRestModal({ char, charId, onClose }) {
       const updates = {
         hp: previewHp,
         'hitDice.current': currentDice - boundedSpent,
+        tempBuffs: [] // 5e Rule: A short rest is 1 hour, which clears almost all combat buffs
       };
 
       if (previewHp > 0 && currentHp === 0) {
@@ -121,15 +122,14 @@ export default function ShortRestModal({ char, charId, onClose }) {
                 <h3 className="text-2xl font-black text-white uppercase tracking-widest mb-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">Rested & Ready</h3>
                 <p className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider">Health and Hit Dice updated.</p>
                 
-                {(shortRestResources.length > 0 || recoverSpells) && (
-                  <div className="bg-slate-950 border-2 border-orange-900 rounded-xl p-4 w-full text-left shadow-inner">
-                    <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest block mb-2">Resources Recovered:</span>
-                    <ul className="text-sm font-bold text-slate-300 space-y-1.5">
-                      {shortRestResources.map(r => <li key={r.name} className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-orange-500"/> {r.name}</li>)}
-                      {recoverSpells && <li className="flex items-center gap-2"><Flame className="w-4 h-4 text-fuchsia-500"/> Spell Slots Reset</li>}
-                    </ul>
-                  </div>
-                )}
+                <div className="bg-slate-950 border-2 border-orange-900 rounded-xl p-4 w-full text-left shadow-inner">
+                  <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest block mb-2">Resources Recovered:</span>
+                  <ul className="text-sm font-bold text-slate-300 space-y-1.5">
+                    <li className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-sky-400"/> Temp Buffs Cleared</li>
+                    {shortRestResources.map(r => <li key={r.name} className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-orange-500"/> {r.name}</li>)}
+                    {recoverSpells && <li className="flex items-center gap-2"><Flame className="w-4 h-4 text-fuchsia-500"/> Spell Slots Reset</li>}
+                  </ul>
+                </div>
               </div>
             ) : (
               <div className="animate-in fade-in duration-300">

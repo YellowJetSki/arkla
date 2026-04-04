@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { doc, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Moon, Bed, CheckCircle2, X, Activity, Flame, ShieldPlus, Stars } from 'lucide-react';
+import { Moon, Bed, CheckCircle2, X, Activity, Flame, ShieldPlus, Stars, Sparkles } from 'lucide-react';
 
 export default function LongRestModal({ char, charId, onClose }) {
   const [isResting, setIsResting] = useState(false);
 
   const maxHD = char.hitDice?.max || char.level || 1;
   const currentHD = char.hitDice?.current || 0;
+  // 5e Rule: Regain up to half total hit dice (minimum 1)
   const recoverAmount = Math.max(1, Math.floor(maxHD / 2));
   const newHD = Math.min(maxHD, currentHD + recoverAmount);
 
@@ -27,6 +28,9 @@ export default function LongRestModal({ char, charId, onClose }) {
       updates['deathSaves.failures'] = 0;
       updates.isConcentrating = false;
       updates['hitDice.current'] = newHD;
+      
+      // WIPE TEMPORARY BUFFS: 8 hours clears all standard combat buffs
+      updates.tempBuffs = [];
 
       if (char.spellSlots) {
         const resetSlots = { ...char.spellSlots };
@@ -47,12 +51,13 @@ export default function LongRestModal({ char, charId, onClose }) {
       }
 
       if (char.conditions && char.conditions.length > 0) {
-        const clearedConditions = [
-          'Blinded', 'Charmed', 'Deafened', 'Frightened', 
-          'Incapacitated', 'Invisible', 'Paralyzed', 'Poisoned', 
+        // 5e Rule: Sleeping does NOT cure Poison, Blindness, Deafness, or Charms.
+        // We only clear short-term tactical/combat conditions.
+        const tacticalConditions = [
+          'Frightened', 'Incapacitated', 'Invisible', 'Paralyzed', 
           'Prone', 'Restrained', 'Stunned', 'Unconscious'
         ];
-        updates.conditions = char.conditions.filter(c => !clearedConditions.includes(c));
+        updates.conditions = char.conditions.filter(c => !tacticalConditions.includes(c));
       } else {
         updates.conditions = [];
       }
@@ -111,6 +116,7 @@ export default function LongRestModal({ char, charId, onClose }) {
                 <div className="flex items-center gap-3 text-emerald-400 text-xs font-black uppercase tracking-wider"><ShieldPlus className="w-5 h-5"/> Full HP Recovered</div>
                 <div className="flex items-center gap-3 text-indigo-400 text-xs font-black uppercase tracking-wider"><Activity className="w-5 h-5"/> {recoverAmount} Hit Dice Recovered</div>
                 <div className="flex items-center gap-3 text-fuchsia-400 text-xs font-black uppercase tracking-wider"><Flame className="w-5 h-5"/> Spell Slots Replenished</div>
+                <div className="flex items-center gap-3 text-sky-400 text-xs font-black uppercase tracking-wider"><Sparkles className="w-5 h-5"/> Temp Buffs Cleared</div>
                 {(char.resources || []).length > 0 && <div className="flex items-center gap-3 text-amber-500 text-xs font-black uppercase tracking-wider"><CheckCircle2 className="w-5 h-5"/> Resources Reset</div>}
               </div>
             </div>
@@ -120,7 +126,7 @@ export default function LongRestModal({ char, charId, onClose }) {
               <h3 className="text-2xl font-black text-white uppercase tracking-widest mb-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">Sleep or Trance?</h3>
               <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner mb-6">
                 <p className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-wider leading-relaxed">
-                  This will simulate 8 hours of rest. You will fully recover your <strong className="text-emerald-500">HP</strong>, regain half your <strong className="text-indigo-400">Hit Dice</strong>, and restore all <strong className="text-fuchsia-500">Spell Slots</strong> and <strong className="text-amber-500">Resources</strong>.
+                  This simulates 8 hours of rest. You will recover your <strong className="text-emerald-500">HP</strong>, regain half your <strong className="text-indigo-400">Hit Dice</strong>, and restore all <strong className="text-fuchsia-500">Spells</strong> and <strong className="text-amber-500">Resources</strong>. Temporary buffs and combat conditions will fade.
                 </p>
               </div>
 

@@ -57,6 +57,8 @@ export default function useCharacterVitals(char, charId, isDM, triggerAlert = co
        if (!updatedConditions.includes('Unconscious')) updatedConditions.push('Unconscious');
        if (!updatedConditions.includes('Prone')) updatedConditions.push('Prone');
        updates.conditions = updatedConditions;
+       // 5e Rule: Incapacitated instantly drops concentration
+       updates.isConcentrating = false; 
     }
     
     try {
@@ -66,6 +68,8 @@ export default function useCharacterVitals(char, charId, isDM, triggerAlert = co
       const mapUpdates = { [`tokens.${charId}.hp`]: boundedHp };
       if (newTempVal !== null) mapUpdates[`tokens.${charId}.tempHp`] = updates.tempHp;
       if (updates.conditions) mapUpdates[`tokens.${charId}.conditions`] = updates.conditions;
+      if (updates.isConcentrating === false) mapUpdates[`tokens.${charId}.isConcentrating`] = false;
+
       batch.update(doc(db, 'campaign', 'battlemap'), mapUpdates);
       
       await batch.commit();
@@ -129,6 +133,8 @@ export default function useCharacterVitals(char, charId, isDM, triggerAlert = co
        if (!updatedConditions.includes('Unconscious')) updatedConditions.push('Unconscious');
        if (!updatedConditions.includes('Prone')) updatedConditions.push('Prone');
        updates.conditions = updatedConditions;
+       // 5e Rule: Incapacitated instantly drops concentration
+       updates.isConcentrating = false;
     }
     
     try {
@@ -140,6 +146,7 @@ export default function useCharacterVitals(char, charId, isDM, triggerAlert = co
          [`tokens.${charId}.tempHp`]: currentTemp
       };
       if (updates.conditions) mapUpdates[`tokens.${charId}.conditions`] = updates.conditions;
+      if (updates.isConcentrating === false) mapUpdates[`tokens.${charId}.isConcentrating`] = false;
 
       batch.update(doc(db, 'campaign', 'battlemap'), mapUpdates);
       await batch.commit();
