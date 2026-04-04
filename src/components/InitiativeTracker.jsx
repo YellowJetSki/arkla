@@ -1,16 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Swords, Trash2, ArrowDown, Play, Users, X, RotateCcw, Plus, AlertTriangle, Dices, ChevronUp, ChevronDown } from 'lucide-react';
+import { Swords, Trash2, ArrowDown, Play, Users, X, RotateCcw, Plus, AlertTriangle, Dices } from 'lucide-react';
 import { getModifier } from '../services/arklaEngine';
 
-export default function InitiativeTracker({ unlockedCharacters, activeEnemies }) {
+export default function InitiativeTracker({ unlockedCharacters, activeEnemies, expandedOverride = false }) {
   const [initiative, setInitiative] = useState([]);
   const [activeTurn, setActiveTurn] = useState(-1); 
   const [round, setRound] = useState(1);
   const [isLoaded, setIsLoaded] = useState(false);
-  
-  const [isExpanded, setIsExpanded] = useState(true); 
   
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [newCustomName, setNewCustomName] = useState('');
@@ -122,19 +120,24 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
   };
 
   const updateValue = (index, val) => {
-    const newOrder = [...initiative];
-    newOrder[index].value = Number(val);
-    newOrder.sort((a, b) => b.value - a.value);
-    saveInitiative(newOrder, activeTurn, round);
+    const newOrder = [...initiativeRef.current];
+    const activeId = activeTurn >= 0 ? newOrder[activeTurn]?.id : null;
+    
+    newOrder[index].value = Number(val) || 0;
+    newOrder.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+    
+    const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
+    saveInitiative(newOrder, newTurn, round);
   };
 
   const resetValues = () => {
-    const resetOrder = initiative.map(item => ({ ...item, value: 0 }));
+    const resetOrder = initiativeRef.current.map(item => ({ ...item, value: 0 }));
     saveInitiative(resetOrder, -1, 1);
   };
 
   const autoRollEnemies = () => {
-    const newOrder = [...initiative];
+    const newOrder = [...initiativeRef.current];
+    const activeId = activeTurn >= 0 ? newOrder[activeTurn]?.id : null;
     let changed = false;
     
     newOrder.forEach(actor => {
@@ -150,26 +153,28 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
     });
 
     if (changed) {
-      newOrder.sort((a, b) => b.value - a.value);
-      saveInitiative(newOrder, activeTurn, round);
+      newOrder.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+      const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
+      saveInitiative(newOrder, newTurn, round);
     }
   };
 
   const nextTurn = () => {
-    if (initiative.length === 0) return;
+    const currentOrder = initiativeRef.current;
+    if (currentOrder.length === 0) return;
     
     let nextIndex = activeTurn;
     let newRound = round;
     let foundAlive = false;
 
-    for (let i = 1; i <= initiative.length; i++) {
-      let checkIndex = (activeTurn + i) % initiative.length;
+    for (let i = 1; i <= currentOrder.length; i++) {
+      let checkIndex = (activeTurn + i) % currentOrder.length;
       
       if (checkIndex === 0 && activeTurn !== -1) {
         newRound++;
       }
 
-      const actor = initiative[checkIndex];
+      const actor = currentOrder[checkIndex];
       let isDead = false;
       
       if (actor.type === 'enemy') {
@@ -188,13 +193,13 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
 
     if (!foundAlive) {
       nextIndex = activeTurn + 1;
-      if (nextIndex >= initiative.length) { nextIndex = 0; newRound++; }
+      if (nextIndex >= currentOrder.length) { nextIndex = 0; newRound++; }
     }
 
-    saveInitiative(initiative, nextIndex, newRound);
+    saveInitiative(currentOrder, nextIndex, newRound);
   };
 
-  const addCustomActor = (e) => {
+  const addCustomActor = async (e) => {
     e.preventDefault();
     if (!newCustomName.trim()) return;
     
@@ -205,15 +210,25 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
       value: 20 
     };
     
-    const newOrder = [...initiative, newActor].sort((a, b) => b.value - a.value);
-    saveInitiative(newOrder, activeTurn, round);
+    const currentInitiative = [...initiativeRef.current];
+    const activeId = activeTurn >= 0 ? currentInitiative[activeTurn]?.id : null;
+
+    const newOrder = [...currentInitiative, newActor].sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+    const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
+
+    await saveInitiative(newOrder, newTurn, round);
     setNewCustomName('');
     setShowCustomForm(false);
   };
 
   const removeCustomActor = (id) => {
-    const newOrder = initiative.filter(i => i.id !== id);
-    saveInitiative(newOrder, activeTurn, round);
+    const currentInitiative = [...initiativeRef.current];
+    const activeId = activeTurn >= 0 ? currentInitiative[activeTurn]?.id : null;
+    
+    const newOrder = currentInitiative.filter(i => i.id !== id);
+    const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
+    
+    saveInitiative(newOrder, newTurn >= 0 ? newTurn : -1, round);
   };
 
   const activeActorData = initiative[activeTurn];
@@ -226,86 +241,69 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
   const showConditionWarning = activeConditions.length > 0;
 
   return (
-    <div className={`flex flex-col bg-slate-900 border-t-[3px] border-slate-950 shadow-[0_-8px_0px_rgba(0,0,0,1)] transition-all duration-300 ease-in-out z-40 w-full ${isExpanded ? 'h-[45vh] md:h-[40vh]' : 'h-14'}`}>
+    <div className={`flex flex-col bg-slate-900 border-[3px] border-slate-950 rounded-2xl shadow-[8px_8px_0px_rgba(0,0,0,1)] transition-all duration-300 ease-in-out w-full h-full overflow-hidden`}>
       
       {/* COMPACT HEADER */}
-      <div 
-        className="h-14 px-3 md:px-4 flex items-center justify-between shrink-0 border-b-[3px] border-slate-950 bg-slate-800 cursor-pointer hover:bg-slate-700 transition-colors" 
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
+      <div className="p-3 flex items-center justify-between shrink-0 border-b-[3px] border-slate-950 bg-indigo-600">
         <div className="flex items-center gap-3 overflow-hidden">
-          <button className="text-slate-400 hover:text-white p-1 rounded transition-colors focus:outline-none">
-            {isExpanded ? <ChevronDown className="w-5 h-5 font-black" /> : <ChevronUp className="w-5 h-5 font-black" />}
-          </button>
-          
-          <h2 className="text-sm font-black text-white flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
-            <Swords className="w-4 h-4 text-fuchsia-500" /> <span className="hidden sm:inline">Initiative</span>
+          <h2 className="text-base font-black text-slate-950 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,0.3)]">
+            <Swords className="w-4 h-4" /> <span className="hidden sm:inline">Initiative</span>
           </h2>
-          
-          <span className="hidden sm:inline-block text-[10px] bg-slate-950 px-2 py-1 rounded border-2 border-slate-900 text-fuchsia-400 font-black uppercase tracking-widest shadow-inner shrink-0">
-            {activeTurn === -1 ? 'Pre-Combat' : `R${round} • T${activeTurn + 1}`}
+          <span className="hidden sm:inline-block text-[10px] bg-slate-950 px-2 py-1 rounded border border-slate-900 text-indigo-400 font-black uppercase tracking-widest shadow-inner shrink-0">
+            {activeTurn === -1 ? 'Pre-Combat' : `Round ${round} • Turn ${activeTurn + 1}`}
           </span>
-          
-          {!isExpanded && activeActorData && (
-            <div className="flex items-center gap-2 ml-1 sm:ml-2 pl-2 sm:pl-3 border-l-2 border-slate-950 truncate">
-               <Play className="w-3 h-3 text-fuchsia-400 fill-current shrink-0 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]" />
-               <span className={`text-xs font-black uppercase tracking-widest truncate drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${activeActorData.type === 'enemy' ? 'text-red-400' : 'text-indigo-400'}`}>
-                 {activeActorData.name}
-               </span>
-            </div>
-          )}
         </div>
 
         <div className="flex items-center gap-2 shrink-0 pl-2">
-           {!isExpanded && initiative.length > 0 && (
+           {initiative.length > 0 && (
               <button 
                 onClick={(e) => { e.stopPropagation(); nextTurn(); }} 
-                className="bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950 font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-[10px] border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"
+                className="bg-indigo-950 hover:bg-slate-900 text-indigo-400 font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 text-[10px] md:text-xs border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"
               >
-                Next <ArrowDown className="w-3.5 h-3.5" />
+                Next <ArrowDown className="w-3 h-3" />
               </button>
            )}
         </div>
       </div>
 
       {/* EXPANDED CONTENT */}
-      <div className={`flex-1 flex flex-col overflow-hidden transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none hidden'}`}>
-        <div className="p-3 md:p-4 flex flex-col h-full bg-slate-900">
+      <div className="flex-1 flex flex-col overflow-hidden opacity-100">
+        <div className="p-3 md:p-4 flex flex-col h-full bg-slate-950">
           
           {/* TOOLBAR */}
-          <div className="flex flex-wrap gap-2 justify-end mb-3 shrink-0">
-            <button onClick={autoRollEnemies} className="bg-indigo-500 hover:bg-indigo-400 text-slate-950 border-2 border-slate-950 p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
-              <Dices className="w-3 h-3" /> Roll NPCs
+          <div className="flex flex-wrap gap-2 justify-end mb-2 shrink-0">
+            <button onClick={autoRollEnemies} className="bg-indigo-600 hover:bg-indigo-500 text-slate-950 border-2 border-slate-950 px-3 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+              <Dices className="w-3 h-3 font-black" /> Roll NPCs
             </button>
-            <button onClick={() => setShowCustomForm(!showCustomForm)} className="bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none border-2 border-slate-900">
+            <button onClick={() => setShowCustomForm(!showCustomForm)} className="bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none border-2 border-slate-950">
               <Plus className="w-3 h-3" /> Lair Action
             </button>
-            <button onClick={resetValues} className="bg-slate-950 hover:bg-slate-800 border-2 border-slate-900 text-amber-500 hover:text-amber-400 p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
-              <RotateCcw className="w-3 h-3" /> Reset
+            <button onClick={resetValues} className="bg-slate-900 hover:bg-slate-800 border-2 border-slate-950 text-amber-500 hover:text-amber-400 px-3 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+              <RotateCcw className="w-3 h-3 font-black" /> Reset
             </button>
           </div>
 
           {/* CUSTOM FORM */}
           {showCustomForm && (
-            <form onSubmit={addCustomActor} className="mb-4 flex gap-2 animate-in fade-in slide-in-from-top-2 shrink-0">
+            <form onSubmit={addCustomActor} className="mb-3 flex gap-2 animate-in fade-in slide-in-from-top-2 shrink-0">
               <input 
                 type="text" 
                 value={newCustomName}
                 onChange={(e) => setNewCustomName(e.target.value)}
-                placeholder="e.g. Environmental Hazard..." 
-                className="flex-1 bg-slate-950 border-2 border-slate-900 rounded-lg px-3 py-2 text-white text-sm font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner"
+                placeholder="e.g. Hazard..." 
+                className="flex-1 bg-slate-900 border-2 border-slate-950 rounded-lg px-3 py-1.5 text-white text-xs font-bold focus:outline-none focus:border-indigo-500 shadow-inner"
                 autoFocus
               />
-              <button type="submit" disabled={!newCustomName.trim()} className="bg-fuchsia-500 hover:bg-fuchsia-400 disabled:opacity-50 text-slate-950 px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-black transition-all border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+              <button type="submit" disabled={!newCustomName.trim()} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-slate-950 px-4 py-1.5 rounded-lg text-[10px] uppercase tracking-widest font-black transition-all border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
                 Add
               </button>
             </form>
           )}
 
           {/* ACTOR LIST */}
-          <div className="space-y-2 flex-1 overflow-y-auto custom-scrollbar pr-1 mb-4">
+          <div className="space-y-1.5 flex-1 overflow-y-auto custom-scrollbar pr-1 mb-2">
             {initiative.length === 0 ? (
-              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest p-4 text-center border-2 border-slate-950 border-dashed rounded-xl bg-slate-900">Waiting for active characters or enemies...</p>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest p-6 text-center border-2 border-slate-900 border-dashed rounded-xl bg-slate-900/50">Waiting for active characters or enemies...</p>
             ) : (
               initiative.map((actor, idx) => {
                 const enemyData = actor.type === 'enemy' ? activeEnemies.find(e => e.id === actor.id) : null;
@@ -314,18 +312,18 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
                 const hpColor = hpPercent > 50 ? 'bg-emerald-500' : hpPercent > 20 ? 'bg-amber-500' : 'bg-red-500';
 
                 return (
-                  <div key={actor.id + idx} className={`flex items-center gap-3 px-3 py-2 rounded-xl border-2 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)]
-                    ${activeTurn === idx ? 'bg-slate-800 border-fuchsia-500' : 'bg-slate-900 border-slate-950'}
+                  <div key={actor.id + idx} className={`flex items-center gap-3 px-3 py-2 rounded-xl border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)]
+                    ${activeTurn === idx ? 'bg-slate-800 border-indigo-500' : 'bg-slate-900 border-slate-950'}
                     ${isDead ? 'opacity-40 grayscale' : ''}
                   `}>
                     <div className="flex-1 flex flex-col min-w-0">
                       <div className="flex items-center gap-2">
-                        {activeTurn === idx && <Play className="w-3 h-3 text-fuchsia-500 fill-current shrink-0 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]" />}
-                        <span className={`font-black uppercase tracking-widest truncate drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${actor.type === 'enemy' ? 'text-red-400' : 'text-indigo-400'} ${activeTurn === idx ? 'text-sm' : 'text-xs'}`}>{actor.name}</span>
+                        {activeTurn === idx && <Play className="w-3 h-3 text-indigo-500 fill-current shrink-0 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]" />}
+                        <span className={`font-black uppercase tracking-widest truncate drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${actor.type === 'enemy' ? 'text-red-400' : 'text-emerald-400'} ${activeTurn === idx ? 'text-base' : 'text-sm'}`}>{actor.name}</span>
                       </div>
                       
                       {enemyData && (
-                        <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden shrink-0 mt-1 border border-slate-900 shadow-inner">
+                        <div className="w-full h-1 bg-slate-950 rounded-full overflow-hidden shrink-0 mt-1 border border-slate-800 shadow-inner">
                            <div className={`h-full ${hpColor} transition-all duration-500`} style={{ width: `${hpPercent}%` }}></div>
                         </div>
                       )}
@@ -333,8 +331,8 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
 
                     <div className="flex items-center gap-2 shrink-0">
                       {actor.type === 'custom' && (
-                        <button onClick={() => removeCustomActor(actor.id)} className="p-1.5 bg-slate-950 border-2 border-slate-900 rounded-lg text-slate-500 hover:text-red-500 hover:border-red-900 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
-                          <Trash2 className="w-3.5 h-3.5" />
+                        <button onClick={() => removeCustomActor(actor.id)} className="p-1 bg-slate-950 border border-slate-900 rounded text-slate-500 hover:text-red-500 hover:border-red-900 transition-colors shadow-sm active:translate-y-px active:shadow-none">
+                          <Trash2 className="w-3 h-3" />
                         </button>
                       )}
                       <input 
@@ -342,7 +340,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
                         value={actor.value} 
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => updateValue(idx, e.target.value)}
-                        className="w-12 bg-slate-950 border-2 border-slate-900 rounded-lg px-1 py-1.5 text-center text-white text-sm font-black focus:outline-none focus:border-fuchsia-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none shadow-inner"
+                        className="w-12 bg-slate-950 border-2 border-slate-900 rounded-lg px-1 py-1 text-center text-white text-sm font-black focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none shadow-inner"
                       />
                     </div>
                   </div>
@@ -352,20 +350,14 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
           </div>
 
           {/* FOOTER */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 shrink-0">
+          <div className="flex flex-col sm:flex-row items-center gap-2 shrink-0 border-t-2 border-slate-900 pt-3">
             {showConditionWarning && (
-              <div className="flex-1 bg-amber-500 border-[3px] border-amber-950 rounded-xl p-2 flex items-center justify-center gap-2 animate-in fade-in zoom-in-95 shadow-[4px_4px_0px_rgba(0,0,0,1)] w-full">
+              <div className="flex-1 bg-amber-500 border-2 border-amber-950 rounded-lg p-2.5 flex items-center justify-center gap-1.5 animate-in fade-in zoom-in-95 shadow-[2px_2px_0px_rgba(0,0,0,1)] w-full">
                  <AlertTriangle className="w-4 h-4 text-amber-950 shrink-0" />
-                 <span className="text-[10px] font-black text-amber-950 uppercase tracking-widest truncate">
-                   Reminder: {activeActorData.name} is {activeConditions.join(', ')}
+                 <span className="text-[10px] font-black text-amber-950 uppercase tracking-widest truncate drop-shadow-[1px_1px_0px_rgba(255,255,255,0.3)]">
+                   {activeActorData.name} is {activeConditions.join(', ')}
                  </span>
               </div>
-            )}
-
-            {initiative.length > 0 && (
-              <button onClick={nextTurn} className="w-full sm:w-auto flex-1 bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950 font-black uppercase tracking-widest py-3 rounded-xl transition-all flex justify-center items-center gap-2 text-[10px] md:text-xs border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none shrink-0">
-                {activeTurn === -1 ? 'Start Combat' : 'Next Turn'} <ArrowDown className="w-4 h-4 font-black" />
-              </button>
             )}
           </div>
 

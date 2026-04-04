@@ -10,17 +10,13 @@ export default function BioTab({ char, charId, isDM, updateField, activeTheme })
         <div className={`absolute top-0 right-0 w-48 h-48 ${activeTheme.bg} blur-[60px] opacity-20 rounded-full pointer-events-none`}></div>
         
         <h3 className="text-lg font-black text-white flex items-center gap-2 mb-6 relative z-10 border-b-2 border-slate-900 pb-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-          <User className={`w-6 h-6 ${activeTheme.text}`} /> Physical Appearance
+          <User className={`w-6 h-6 ${activeTheme.text}`} /> Physical Profile
         </h3>
         
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 relative z-10">
+        <div className="grid grid-cols-2 gap-4 relative z-10">
           {[
             { label: 'Age', field: 'age', placeholder: 'e.g. 24' },
-            { label: 'Height', field: 'height', placeholder: 'e.g. 5\'10"' },
-            { label: 'Weight', field: 'weight', placeholder: 'e.g. 160 lbs' },
-            { label: 'Eyes', field: 'eyes', placeholder: 'e.g. Emerald' },
-            { label: 'Skin', field: 'skin', placeholder: 'e.g. Fair' },
-            { label: 'Hair', field: 'hair', placeholder: 'e.g. Black' }
+            { label: 'Height', field: 'height', placeholder: 'e.g. 5\'10"' }
           ].map((item) => (
             <div key={item.field} className="bg-slate-900 p-3 rounded-xl border-2 border-slate-950 shadow-inner group transition-colors">
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{item.label}</label>

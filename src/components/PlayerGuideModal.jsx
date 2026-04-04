@@ -66,23 +66,23 @@ export default function PlayerGuideModal({ onClose }) {
       {/* Immersive ambient background glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none"></div>
 
-      <div className="bg-slate-900/80 backdrop-blur-2xl border border-indigo-500/30 rounded-3xl w-full max-w-4xl shadow-[0_0_60px_rgba(99,102,241,0.2)] flex flex-col max-h-[90dvh] relative overflow-hidden animate-in zoom-in-95 duration-500">
+      <div className="bg-slate-900 border-[3px] border-slate-950 rounded-3xl w-full max-w-4xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] relative overflow-hidden animate-in zoom-in-95 duration-500">
         
-        <div className="p-5 border-b border-slate-700/50 flex justify-between items-center bg-slate-900/50 relative z-10 shrink-0">
-          <h2 className="text-xl font-black text-indigo-400 flex items-center gap-3 uppercase tracking-widest">
+        <div className="p-5 border-b-[3px] border-slate-950 flex justify-between items-center bg-slate-900/50 relative z-10 shrink-0">
+          <h2 className="text-xl font-black text-indigo-400 flex items-center gap-3 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
             <BookOpen className="w-6 h-6" /> Campaign Handbook
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-800 p-2 rounded-xl border border-slate-700 hover:border-indigo-500/50 shadow-sm">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-800 p-2 rounded-xl border-2 border-slate-950 hover:bg-red-500 hover:border-red-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+            <X className="w-5 h-5 font-black" />
           </button>
         </div>
 
-        <div className="bg-slate-950/50 border-b border-slate-800/80 shrink-0 px-4 py-3 relative z-10">
+        <div className="bg-slate-950/50 border-b-[3px] border-slate-950 shrink-0 px-4 py-3 relative z-10">
           <ScrollableRow className="gap-2">
-            <button onClick={() => setActiveTab('rules')} className={`px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all flex-1 text-center shadow-sm ${activeTab === 'rules' ? 'bg-indigo-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)]' : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/50'}`}>Core Rules</button>
-            <button onClick={() => setActiveTab('conditions')} className={`px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all flex-1 text-center shadow-sm ${activeTab === 'conditions' ? 'bg-fuchsia-600 text-white shadow-[0_0_15px_rgba(217,70,239,0.4)]' : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/50'}`}>Conditions</button>
-            <button onClick={() => setActiveTab('classes')} className={`px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all flex-1 text-center shadow-sm ${activeTab === 'classes' ? 'bg-amber-600 text-white shadow-[0_0_15px_rgba(245,158,11,0.4)]' : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/50'}`}>Classes</button>
-            <button onClick={() => setActiveTab('species')} className={`px-5 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all flex-1 text-center shadow-sm ${activeTab === 'species' ? 'bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-700/50'}`}>Species</button>
+            <button onClick={() => setActiveTab('rules')} className={`px-5 py-2.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all flex-1 text-center border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${activeTab === 'rules' ? 'bg-indigo-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-950'}`}>Core Rules</button>
+            <button onClick={() => setActiveTab('conditions')} className={`px-5 py-2.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all flex-1 text-center border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${activeTab === 'conditions' ? 'bg-fuchsia-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-950'}`}>Conditions</button>
+            <button onClick={() => setActiveTab('classes')} className={`px-5 py-2.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all flex-1 text-center border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${activeTab === 'classes' ? 'bg-amber-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-950'}`}>Classes</button>
+            <button onClick={() => setActiveTab('species')} className={`px-5 py-2.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all flex-1 text-center border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${activeTab === 'species' ? 'bg-emerald-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-950'}`}>Species</button>
           </ScrollableRow>
         </div>
 
@@ -91,54 +91,54 @@ export default function PlayerGuideModal({ onClose }) {
           {activeTab === 'rules' && (
             <div className="space-y-6 max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
               
-              <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-5 md:col-span-2 shadow-inner">
-                <h3 className="font-black text-indigo-400 text-lg mb-4 border-b border-slate-700/50 pb-2 flex items-center gap-2 uppercase tracking-widest"><Activity className="w-5 h-5"/> Anatomy of a Turn</h3>
+              <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 md:col-span-2 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                <h3 className="font-black text-indigo-400 text-lg mb-4 border-b-2 border-slate-950 pb-2 flex items-center gap-2 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><Activity className="w-5 h-5"/> Anatomy of a Turn</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 shadow-sm hover:border-indigo-500/30 transition-colors">
-                    <strong className="text-white block mb-1">1. Movement</strong>
-                    <span className="text-xs text-slate-400 leading-relaxed block">Can be broken up before and after your actions. Standing up costs half your speed.</span>
+                  <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                    <strong className="text-white font-black uppercase tracking-widest block mb-1 text-[10px]">1. Movement</strong>
+                    <span className="text-xs font-bold text-slate-400 leading-relaxed block">Can be broken up before and after your actions. Standing up costs half your speed.</span>
                   </div>
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 shadow-sm hover:border-indigo-500/30 transition-colors">
-                    <strong className="text-white block mb-1">2. Action</strong>
-                    <span className="text-xs text-slate-400 leading-relaxed block">Your main activity (Attack, Cast a Spell, Dash, Dodge, Help, Hide, Use Object).</span>
+                  <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                    <strong className="text-white font-black uppercase tracking-widest block mb-1 text-[10px]">2. Action</strong>
+                    <span className="text-xs font-bold text-slate-400 leading-relaxed block">Your main activity (Attack, Cast a Spell, Dash, Dodge, Help, Hide, Use Object).</span>
                   </div>
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 shadow-sm hover:border-indigo-500/30 transition-colors">
-                    <strong className="text-white block mb-1">3. Bonus Action</strong>
-                    <span className="text-xs text-slate-400 leading-relaxed block">Only available if a specific spell, ability, or feature says it costs a Bonus Action.</span>
+                  <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                    <strong className="text-white font-black uppercase tracking-widest block mb-1 text-[10px]">3. Bonus Action</strong>
+                    <span className="text-xs font-bold text-slate-400 leading-relaxed block">Only available if a specific spell, ability, or feature says it costs a Bonus Action.</span>
                   </div>
-                  <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50 shadow-sm hover:border-indigo-500/30 transition-colors">
-                    <strong className="text-white block mb-1">4. Reaction</strong>
-                    <span className="text-xs text-slate-400 leading-relaxed block">One per round. Used outside your turn in response to triggers (e.g., Opportunity Attack).</span>
+                  <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                    <strong className="text-white font-black uppercase tracking-widest block mb-1 text-[10px]">4. Reaction</strong>
+                    <span className="text-xs font-bold text-slate-400 leading-relaxed block">One per round. Used outside your turn in response to triggers (e.g., Opportunity Attack).</span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-5 shadow-inner">
-                <h3 className="font-black text-amber-400 text-lg mb-4 border-b border-amber-900/30 pb-2 flex items-center gap-2 uppercase tracking-widest"><Swords className="w-5 h-5"/> Common Actions</h3>
-                <ul className="space-y-3">
-                  <li className="text-sm text-slate-300"><strong className="text-white">Dash:</strong> Gain extra movement equal to your speed for the current turn.</li>
-                  <li className="text-sm text-slate-300"><strong className="text-white">Disengage:</strong> Your movement doesn't provoke Opportunity Attacks for the rest of the turn.</li>
-                  <li className="text-sm text-slate-300"><strong className="text-white">Dodge:</strong> Attack rolls against you have Disadvantage, and you have Advantage on DEX saves.</li>
-                  <li className="text-sm text-slate-300"><strong className="text-white">Help:</strong> Give an ally Advantage on their next skill check or attack roll against a target.</li>
-                  <li className="text-sm text-slate-300"><strong className="text-white">Ready:</strong> Hold your Action for a specific trigger (requires your Reaction to unleash).</li>
-                  <li className="text-sm text-slate-300"><strong className="text-white">Hide:</strong> Roll Stealth vs Perception to become unseen.</li>
+              <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                <h3 className="font-black text-amber-400 text-lg mb-4 border-b-2 border-slate-950 pb-2 flex items-center gap-2 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><Swords className="w-5 h-5"/> Common Actions</h3>
+                <ul className="space-y-3 font-bold">
+                  <li className="text-xs text-slate-300"><strong className="text-white font-black uppercase tracking-wider text-[10px]">Dash:</strong> Gain extra movement equal to your speed for the current turn.</li>
+                  <li className="text-xs text-slate-300"><strong className="text-white font-black uppercase tracking-wider text-[10px]">Disengage:</strong> Your movement doesn't provoke Opportunity Attacks for the rest of the turn.</li>
+                  <li className="text-xs text-slate-300"><strong className="text-white font-black uppercase tracking-wider text-[10px]">Dodge:</strong> Attack rolls against you have Disadvantage, and you have Advantage on DEX saves.</li>
+                  <li className="text-xs text-slate-300"><strong className="text-white font-black uppercase tracking-wider text-[10px]">Help:</strong> Give an ally Advantage on their next skill check or attack roll against a target.</li>
+                  <li className="text-xs text-slate-300"><strong className="text-white font-black uppercase tracking-wider text-[10px]">Ready:</strong> Hold your Action for a specific trigger (requires your Reaction to unleash).</li>
+                  <li className="text-xs text-slate-300"><strong className="text-white font-black uppercase tracking-wider text-[10px]">Hide:</strong> Roll Stealth vs Perception to become unseen.</li>
                 </ul>
               </div>
 
               <div className="space-y-6">
-                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-5 shadow-inner">
-                  <h3 className="font-black text-emerald-400 text-lg mb-4 border-b border-emerald-900/30 pb-2 flex items-center gap-2 uppercase tracking-widest"><ArrowDownCircle className="w-5 h-5"/> Cover Rules</h3>
-                  <ul className="space-y-3 text-sm text-slate-300">
-                    <li><strong className="text-white">Half Cover:</strong> +2 bonus to AC and DEX saving throws (e.g. low wall, furniture).</li>
-                    <li><strong className="text-white">Three-Quarters Cover:</strong> +5 bonus to AC and DEX saving throws (e.g. arrow slit, thick tree).</li>
-                    <li><strong className="text-white">Total Cover:</strong> You cannot be targeted directly by attacks or spells.</li>
+                <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                  <h3 className="font-black text-emerald-400 text-lg mb-4 border-b-2 border-slate-950 pb-2 flex items-center gap-2 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><ArrowDownCircle className="w-5 h-5"/> Cover Rules</h3>
+                  <ul className="space-y-3 text-xs font-bold text-slate-300">
+                    <li><strong className="text-white font-black uppercase tracking-wider text-[10px]">Half Cover:</strong> +2 bonus to AC and DEX saving throws (e.g. low wall, furniture).</li>
+                    <li><strong className="text-white font-black uppercase tracking-wider text-[10px]">Three-Quarters Cover:</strong> +5 bonus to AC and DEX saving throws (e.g. arrow slit, thick tree).</li>
+                    <li><strong className="text-white font-black uppercase tracking-wider text-[10px]">Total Cover:</strong> You cannot be targeted directly by attacks or spells.</li>
                   </ul>
                 </div>
 
-                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-5 shadow-inner">
-                  <h3 className="font-black text-fuchsia-400 text-lg mb-2 uppercase tracking-widest">Advantage & Disadvantage</h3>
-                  <p className="text-sm text-slate-300 leading-relaxed mb-3">If you have <strong className="text-white">Advantage</strong>, roll two d20s and take the <strong className="text-emerald-400">higher</strong> number. If you have <strong className="text-white">Disadvantage</strong>, roll two d20s and take the <strong className="text-red-400">lower</strong> number.</p>
-                  <p className="text-xs text-slate-400 italic bg-slate-900/80 p-2.5 rounded-lg border border-slate-700/50">If you have both at the same time, they cancel out.</p>
+                <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                  <h3 className="font-black text-fuchsia-400 text-lg mb-2 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">Advantage & Disadvantage</h3>
+                  <p className="text-xs font-bold text-slate-300 leading-relaxed mb-3">If you have <strong className="text-white">Advantage</strong>, roll two d20s and take the <strong className="text-emerald-400">higher</strong> number. If you have <strong className="text-white">Disadvantage</strong>, roll two d20s and take the <strong className="text-red-400">lower</strong> number.</p>
+                  <p className="text-[10px] uppercase tracking-widest font-black text-slate-500 bg-slate-950 p-2.5 rounded-lg border-2 border-slate-900 shadow-inner">If you have both at the same time, they cancel out.</p>
                 </div>
               </div>
 
@@ -147,17 +147,17 @@ export default function PlayerGuideModal({ onClose }) {
 
           {activeTab === 'conditions' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-              <div className="bg-fuchsia-900/20 border border-fuchsia-500/30 p-4 rounded-xl flex items-start gap-3 shadow-inner">
-                <AlertCircle className="w-6 h-6 text-fuchsia-400 shrink-0 mt-0.5" />
-                <p className="text-sm text-fuchsia-100/80 leading-relaxed">
+              <div className="bg-slate-900 border-[3px] border-fuchsia-950 p-4 rounded-xl flex items-start gap-3 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                <AlertCircle className="w-6 h-6 text-fuchsia-500 shrink-0 mt-0.5" />
+                <p className="text-xs font-bold text-fuchsia-100 leading-relaxed">
                   These statuses alter the rules for whoever is afflicted. Multiple instances of the same condition don't stack. The Engine will automatically calculate speed and disadvantage penalties for you when these are applied to your sheet.
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {CONDITIONS.map(cond => (
-                  <div key={cond.name} className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-5 shadow-sm hover:border-fuchsia-500/30 transition-colors">
-                    <h4 className="font-black text-fuchsia-300 mb-2 text-lg drop-shadow-sm">{cond.name}</h4>
-                    <p className="text-sm text-slate-300 leading-relaxed">{cond.desc}</p>
+                  <div key={cond.name} className="bg-slate-900 border-[3px] border-slate-950 rounded-xl p-5 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:border-fuchsia-500 transition-colors">
+                    <h4 className="font-black text-fuchsia-400 mb-2 text-lg drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] uppercase tracking-widest">{cond.name}</h4>
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed">{cond.desc}</p>
                   </div>
                 ))}
               </div>
@@ -166,22 +166,22 @@ export default function PlayerGuideModal({ onClose }) {
 
           {activeTab === 'classes' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-              <p className="text-slate-300 text-sm bg-slate-800/50 backdrop-blur-sm p-4 rounded-xl border border-slate-700/50 shadow-inner">
+              <p className="text-slate-300 font-bold text-xs bg-slate-900 p-4 rounded-xl border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] leading-relaxed">
                 Choose your path carefully. Note that <strong className="text-amber-400">Mages</strong> and <strong className="text-amber-400">Dealt</strong> rely on raw magic or powerful pacts, entirely avoiding dark or demonic arts to abide by the realm's laws.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {CLASS_LORE.map(cls => (
-                  <div key={cls.name} className={`bg-slate-800/50 backdrop-blur-sm border rounded-2xl p-5 flex flex-col shadow-sm transition-all duration-300 hover:-translate-y-0.5 ${cls.name === 'Pirate' ? 'border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.15)] hover:border-amber-400' : 'border-slate-700/50 hover:border-slate-500'}`}>
-                    <h3 className={`font-black text-xl flex items-center gap-3 mb-3 pb-2 border-b ${cls.name === 'Pirate' ? 'text-amber-400 border-amber-900/30' : 'text-white border-slate-700/50'}`}>
-                      <cls.icon className={`w-6 h-6 ${cls.name === 'Pirate' ? 'text-amber-500' : 'text-slate-400'}`} /> {cls.name}
+                  <div key={cls.name} className={`bg-slate-900 border-[3px] rounded-2xl p-5 flex flex-col shadow-[6px_6px_0px_rgba(0,0,0,1)] transition-all duration-300 hover:-translate-y-1 ${cls.name === 'Pirate' ? 'border-amber-500 hover:border-amber-400 shadow-[6px_6px_0px_rgba(245,158,11,1)]' : 'border-slate-950 hover:border-slate-700'}`}>
+                    <h3 className={`font-black text-xl flex items-center gap-3 mb-3 pb-2 border-b-2 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${cls.name === 'Pirate' ? 'text-amber-400 border-amber-900' : 'text-white border-slate-950'}`}>
+                      <cls.icon className={`w-6 h-6 ${cls.name === 'Pirate' ? 'text-amber-500' : 'text-slate-500'}`} /> {cls.name}
                     </h3>
-                    <p className="text-sm text-slate-300 leading-relaxed flex-1">{cls.desc}</p>
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed flex-1">{cls.desc}</p>
                     
                     {cls.mechanics && (
-                      <div className="mt-4 bg-slate-900/80 rounded-xl p-4 border border-amber-900/50 space-y-3 shadow-inner">
-                        <span className="text-xs font-black text-amber-500 uppercase tracking-widest block mb-1">Unique Mechanics</span>
+                      <div className="mt-4 bg-slate-950 rounded-xl p-4 border-2 border-amber-900 space-y-3 shadow-inner">
+                        <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Unique Mechanics</span>
                         {cls.mechanics.map((mech, i) => (
-                          <p key={i} className="text-xs text-slate-300 leading-relaxed border-l-2 border-amber-500/50 pl-3 py-0.5">{mech}</p>
+                          <p key={i} className="text-xs font-bold text-slate-300 leading-relaxed border-l-[3px] border-amber-500 pl-3 py-0.5">{mech}</p>
                         ))}
                       </div>
                     )}
@@ -193,14 +193,14 @@ export default function PlayerGuideModal({ onClose }) {
 
           {activeTab === 'species' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-              <p className="text-slate-300 text-sm bg-slate-800/50 backdrop-blur-sm p-4 rounded-xl border border-slate-700/50 shadow-inner">
+              <p className="text-slate-300 font-bold text-xs bg-slate-900 p-4 rounded-xl border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] leading-relaxed">
                 The world is diverse and full of unique origins. Choose the species that best fits your character's story.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {SPECIES_LORE.map(spec => (
-                  <div key={spec.name} className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-5 shadow-sm hover:border-emerald-500/30 transition-colors">
-                    <h3 className="font-black text-emerald-400 text-xl mb-3 drop-shadow-sm">{spec.name}</h3>
-                    <p className="text-sm text-slate-300 leading-relaxed">{spec.desc}</p>
+                  <div key={spec.name} className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:border-emerald-500 transition-colors">
+                    <h3 className="font-black text-emerald-400 text-xl mb-3 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] uppercase tracking-widest">{spec.name}</h3>
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed">{spec.desc}</p>
                   </div>
                 ))}
               </div>
@@ -209,7 +209,7 @@ export default function PlayerGuideModal({ onClose }) {
 
         </div>
         
-        <div className="p-4 bg-slate-900/90 border-t border-slate-800 shrink-0 text-center relative z-10">
+        <div className="p-4 bg-slate-950 border-t-[3px] border-slate-950 shrink-0 text-center relative z-10">
           <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black">When in doubt, ask the Dungeon Master.</p>
         </div>
 

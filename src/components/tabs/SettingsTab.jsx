@@ -70,7 +70,7 @@ export default function SettingsTab({ char, updateField, activeTheme, THEMES, re
         </p>
         <button 
           onClick={() => updateField('hasCompletedTutorial', false)} 
-          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black uppercase tracking-widest py-3 px-6 rounded-xl border-2 border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px]"
+          className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black uppercase tracking-widest py-3 px-6 rounded-xl border-[3px] border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px]"
         >
           <RotateCcw className="w-5 h-5" /> Replay Tutorial
         </button>
@@ -86,9 +86,9 @@ export default function SettingsTab({ char, updateField, activeTheme, THEMES, re
             <button
               key={themeName}
               onClick={() => updateField('theme', themeName)}
-              className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${char.theme === themeName ? `border-slate-950 bg-slate-950 ring-2 ring-offset-2 ring-offset-slate-800 ring-${themeName}-500` : 'border-slate-950 bg-slate-900 hover:bg-slate-950'}`}
+              className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-[3px] transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] ${char.theme === themeName ? `border-slate-950 bg-slate-950 ring-2 ring-offset-2 ring-offset-slate-800 ring-${themeName}-500` : 'border-slate-950 bg-slate-900 hover:bg-slate-950'}`}
             >
-              <div className={`w-8 h-8 rounded-full ${themeClasses.bg} border-2 border-slate-950 shadow-inner`}></div>
+              <div className={`w-8 h-8 rounded-full ${themeClasses.bg} border-[3px] border-slate-950 shadow-inner`}></div>
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{themeName}</span>
             </button>
           ))}
@@ -104,10 +104,10 @@ export default function SettingsTab({ char, updateField, activeTheme, THEMES, re
           Export your character sheet to save it locally, or restore from a previous backup file.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
-          <button onClick={handleExport} className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black uppercase tracking-widest py-3 rounded-xl border-2 border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px]">
+          <button onClick={handleExport} className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black uppercase tracking-widest py-3 rounded-xl border-[3px] border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px]">
             <Download className="w-5 h-5" /> Export JSON
           </button>
-          <label className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-black uppercase tracking-widest py-3 rounded-xl border-2 border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] cursor-pointer">
+          <label className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-black uppercase tracking-widest py-3 rounded-xl border-[3px] border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] cursor-pointer">
             <Upload className="w-5 h-5" /> Restore JSON
             <input type="file" accept=".json" onChange={handleImport} className="hidden" />
           </label>

@@ -97,7 +97,7 @@ export default function TempBuffsModal({ charId, tempBuffs, isDM, activeTheme, o
                     />
                 </div>
               </div>
-              <button disabled={isSaving} type="submit" className={`w-full py-3 rounded-lg font-black text-white text-xs uppercase tracking-widest ${activeTheme.bg} hover:opacity-90 transition-all shadow-md mt-1`}>
+              <button disabled={isSaving} type="submit" className={`w-full py-3 rounded-lg font-black text-white text-xs uppercase tracking-widest ${activeTheme.bg} hover:opacity-90 transition-all border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] mt-1`}>
                 {isSaving ? 'Applying...' : 'Apply Buff'}
               </button>
             </form>

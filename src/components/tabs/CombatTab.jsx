@@ -36,12 +36,22 @@ export default function CombatTab({
       propsStr = w.properties;
     }
 
+    let rangeStr = '';
+    if (w.range) {
+      if (typeof w.range === 'string') {
+        rangeStr = w.range;
+      } else if (w.range.normal) {
+        rangeStr = `${w.range.normal}${w.range.long ? `/${w.range.long}` : ''} ft.`;
+      }
+    }
+
     return {
       name: w.name,
       hit: '--',
       damage: w.damageDice || w.damage?.damage_dice || '1d4',
       type: w.damageType || w.damage?.damage_type?.name || 'Slashing',
-      notes: propsStr || (typeof w.desc === 'string' ? w.desc : '')
+      notes: propsStr || (typeof w.desc === 'string' ? w.desc : ''),
+      range: rangeStr
     };
   });
 
@@ -55,7 +65,7 @@ export default function CombatTab({
       return combatKeywords.some(kw => text.includes(kw));
   });
 
-  // Action Categorization Logic (The D&D Beyond approach)
+  // Action Categorization Logic
   const categorizedActions = {
     action: [],
     bonus: [],
@@ -65,13 +75,16 @@ export default function CombatTab({
 
   allAttacks.forEach(atk => {
     const scaled = parseAndScaleAttack(atk, char.stats, char.level, char.class);
-    // Weapons generally default to 1 Action unless specified in notes
+    
+    // Explicitly preserve the range property since parsing strips it
+    const finalAtk = { ...scaled, range: atk.range || scaled.range, isWeapon: true };
+
     if ((scaled.notes || '').toLowerCase().includes('bonus action')) {
-      categorizedActions.bonus.push({ ...scaled, isWeapon: true });
+      categorizedActions.bonus.push(finalAtk);
     } else if ((scaled.notes || '').toLowerCase().includes('reaction')) {
-      categorizedActions.reaction.push({ ...scaled, isWeapon: true });
+      categorizedActions.reaction.push(finalAtk);
     } else {
-      categorizedActions.action.push({ ...scaled, isWeapon: true });
+      categorizedActions.action.push(finalAtk);
     }
   });
 
@@ -97,7 +110,18 @@ export default function CombatTab({
             <h4 className="font-black text-white text-base md:text-lg mb-1 drop-shadow-sm flex items-center gap-2">
                <Sword className={`w-4 h-4 ${activeTheme.text}`} /> {item.name}
             </h4>
-            {item.notes && <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black bg-slate-950 border border-slate-800 inline-block px-2 py-1 rounded shadow-inner truncate max-w-full">{item.notes}</p>}
+            <div className="flex flex-wrap gap-1 mt-1">
+              {item.range && (
+                <span className="text-[9px] text-sky-400 uppercase tracking-widest font-black bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner flex items-center gap-1">
+                  <Target className="w-2.5 h-2.5" /> {item.range}
+                </span>
+              )}
+              {item.notes && (
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner truncate max-w-full">
+                  {item.notes}
+                </p>
+              )}
+            </div>
           </div>
           
           <div className="flex gap-2 shrink-0">

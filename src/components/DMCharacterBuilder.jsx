@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { doc, writeBatch } from 'firebase/firestore';
+import { doc, writeBatch, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { UserPlus, ChevronRight, ChevronLeft, X } from 'lucide-react';
+import { UserPlus, ChevronRight, ChevronLeft, X, Edit3 } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import { fetchAllEquipment, fetchEquipmentDetails, fetchSpeciesData, fetchClassData, fetchClassProgression } from '../services/srdApi';
 import { calculateSpellcastingStats } from '../services/arklaEngine';
@@ -15,7 +15,7 @@ import StepCompanion from './builder-steps/StepCompanion';
 import StepInventory from './builder-steps/StepInventory';
 import StepLore from './builder-steps/StepLore';
 
-export default function DMCharacterBuilder({ onClose }) {
+export default function DMCharacterBuilder({ onClose, initialData = null, charId = null }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
@@ -47,40 +47,72 @@ export default function DMCharacterBuilder({ onClose }) {
   });
 
   const [inventory, setInventory] = useState([]);
-  const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
+  // FIX: Added 'range' to the initial state
+  const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
   const [srdEquipmentList, setSrdEquipmentList] = useState([]);
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
+
+  // RE-HYDRATION LOGIC
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        name: initialData.name || '', species: initialData.species || '', class: initialData.class || '', 
+        level: initialData.level || 1, theme: initialData.theme || 'indigo',
+        stats: initialData.stats || { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
+        alignment: initialData.alignment || 'Neutral', backstory: initialData.backstory || '', 
+        speed: initialData.speed || 30, hitDie: initialData.hitDice?.type || 'd10', 
+        imageUrl: initialData.imageUrl || '', tokenImg: initialData.img || '', 
+        age: initialData.age || '', height: initialData.height || '', weight: initialData.weight || '', 
+        eyes: initialData.eyes || '', skin: initialData.skin || '', hair: initialData.hair || ''
+      });
+
+      if (initialData.proficiencies) setCustomProfs(initialData.proficiencies);
+      if (initialData.features) {
+        setSpeciesTraits(initialData.features.filter(f => !f.name.includes('Class Feature')));
+        setClassFeatures(initialData.features.filter(f => f.name.includes('Class Feature')));
+      }
+      if (initialData.inventory) setInventory(initialData.inventory);
+      if (initialData.spells) setSpells(initialData.spells);
+      if (initialData.spellSlots && Object.keys(initialData.spellSlots).length > 0) setForceShowSpells(true);
+      if (initialData.companion) {
+        setHasCompanion(true);
+        setCompanionData(initialData.companion);
+      }
+    }
+  }, [initialData]);
 
   useEffect(() => { fetchAllEquipment().then(setSrdEquipmentList); }, []);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (formData.species.length > 2) {
+      if (formData.species.length > 2 && (!initialData || formData.species !== initialData.species)) {
         const data = await fetchSpeciesData(formData.species);
         if (data) setSrdSpeciesOffer(data);
       } else setSrdSpeciesOffer(null);
     }, 800);
     return () => clearTimeout(timer);
-  }, [formData.species]);
+  }, [formData.species, initialData]);
 
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (formData.class.length > 2) {
+      if (formData.class.length > 2 && (!initialData || formData.class !== initialData.class)) {
         const data = await fetchClassData(formData.class);
         if (data) setSrdClassOffer(data);
       } else setSrdClassOffer(null);
     }, 800);
     return () => clearTimeout(timer);
-  }, [formData.class]);
+  }, [formData.class, initialData]);
 
-  const hasSpells = !!spellcastingMeta || forceShowSpells;
+  const hasSpells = !!spellcastingMeta || forceShowSpells || spells.length > 0;
   const steps = ['identity', 'attributes', 'traits', 'features', ...(hasSpells ? ['spells'] : []), 'companion', 'inventory', 'lore'];
   const currentStep = steps[stepIndex];
 
   const updateField = (field, val) => setFormData(prev => ({ ...prev, [field]: val }));
   const updateStat = (stat, val) => setFormData(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(val) } }));
   const updateProf = (field, val) => setCustomProfs(prev => ({ ...prev, [field]: val }));
+  const updateCompField = (field, val) => setCompanionData(prev => ({ ...prev, [field]: val }));
+  const updateCompStat = (stat, val) => setCompanionData(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(val) } }));
   
   const rollStat = () => {
     const rolls = Array.from({ length: 4 }, () => Math.floor(Math.random() * 6) + 1).sort((a, b) => b - a);
@@ -114,7 +146,6 @@ export default function DMCharacterBuilder({ onClose }) {
       setClassFeatures(prog.features);
       setSpellcastingMeta(prog.spellcasting);
     }
-    
     setSrdClassOffer(null);
   };
 
@@ -145,10 +176,12 @@ export default function DMCharacterBuilder({ onClose }) {
       id: `item_${Date.now()}`, name: newItem.name, category: newItem.category, quantity: Number(newItem.quantity) || 1,
       desc: newItem.desc, imageUrl: newItem.imageUrl || '', damageDice: newItem.category === 'Weapon' ? newItem.damageDice : null,
       damageType: newItem.category === 'Weapon' ? newItem.damageType : null, properties: newItem.category === 'Weapon' ? newItem.properties : null,
+      range: newItem.category === 'Weapon' ? newItem.range : null, // FIX: Properly save range
       ac: newItem.category === 'Armor' ? Number(newItem.ac) : null
     };
     setInventory(prev => [...prev, formattedItem]);
-    setNewItem({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
+    // FIX: reset range
+    setNewItem({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
   };
 
   const removeInventoryItem = (index) => setInventory(prev => prev.filter((_, i) => i !== index));
@@ -161,13 +194,13 @@ export default function DMCharacterBuilder({ onClose }) {
     
     setIsSaving(true);
     try {
-      const charId = `char_${Date.now()}`;
+      const finalCharId = initialData ? charId : `char_${Date.now()}`;
       const conMod = Math.floor((formData.stats.CON - 10) / 2);
       const dexMod = Math.floor((formData.stats.DEX - 10) / 2);
 
       const combinedFeatures = [
-        ...speciesTraits.filter(t => t.name && t.desc).map(t => ({ name: t.name.includes('Trait:') ? t.name : `${formData.species || 'Base'} Trait: ${t.name}`, desc: t.desc })),
-        ...classFeatures.filter(f => f.name && f.desc).map(f => ({ name: `Class Feature: ${f.name}`, desc: f.desc }))
+        ...speciesTraits.filter(t => t.name && t.desc).map(t => ({ name: t.name.includes('Trait:') ? t.name : `${formData.species || 'Base'} Trait: ${t.name}`, desc: t.desc, isDefensive: t.isDefensive || false })),
+        ...classFeatures.filter(f => f.name && f.desc).map(f => ({ name: f.name.includes('Class Feature') ? f.name : `Class Feature: ${f.name}`, desc: f.desc, isDefensive: f.isDefensive || false }))
       ];
       
       const startLevel = Math.max(1, Number(formData.level) || 1);
@@ -178,12 +211,18 @@ export default function DMCharacterBuilder({ onClose }) {
       const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
       const totalMaxHp = levelOneHp + higherLevelHp;
 
-      const slots = {};
+      // Merge existing spell slots with new meta if editing
+      const slots = initialData?.spellSlots || {};
       if (spellcastingMeta) {
          Object.keys(spellcastingMeta).forEach(key => {
            if (key.startsWith('spell_slots_level_')) {
              const lvl = key.replace('spell_slots_level_', '');
-             if (spellcastingMeta[key] > 0) slots[lvl] = { current: spellcastingMeta[key], max: spellcastingMeta[key] };
+             if (spellcastingMeta[key] > 0) {
+                 slots[lvl] = { 
+                     current: slots[lvl] ? Math.min(slots[lvl].current, spellcastingMeta[key]) : spellcastingMeta[key], 
+                     max: spellcastingMeta[key] 
+                 };
+             }
            }
          });
       }
@@ -191,33 +230,40 @@ export default function DMCharacterBuilder({ onClose }) {
       const classesToPass = [{ name: formData.class || 'Fighter', level: startLevel }];
       const spellStats = calculateSpellcastingStats(classesToPass, formData.stats);
 
-      const newChar = {
+      const payload = {
         name: formData.name, species: formData.species || 'Human', class: formData.class || 'Fighter',
         classes: classesToPass, level: startLevel, theme: formData.theme,
-        exp: 0, alignment: formData.alignment,
+        alignment: formData.alignment,
         age: formData.age, height: formData.height, weight: formData.weight, eyes: formData.eyes, skin: formData.skin, hair: formData.hair,
-        hp: totalMaxHp, maxHp: totalMaxHp, tempHp: 0, hitDice: { current: startLevel, max: startLevel, type: formData.hitDie },
-        ac: 10 + dexMod, speed: formData.speed, initiative: '--', 
+        maxHp: totalMaxHp, hitDice: { current: initialData ? initialData.hitDice?.current : startLevel, max: startLevel, type: formData.hitDie },
+        ac: 10 + dexMod, speed: formData.speed,
         spellSave: spellStats.spellSave || '--', spellAttack: spellStats.spellAttack || '--',
-        combatInitiative: null, inspiration: false, isConcentrating: false, conditions: [], hasCompletedTutorial: false, journal: '',
-        stats: formData.stats, currency: { assarions: 0, quadrans: 0, leptons: 0 }, imageUrl: formData.imageUrl, img: formData.tokenImg,
-        deathSaves: { successes: 0, failures: 0 }, resources: [],
-        spellSlots: slots, spells: spells, dmNotes: '', attacks: [], 
-        proficiencies: customProfs, features: combinedFeatures, inventory: inventory,
-        traits: { personality: '', ideal: '', bond: '', flaws: '' }, backstory: formData.backstory, notes: '', levelUpPending: false,
+        stats: formData.stats, imageUrl: formData.imageUrl, img: formData.tokenImg,
+        spellSlots: slots, spells: spells, proficiencies: customProfs, features: combinedFeatures, inventory: inventory,
+        backstory: formData.backstory,
         companion: hasCompanion ? { ...companionData, hp: Number(companionData.hp), ac: Number(companionData.ac), speed: Number(companionData.speed), awakeLevel: Number(companionData.awakeLevel) } : null
       };
 
-      const batch = writeBatch(db);
-      batch.set(doc(db, 'characters', charId), newChar);
-
-      const sessionRef = doc(db, 'campaign', 'main_session');
-      batch.update(sessionRef, { unlockedCharacters: [...(window.unlockedCharactersCache || []), charId] });
-
-      await batch.commit();
+      if (initialData) {
+        await updateDoc(doc(db, 'characters', finalCharId), payload);
+      } else {
+        const newChar = {
+          ...payload,
+          exp: 0, hp: totalMaxHp, tempHp: 0, initiative: '--',
+          combatInitiative: null, inspiration: false, isConcentrating: false, conditions: [], hasCompletedTutorial: false, journal: '',
+          currency: { assarions: 0, quadrans: 0, leptons: 0 }, deathSaves: { successes: 0, failures: 0 }, resources: [],
+          dmNotes: '', attacks: [], traits: { personality: '', ideal: '', bond: '', flaws: '' }, notes: '', levelUpPending: false
+        };
+        const batch = writeBatch(db);
+        batch.set(doc(db, 'characters', finalCharId), newChar);
+        const sessionRef = doc(db, 'campaign', 'main_session');
+        batch.update(sessionRef, { unlockedCharacters: [...(window.unlockedCharactersCache || []), finalCharId] });
+        await batch.commit();
+      }
+      
       onClose();
     } catch (err) {
-      setDialog({ isOpen: true, title: 'Error', message: 'Failed to construct character.', type: 'alert', onConfirm: closeDialog });
+      setDialog({ isOpen: true, title: 'Error', message: 'Failed to scribe character data.', type: 'alert', onConfirm: closeDialog });
       setIsSaving(false);
     }
   };
@@ -228,14 +274,24 @@ export default function DMCharacterBuilder({ onClose }) {
       <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/10 blur-[150px] rounded-full pointer-events-none -z-10"></div>
 
-        <div className="bg-slate-900 border border-indigo-500/50 rounded-3xl w-full max-w-3xl shadow-[0_0_60px_rgba(99,102,241,0.2)] flex flex-col max-h-[90dvh] relative overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="bg-slate-900 border border-indigo-500/50 rounded-3xl w-full max-w-3xl shadow-[0_0_60px_rgba(99,102,241,0.2)] flex flex-col h-[90dvh] relative overflow-hidden animate-in zoom-in-95 duration-300">
           <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 relative z-10 shrink-0">
-            <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest"><UserPlus className="w-5 h-5 text-indigo-400" /> Construct Character</h2>
+            <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest">
+                {initialData ? <><Edit3 className="w-5 h-5 text-amber-400" /> Edit Character</> : <><UserPlus className="w-5 h-5 text-indigo-400" /> Construct Character</>}
+            </h2>
             <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors bg-slate-800 p-2 rounded-xl border border-slate-700"><X className="w-4 h-4" /></button>
           </div>
 
-          <div className="flex h-1.5 bg-slate-800 shrink-0">
-             <div className="h-full bg-indigo-500 transition-all duration-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]" style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}></div>
+          <div className="flex bg-slate-950 border-b-[3px] border-slate-900 shrink-0 overflow-x-auto custom-scrollbar p-3 gap-2">
+            {steps.map((step, idx) => (
+              <button 
+                key={step}
+                onClick={() => setStepIndex(idx)}
+                className={`px-4 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${stepIndex === idx ? 'bg-indigo-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 border-slate-950 hover:bg-slate-800 hover:text-white'}`}
+              >
+                {step}
+              </button>
+            ))}
           </div>
 
           <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
@@ -261,8 +317,8 @@ export default function DMCharacterBuilder({ onClose }) {
                  Next Step <ChevronRight className="w-5 h-5" />
                </button>
             ) : (
-               <button onClick={handleFinish} disabled={isSaving || !formData.name} className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)]">
-                 {isSaving ? 'Scribing Data...' : 'Construct Character'}
+               <button onClick={handleFinish} disabled={isSaving || !formData.name} className={`flex-1 ${initialData ? 'bg-amber-600 hover:bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]'} disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all`}>
+                 {isSaving ? 'Scribing Data...' : (initialData ? 'Save Changes' : 'Construct Character')}
                </button>
             )}
           </div>

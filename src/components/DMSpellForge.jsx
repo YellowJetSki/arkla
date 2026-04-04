@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { collection, addDoc, getDocs, updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Wand2, X, Target, Search, Loader2, Plus, BookOpen, Flame } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
@@ -20,6 +20,48 @@ export default function DMSpellForge({ onClose }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [srdSpells, setSrdSpells] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Target Assignment State
+  const [targets, setTargets] = useState({ players: [], enemies: [] });
+  const [selectedTarget, setSelectedTarget] = useState('');
+
+  // Fetch active players and enemies for assignment
+  useEffect(() => {
+    const fetchTargets = async () => {
+      try {
+        const playersSnap = await getDocs(collection(db, 'characters'));
+        const enemiesSnap = await getDocs(collection(db, 'active_enemies'));
+        
+        setTargets({
+          players: playersSnap.docs.map(d => ({ id: d.id, name: d.data().name || 'Unknown Player' })),
+          enemies: enemiesSnap.docs.map(d => ({ id: d.id, name: d.data().name || 'Unknown Enemy' }))
+        });
+      } catch (e) {
+        console.error("Failed to fetch targets", e);
+      }
+    };
+    fetchTargets();
+  }, []);
+
+  // API Search Debouncer
+  useEffect(() => {
+    const delayFn = setTimeout(async () => {
+      if (searchQuery.trim().length > 1) {
+        setIsSearching(true);
+        try {
+          const res = await fetch(`https://www.dnd5eapi.co/api/spells/?name=${encodeURIComponent(searchQuery.trim())}`);
+          const data = await res.json();
+          setSrdSpells(data.results || []);
+        } catch (err) {
+          console.error(err);
+        }
+        setIsSearching(false);
+      } else {
+        setSrdSpells([]);
+      }
+    }, 500);
+    return () => clearTimeout(delayFn);
+  }, [searchQuery]);
 
   const handleComponentChange = (comp) => {
     setSpell(prev => ({
@@ -42,29 +84,40 @@ export default function DMSpellForge({ onClose }) {
         desc: typeof spell.desc === 'string' ? spell.desc.split('\n') : spell.desc,
         index: `hb_spell_${Date.now()}`
       };
+      
+      // 1. Always save to Archives
       await addDoc(collection(db, 'homebrew_spells'), formattedSpell);
-      setDialog({ isOpen: true, title: 'Success', message: 'Custom spell scribed to archives!', type: 'alert', onConfirm: onClose });
+
+      // 2. Assign to target if selected
+      if (selectedTarget) {
+        const [type, id] = selectedTarget.split(':');
+        
+        if (type === 'player') {
+           await updateDoc(doc(db, 'characters', id), {
+              spells: arrayUnion(formattedSpell)
+           });
+        } else if (type === 'enemy') {
+           // For enemies, we format it as an action so it reliably renders in their stat block
+           const spellText = `*Level ${spell.level} ${spell.school.name}*.\n**Casting Time:** ${spell.casting_time}\n**Range:** ${spell.range}\n**Components:** ${spell.components.join(', ')}\n**Duration:** ${spell.duration}\n\n${formattedSpell.desc.join('\n')}`;
+           await updateDoc(doc(db, 'active_enemies', id), {
+              actions: arrayUnion({ name: `Spell: ${spell.name}`, desc: spellText })
+           });
+        }
+      }
+
+      setDialog({ 
+        isOpen: true, 
+        title: 'Success', 
+        message: selectedTarget ? 'Spell scribed and assigned to target!' : 'Custom spell scribed to archives!', 
+        type: 'alert', 
+        onConfirm: onClose 
+      });
     } catch (error) {
       console.error("Error forging spell:", error);
       setDialog({ isOpen: true, title: 'Forge Error', message: 'Failed to scribe the spell.', type: 'alert' });
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const searchApi = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    setIsSearching(true);
-    try {
-      const res = await fetch(`https://www.dnd5eapi.co/api/spells/?name=${encodeURIComponent(searchQuery.trim())}`);
-      const data = await res.json();
-      setSrdSpells(data.results || []);
-    } catch (err) {
-      console.error(err);
-      setDialog({ isOpen: true, title: 'API Error', message: 'Failed to search archives.', type: 'alert' });
-    }
-    setIsSearching(false);
   };
 
   const loadApiSpellIntoForge = async (url) => {
@@ -192,19 +245,39 @@ export default function DMSpellForge({ onClose }) {
                   <textarea value={typeof spell.desc === 'string' ? spell.desc : spell.desc.join('\n')} onChange={e => setSpell({...spell, desc: e.target.value})} className="w-full h-40 bg-slate-950 border-2 border-slate-900 rounded-xl px-4 py-4 text-slate-300 font-medium text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner resize-y custom-scrollbar leading-relaxed" placeholder="The magic erupts..." />
                 </div>
                 
+                <div className="bg-slate-900 border-[3px] border-slate-950 p-4 rounded-2xl shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                  <label className="block text-[10px] font-black text-fuchsia-500 uppercase tracking-widest mb-2">Assign Spell (Optional)</label>
+                  <select value={selectedTarget} onChange={e => setSelectedTarget(e.target.value)} className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-4 py-3 text-white text-sm font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner appearance-none cursor-pointer">
+                     <option value="">Save to Archives Only</option>
+                     {targets.players.length > 0 && (
+                       <optgroup label="Active Players" className="text-indigo-400">
+                         {targets.players.map(p => <option key={p.id} value={`player:${p.id}`}>{p.name}</option>)}
+                       </optgroup>
+                     )}
+                     {targets.enemies.length > 0 && (
+                       <optgroup label="Active Enemies" className="text-red-400">
+                         {targets.enemies.map(e => <option key={e.id} value={`enemy:${e.id}`}>{e.name}</option>)}
+                       </optgroup>
+                     )}
+                  </select>
+                </div>
+
                 <button type="submit" disabled={isSaving} className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-950 font-black uppercase tracking-widest py-4 rounded-xl transition-all border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none">
-                  {isSaving ? 'Scribing...' : 'Scribe Custom Spell'}
+                  {isSaving ? 'Scribing...' : selectedTarget ? 'Scribe & Assign Spell' : 'Scribe Custom Spell'}
                 </button>
               </form>
             ) : (
               <div className="space-y-6 animate-in fade-in">
-                <form onSubmit={searchApi} className="relative bg-slate-900 p-4 rounded-2xl border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex gap-3">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 font-black" />
-                    <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search API for Spells (e.g. Fireball)..." className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl pl-10 pr-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" />
-                  </div>
-                  <button type="submit" className="bg-fuchsia-600 hover:bg-fuchsia-500 px-6 py-3 rounded-xl text-slate-950 font-black text-xs uppercase tracking-widest border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all">Search</button>
-                </form>
+                <div className="relative bg-slate-900 p-4 rounded-2xl border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+                  <Search className="absolute left-7 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 font-black" />
+                  <input 
+                    type="text" 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    placeholder="Search API for Spells (e.g. Fireball)..." 
+                    className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl pl-12 pr-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-fuchsia-500 shadow-inner" 
+                  />
+                </div>
                 
                 {isSearching ? (
                   <div className="flex justify-center p-12"><Loader2 className="w-10 h-10 text-fuchsia-500 animate-spin" /></div>

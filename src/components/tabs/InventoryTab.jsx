@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, runTransaction, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, runTransaction, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Backpack, Coins, Search, Hammer, Plus, Minus, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon, Filter } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
@@ -220,15 +220,10 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   };
 
   const adjustCurrency = async (type, amount) => {
-    if (!charId) return;
-    const charRef = doc(db, 'characters', charId);
+    if (!charId || !char) return;
+    const current = char.currency?.[type] || 0;
     try {
-      await runTransaction(db, async (transaction) => {
-        const sfDoc = await transaction.get(charRef);
-        if (!sfDoc.exists()) return;
-        const current = sfDoc.data().currency?.[type] || 0;
-        transaction.update(charRef, { [`currency.${type}`]: Math.max(0, current + amount) });
-      });
+      await updateDoc(doc(db, 'characters', charId), { [`currency.${type}`]: Math.max(0, current + amount) });
     } catch (err) { console.error(err); }
   };
 

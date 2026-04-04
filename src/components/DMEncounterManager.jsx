@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, doc, setDoc, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, onSnapshot, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { ShieldAlert, X, Plus, Play, Trash2, Map, Users } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
@@ -61,8 +61,10 @@ export default function DMEncounterManager({ onClose }) {
       return;
     }
     
+    // Force object format
+    let currentPresets = Array.isArray(encounters) ? { ...encounters } : encounters;
     const updatedEncounters = {
-      ...encounters,
+      ...currentPresets,
       [Date.now().toString()]: {
         name: newEncounterName,
         enemies: draftEnemies
@@ -81,9 +83,15 @@ export default function DMEncounterManager({ onClose }) {
       message: 'Are you sure you want to permanently delete this saved encounter?',
       type: 'confirm',
       onConfirm: async () => {
-        const updatedEncounters = { ...encounters };
-        delete updatedEncounters[encounterKey];
-        await setDoc(doc(db, 'campaign', 'encounters'), { presets: updatedEncounters });
+        let newPresets;
+        // Check if legacy array format, handle gracefully
+        if (Array.isArray(encounters)) {
+          newPresets = encounters.filter((_, idx) => idx.toString() !== encounterKey.toString());
+        } else {
+          newPresets = { ...encounters };
+          delete newPresets[encounterKey];
+        }
+        await updateDoc(doc(db, 'campaign', 'encounters'), { presets: newPresets });
         closeDialog();
       }
     });
@@ -101,14 +109,18 @@ export default function DMEncounterManager({ onClose }) {
             const uniqueId = `${draftEnemy.id}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
             const enemyRef = doc(db, 'active_enemies', uniqueId);
             
-            const enemyDex = draftEnemy.fullData.stats?.DEX || 10;
+            const enemyData = draftEnemy.fullData || {};
+            const enemyDex = enemyData.stats?.DEX || 10;
             const dexMod = Math.floor((enemyDex - 10) / 2);
             const rolledInitiative = Math.floor(Math.random() * 20) + 1 + dexMod;
 
             await setDoc(enemyRef, {
-              ...draftEnemy.fullData,
+              ...enemyData,
+              name: draftEnemy.name || 'Unknown Entity',
               id: uniqueId, 
-              currentHp: draftEnemy.fullData.hp || draftEnemy.fullData.maxHp || 10,
+              currentHp: enemyData.hp || enemyData.maxHp || 10,
+              maxHp: enemyData.maxHp || enemyData.hp || 10,
+              img: enemyData.tokenUrl || enemyData.imageUrl || '/icon.png', 
               conditions: [],
               encounterName: encounter.name,
               initiative: rolledInitiative 
@@ -128,7 +140,6 @@ export default function DMEncounterManager({ onClose }) {
       <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
         <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl w-full max-w-5xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500 relative overflow-hidden">
           
-          {/* Solid Color Header */}
           <div className="p-4 border-b-[3px] border-slate-950 flex justify-between items-center bg-indigo-500 rounded-t-xl shrink-0 relative z-10">
             <h2 className="text-xl font-black text-slate-950 flex items-center gap-2 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,0.3)]">
               <ShieldAlert className="w-6 h-6" /> Encounter Staging
@@ -140,7 +151,6 @@ export default function DMEncounterManager({ onClose }) {
 
           <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 bg-slate-950 relative z-10">
             
-            {/* Left Column: Draft Encounter */}
             <div className="space-y-6">
               <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden">
                 <div className="flex justify-between items-center border-b-2 border-slate-950 pb-3 mb-4">
@@ -175,7 +185,6 @@ export default function DMEncounterManager({ onClose }) {
               </div>
             </div>
 
-            {/* Right Column: Saved Encounters */}
             <div className="space-y-4">
               <h3 className="font-black text-white border-b-[3px] border-slate-900 pb-3 flex items-center gap-2 uppercase tracking-widest text-lg drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><Map className="w-6 h-6 text-indigo-500" /> Saved Encounters</h3>
               {Object.keys(encounters).length === 0 ? (

@@ -12,6 +12,95 @@ const speciesDataCache = new Map();
 const classDataCache = new Map();
 const spellDetailsCache = new Map();
 
+// ==========================================
+// CUSTOM KNOWLEDGE BASE INTERCEPTOR
+// ==========================================
+// This bypasses the OGL limitations of the public SRD API.
+// Add any homebrew species or missing official sub-species here!
+const CUSTOM_SPECIES = {
+  "wood elf": {
+    name: "Wood Elf",
+    speed: 35,
+    languages: "Common, Elvish",
+    traits: [
+      { name: "Darkvision", desc: "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light." },
+      { name: "Keen Senses", desc: "You have proficiency in the Perception skill." },
+      { name: "Fey Ancestry", desc: "You have advantage on saving throws against being charmed, and magic can't put you to sleep." },
+      { name: "Elf Weapon Training", desc: "You have proficiency with the longsword, shortsword, shortbow, and longbow." },
+      { name: "Fleet of Foot", desc: "Your base walking speed increases to 35 feet." },
+      { name: "Mask of the Wild", desc: "You can attempt to hide even when you are only lightly obscured by foliage, heavy rain, falling snow, mist, and other natural phenomena." }
+    ]
+  },
+  "drow": {
+    name: "Drow",
+    speed: 30,
+    languages: "Common, Elvish, Undercommon",
+    traits: [
+      { name: "Superior Darkvision", desc: "Your darkvision has a radius of 120 feet." },
+      { name: "Sunlight Sensitivity", desc: "You have disadvantage on attack rolls and on Wisdom (Perception) checks that rely on sight when you, the target of your attack, or whatever you are trying to perceive is in direct sunlight." },
+      { name: "Drow Magic", desc: "You know the Dancing Lights cantrip. When you reach 3rd level, you can cast Faerie Fire. When you reach 5th level, you can cast Darkness. Charisma is your spellcasting ability." },
+      { name: "Drow Weapon Training", desc: "You have proficiency with rapiers, shortswords, and hand crossbows." }
+    ]
+  },
+  "dark elf": {
+    name: "Dark Elf",
+    speed: 30,
+    languages: "Common, Elvish, Undercommon",
+    traits: [
+      { name: "Superior Darkvision", desc: "Your darkvision has a radius of 120 feet." },
+      { name: "Sunlight Sensitivity", desc: "You have disadvantage on attack rolls and on Wisdom (Perception) checks that rely on sight when you, the target of your attack, or whatever you are trying to perceive is in direct sunlight." },
+      { name: "Drow Magic", desc: "You know the Dancing Lights cantrip. When you reach 3rd level, you can cast Faerie Fire. When you reach 5th level, you can cast Darkness. Charisma is your spellcasting ability." },
+      { name: "Drow Weapon Training", desc: "You have proficiency with rapiers, shortswords, and hand crossbows." }
+    ]
+  },
+  "mountain dwarf": {
+    name: "Mountain Dwarf",
+    speed: 25,
+    languages: "Common, Dwarvish",
+    traits: [
+      { name: "Darkvision", desc: "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light." },
+      { name: "Dwarven Resilience", desc: "You have advantage on saving throws against poison, and you have resistance against poison damage." },
+      { name: "Dwarven Combat Training", desc: "You have proficiency with the battleaxe, handaxe, light hammer, and warhammer." },
+      { name: "Dwarven Armor Training", desc: "You have proficiency with light and medium armor." },
+      { name: "Stonecunning", desc: "Whenever you make an Intelligence (History) check related to the origin of stonework, you add double your proficiency bonus to the check." }
+    ]
+  },
+  "stout halfling": {
+    name: "Stout Halfling",
+    speed: 25,
+    languages: "Common, Halfling",
+    traits: [
+      { name: "Lucky", desc: "When you roll a 1 on the d20 for an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll." },
+      { name: "Brave", desc: "You have advantage on saving throws against being frightened." },
+      { name: "Halfling Nimbleness", desc: "You can move through the space of any creature that is of a size larger than yours." },
+      { name: "Stout Resilience", desc: "You have advantage on saving throws against poison, and you have resistance against poison damage." }
+    ]
+  },
+  "forest gnome": {
+    name: "Forest Gnome",
+    speed: 25,
+    languages: "Common, Gnomish",
+    traits: [
+      { name: "Darkvision", desc: "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light." },
+      { name: "Gnome Cunning", desc: "You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic." },
+      { name: "Natural Illusionist", desc: "You know the minor illusion cantrip. Intelligence is your spellcasting ability for it." },
+      { name: "Speak with Small Beasts", desc: "Through sounds and gestures, you can communicate simple ideas with Small or smaller beasts." }
+    ]
+  },
+  "half-elf": {
+    name: "Half-Elf",
+    speed: 30,
+    languages: "Common, Elvish, and one extra language",
+    traits: [
+      { name: "Darkvision", desc: "You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light." },
+      { name: "Fey Ancestry", desc: "You have advantage on saving throws against being charmed, and magic can't put you to sleep." },
+      { name: "Skill Versatility", desc: "You gain proficiency in two skills of your choice." }
+    ]
+  }
+};
+// ==========================================
+
+
 export const fetchAllEquipment = async () => {
   if (equipmentListCache) return equipmentListCache;
   try {
@@ -99,8 +188,17 @@ export const fetchEquipmentDetails = async (urlOrIndex) => {
 
 export const fetchSpeciesData = async (speciesInput) => {
   if (!speciesInput) return null;
-  const formattedInput = speciesInput.toLowerCase().trim().replace(/\s+/g, '-');
-  const baseRaceFallback = speciesInput.toLowerCase().split(' ').pop(); 
+  
+  const lowerInput = speciesInput.toLowerCase().trim();
+  
+  // 1. Intercept with Custom Knowledge Base First
+  if (CUSTOM_SPECIES[lowerInput]) {
+    return CUSTOM_SPECIES[lowerInput];
+  }
+
+  // 2. Fallback to the Public SRD API
+  const formattedInput = lowerInput.replace(/\s+/g, '-');
+  const baseRaceFallback = lowerInput.split(' ').pop(); 
   if (speciesDataCache.has(formattedInput)) return speciesDataCache.get(formattedInput);
 
   try {

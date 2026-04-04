@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 
 export default function TokenLayer({
   tokens,
@@ -53,6 +54,9 @@ export default function TokenLayer({
       )}
 
       {Object.values(tokens).map(token => {
+        // SAFETY: Only render tokens with a valid ID
+        if (!token || !token.id) return null;
+
         const isSelected = mapData.activeTokenId === token.id || selectedTokenId === token.id;
         const isDead = token.hp <= 0;
         const gridPixelSize = 50 * (token.size || 1);
@@ -79,7 +83,7 @@ export default function TokenLayer({
             onContextMenu={(e) => { e.preventDefault(); setContextMenu({ token, x: e.clientX, y: e.clientY }); }}
             onClick={(e) => { e.stopPropagation(); setSelectedTokenId(selectedTokenId === token.id ? null : token.id); }}
           >
-            <div className="relative w-full h-full p-0.5 group/token">
+            <div className="relative w-full h-full p-0.5 group/token flex items-center justify-center">
                
                {/* Quick HP HUD (DM Only, when selected) */}
                {isSelected && (
@@ -88,6 +92,10 @@ export default function TokenLayer({
                    <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp - 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">-1</button>
                    <span className={`text-[10px] font-black px-1.5 min-w-[24px] text-center ${isDead ? 'text-red-500' : 'text-white'}`}>{token.hp}</span>
                    <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp + 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">+1</button>
+                   <div className="w-px h-4 bg-slate-700 mx-1"></div>
+                   <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, -99999); }} className="p-1 bg-slate-800 hover:bg-red-600 text-white rounded cursor-pointer" title="Remove Token">
+                     <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
+                   </button>
                  </div>
                )}
 
@@ -117,10 +125,12 @@ export default function TokenLayer({
                  </div>
                )}
                
-               {/* HP Bar (Hidden if dead) */}
+               {/* Centered HP Bar (Hidden if dead) */}
                {!isDead && (
-                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[80%] h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 z-10">
-                   <div className={`h-full ${token.hp > (token.maxHp/2) ? 'bg-emerald-500' : token.hp > (token.maxHp/4) ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.max(0, Math.min(100, (token.hp / token.maxHp) * 100))}%` }}></div>
+                 <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-[80%] h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 z-10 flex justify-center items-center">
+                   <div className="w-full h-full bg-slate-800">
+                     <div className={`h-full ${token.hp > (token.maxHp/2) ? 'bg-emerald-500' : token.hp > (token.maxHp/4) ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.max(0, Math.min(100, (token.hp / token.maxHp) * 100))}%` }}></div>
+                   </div>
                  </div>
                )}
                

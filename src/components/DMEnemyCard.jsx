@@ -96,6 +96,18 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
   const hpPercent = Math.max(0, Math.min(100, (currentHp / enemy.hp) * 100));
   const hpColor = hpPercent > 50 ? 'bg-emerald-500/80' : hpPercent > 20 ? 'bg-amber-500/80' : 'bg-red-500/80';
 
+  // Data Normalization Helper: Makes sure strings are safely wrapped into arrays to prevent .map crashes
+  const normalizeArray = (val, defaultName) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') return [{ name: defaultName, desc: val }];
+    return [];
+  };
+
+  const safeActions = normalizeArray(enemy.actions, 'Actions');
+  const safeFeatures = normalizeArray(enemy.features, 'Traits');
+  const safeParsedActions = normalizeArray(enemy.parsedActions, 'Actions');
+
   return (
     <>
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
@@ -249,18 +261,18 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
             </div>
           </div>
 
-          {(enemy.actions?.length > 0 || enemy.features?.length > 0) && (
+          {(safeActions.length > 0 || safeFeatures.length > 0) && (
             <div className="bg-slate-900 p-4 rounded-xl border-2 border-slate-950 space-y-4 mt-auto shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-              {enemy.features?.map((f, i) => (
+              {safeFeatures.map((f, i) => (
                 <div key={`f-${i}`} className="text-xs border-b-2 border-slate-950 pb-3 last:border-0 last:pb-0">
                   <span className="font-black text-amber-500 uppercase tracking-widest block mb-1 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">{f.name}</span>
-                  <span className="text-slate-300 font-medium leading-relaxed">{f.desc}</span>
+                  <span className="text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{f.desc}</span>
                 </div>
               ))}
-              {enemy.actions?.map((a, i) => (
+              {safeActions.map((a, i) => (
                 <div key={`a-${i}`} className="text-xs border-b-2 border-slate-950 pb-3 last:border-0 last:pb-0">
                   <span className="font-black text-red-500 uppercase tracking-widest block mb-1 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">{a.name}</span>
-                  <span className="text-slate-300 font-medium leading-relaxed">{a.desc}</span>
+                  <span className="text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{a.desc}</span>
                 </div>
               ))}
             </div>
@@ -289,28 +301,28 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
             </div>
 
             <div className="space-y-4 pt-2">
-              {enemy.features && enemy.features.length > 0 && (
+              {safeFeatures.length > 0 && (
                 <div className="bg-slate-900 border-2 border-slate-950 rounded-xl p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
                   <h5 className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-3 border-b-2 border-slate-950 pb-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">Traits</h5>
-                  {enemy.features.map((feat, i) => (
-                    <p key={i} className="text-xs text-slate-300 font-medium mb-2 leading-relaxed"><strong className="text-white font-black uppercase tracking-wider">{feat.name}.</strong> {feat.desc}</p>
+                  {safeFeatures.map((feat, i) => (
+                    <p key={i} className="text-xs text-slate-300 font-medium mb-2 leading-relaxed whitespace-pre-wrap"><strong className="text-white font-black uppercase tracking-wider">{feat.name}.</strong> {feat.desc}</p>
                   ))}
                 </div>
               )}
               
-              {enemy.actions && enemy.actions.length > 0 && (
+              {safeActions.length > 0 && (
                 <div className="bg-slate-900 border-2 border-slate-950 rounded-xl p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
                   <h5 className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-3 flex items-center gap-1.5 border-b-2 border-slate-950 pb-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><Swords className="w-4 h-4"/> Actions</h5>
-                  {enemy.actions.map((act, i) => (
-                    <p key={i} className="text-xs text-slate-300 font-medium mb-2.5 leading-relaxed"><strong className="text-white font-black uppercase tracking-wider">{act.name}.</strong> {act.desc}</p>
+                  {safeActions.map((act, i) => (
+                    <p key={i} className="text-xs text-slate-300 font-medium mb-2.5 leading-relaxed whitespace-pre-wrap"><strong className="text-white font-black uppercase tracking-wider">{act.name}.</strong> {act.desc}</p>
                   ))}
                 </div>
               )}
 
-              {enemy.parsedActions && enemy.parsedActions.length > 0 && (
+              {safeParsedActions.length > 0 && (
                 <div className="bg-slate-900 border-2 border-slate-950 rounded-xl p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
                   <h5 className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-3 flex items-center gap-1.5 border-b-2 border-slate-950 pb-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><Swords className="w-4 h-4"/> Actions</h5>
-                  {enemy.parsedActions.map((act, i) => (
+                  {safeParsedActions.map((act, i) => (
                     <p key={i} className="text-xs text-slate-300 font-medium mb-3 leading-relaxed whitespace-pre-wrap"><strong className="text-white font-black uppercase tracking-wider block mb-1">{act.name}.</strong>{act.desc}</p>
                   ))}
                 </div>
