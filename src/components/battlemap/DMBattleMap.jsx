@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -395,7 +395,7 @@ export default function DMBattleMap() {
                 />
              </div>
              <div className="p-4 bg-slate-950 flex justify-end gap-3 border-t-2 border-slate-900">
-                <button type="button" onClick={() => setImagePrompt({ isOpen: false, tokenId: null, url: '' })} className="px-5 py-2.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-900 hover:text-white border-2 border-slate-800 transition-colors">Cancel</button>
+                <button type="button" onClick={() => setImagePrompt({ isOpen: false, tokenId: null, url: '' })} className="px-5 py-2.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-900 hover:text-white border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all">Cancel</button>
                 <button type="submit" className="px-6 py-2.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest text-slate-950 bg-indigo-500 hover:bg-indigo-400 border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all">Update</button>
              </div>
           </form>
