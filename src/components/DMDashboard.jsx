@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, doc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, Map, Users, Swords, Skull, Flame } from 'lucide-react';
 
@@ -27,7 +27,6 @@ export default function DMDashboard({ onLogout }) {
   const [activeManager, setActiveManager] = useState(null); 
   const [isBattleMode, setIsBattleMode] = useState(false); 
   
-  // Mobile Navigation State
   const [mobileTab, setMobileTab] = useState('initiative');
 
   const [showScratchpad, setShowScratchpad] = useState(false);
@@ -114,11 +113,25 @@ export default function DMDashboard({ onLogout }) {
       onConfirm: async () => {
         try {
           const batch = writeBatch(db);
+          
           for (const charId of unlockedCharacters) {
             batch.update(doc(db, 'characters', charId), { conditions: [], isConcentrating: false });
           }
+          
           const enemyDocs = await getDocs(collection(db, 'active_enemies'));
           enemyDocs.forEach((docSnap) => batch.update(docSnap.ref, { conditions: [] }));
+
+          const mapRef = doc(db, 'campaign', 'battlemap');
+          const mapSnap = await getDoc(mapRef);
+          if (mapSnap.exists() && mapSnap.data().tokens) {
+            const mapTokens = mapSnap.data().tokens;
+            Object.keys(mapTokens).forEach(tokenId => {
+               mapTokens[tokenId].conditions = [];
+               mapTokens[tokenId].isConcentrating = false;
+            });
+            batch.update(mapRef, { tokens: mapTokens });
+          }
+
           await batch.commit();
           closeDialog();
           showToast('All Conditions Swept');
@@ -135,14 +148,26 @@ export default function DMDashboard({ onLogout }) {
       const batch = writeBatch(db);
       const targets = selectedEnemies.length > 0 ? activeEnemies.filter(e => selectedEnemies.includes(e.id)) : activeEnemies;
       
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      const mapSnap = await getDoc(mapRef);
+      let mapTokens = mapSnap.exists() ? mapSnap.data().tokens || {} : {};
+      let tokensChanged = false;
+
       targets.forEach(enemy => {
         const ref = doc(db, 'active_enemies', enemy.id);
         const current = enemy.currentHp ?? enemy.hp;
         const newHp = isDamage ? Math.max(0, current - amt) : Math.min(enemy.hp, current + amt);
         batch.update(ref, { currentHp: newHp });
+
+        if (mapTokens[enemy.id]) {
+           mapTokens[enemy.id].hp = newHp;
+           tokensChanged = true;
+        }
       });
       
+      if (tokensChanged) batch.update(mapRef, { tokens: mapTokens });
       await batch.commit();
+      
       setMassMathAmount('');
       setSelectedEnemies([]); 
       showToast(isDamage ? `Applied ${amt} Mass Damage` : `Applied ${amt} Mass Healing`);
