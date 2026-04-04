@@ -120,19 +120,24 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
   };
 
   const updateValue = (index, val) => {
-    const newOrder = [...initiative];
-    newOrder[index].value = Number(val);
-    newOrder.sort((a, b) => b.value - a.value);
-    saveInitiative(newOrder, activeTurn, round);
+    const newOrder = [...initiativeRef.current];
+    const activeId = activeTurn >= 0 ? newOrder[activeTurn]?.id : null;
+    
+    newOrder[index].value = Number(val) || 0;
+    newOrder.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+    
+    const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
+    saveInitiative(newOrder, newTurn, round);
   };
 
   const resetValues = () => {
-    const resetOrder = initiative.map(item => ({ ...item, value: 0 }));
+    const resetOrder = initiativeRef.current.map(item => ({ ...item, value: 0 }));
     saveInitiative(resetOrder, -1, 1);
   };
 
   const autoRollEnemies = () => {
-    const newOrder = [...initiative];
+    const newOrder = [...initiativeRef.current];
+    const activeId = activeTurn >= 0 ? newOrder[activeTurn]?.id : null;
     let changed = false;
     
     newOrder.forEach(actor => {
@@ -148,26 +153,28 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
     });
 
     if (changed) {
-      newOrder.sort((a, b) => b.value - a.value);
-      saveInitiative(newOrder, activeTurn, round);
+      newOrder.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+      const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
+      saveInitiative(newOrder, newTurn, round);
     }
   };
 
   const nextTurn = () => {
-    if (initiative.length === 0) return;
+    const currentOrder = initiativeRef.current;
+    if (currentOrder.length === 0) return;
     
     let nextIndex = activeTurn;
     let newRound = round;
     let foundAlive = false;
 
-    for (let i = 1; i <= initiative.length; i++) {
-      let checkIndex = (activeTurn + i) % initiative.length;
+    for (let i = 1; i <= currentOrder.length; i++) {
+      let checkIndex = (activeTurn + i) % currentOrder.length;
       
       if (checkIndex === 0 && activeTurn !== -1) {
         newRound++;
       }
 
-      const actor = initiative[checkIndex];
+      const actor = currentOrder[checkIndex];
       let isDead = false;
       
       if (actor.type === 'enemy') {
@@ -186,13 +193,13 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
 
     if (!foundAlive) {
       nextIndex = activeTurn + 1;
-      if (nextIndex >= initiative.length) { nextIndex = 0; newRound++; }
+      if (nextIndex >= currentOrder.length) { nextIndex = 0; newRound++; }
     }
 
-    saveInitiative(initiative, nextIndex, newRound);
+    saveInitiative(currentOrder, nextIndex, newRound);
   };
 
-  const addCustomActor = (e) => {
+  const addCustomActor = async (e) => {
     e.preventDefault();
     if (!newCustomName.trim()) return;
     
@@ -203,15 +210,25 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
       value: 20 
     };
     
-    const newOrder = [...initiative, newActor].sort((a, b) => b.value - a.value);
-    saveInitiative(newOrder, activeTurn, round);
+    const currentInitiative = [...initiativeRef.current];
+    const activeId = activeTurn >= 0 ? currentInitiative[activeTurn]?.id : null;
+
+    const newOrder = [...currentInitiative, newActor].sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
+    const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
+
+    await saveInitiative(newOrder, newTurn, round);
     setNewCustomName('');
     setShowCustomForm(false);
   };
 
   const removeCustomActor = (id) => {
-    const newOrder = initiative.filter(i => i.id !== id);
-    saveInitiative(newOrder, activeTurn, round);
+    const currentInitiative = [...initiativeRef.current];
+    const activeId = activeTurn >= 0 ? currentInitiative[activeTurn]?.id : null;
+    
+    const newOrder = currentInitiative.filter(i => i.id !== id);
+    const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
+    
+    saveInitiative(newOrder, newTurn >= 0 ? newTurn : -1, round);
   };
 
   const activeActorData = initiative[activeTurn];

@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, doc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, Map, Users, Swords, Skull } from 'lucide-react';
+import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, Map, Users, Swords, Skull, Flame } from 'lucide-react';
 
 import InitiativeTracker from './InitiativeTracker';
 import DMEncounterManager from './DMEncounterManager';
 import DMItemManager from './DMItemManager'; 
+import DMSpellVault from './DMSpellVault';
+import DMFeatVault from './DMFeatVault';
 import DMHandoutManager from './DMHandoutManager';
 import DMXPManager from './DMXPManager';
 import DMReferenceModal from './DMReferenceModal';
@@ -13,7 +15,6 @@ import DialogModal from './shared/DialogModal';
 import DebouncedTextarea from './shared/DebouncedTextarea';
 import EnemyForge from './EnemyForge';
 import DMCharacterBuilder from './DMCharacterBuilder';
-import DMSpellForge from './DMSpellForge';
 
 import DMPartyPanel from './DMPartyPanel';
 import DMThreatsPanel from './DMThreatsPanel';
@@ -31,7 +32,6 @@ export default function DMDashboard({ onLogout }) {
 
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [isForgingEnemy, setIsForgingEnemy] = useState(false);
-  const [isForgingSpell, setIsForgingSpell] = useState(false);
   const [isBuildingCharacter, setIsBuildingCharacter] = useState(false);
   const [scratchpad, setScratchpad] = useState(() => localStorage.getItem('dm_scratchpad') || '');
 
@@ -214,11 +214,12 @@ export default function DMDashboard({ onLogout }) {
       )}
 
       {isForgingEnemy && <EnemyForge onClose={() => setIsForgingEnemy(false)} />}
-      {isForgingSpell && <DMSpellForge onClose={() => setIsForgingSpell(false)} />}
       {isBuildingCharacter && <DMCharacterBuilder onClose={() => setIsBuildingCharacter(false)} />}
       
       {activeManager === 'encounters' && <DMEncounterManager onClose={() => setActiveManager(null)} />}
       {activeManager === 'items' && <DMItemManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
+      {activeManager === 'spells' && <DMSpellVault activePlayers={unlockedCharacters} activeEnemies={activeEnemies} onClose={() => setActiveManager(null)} />}
+      {activeManager === 'feats' && <DMFeatVault activePlayers={unlockedCharacters} activeEnemies={activeEnemies} onClose={() => setActiveManager(null)} />}
       {activeManager === 'handouts' && <DMHandoutManager onClose={() => setActiveManager(null)} />}
       {activeManager === 'rules' && <DMReferenceModal onClose={() => setActiveManager(null)} />}
       {activeManager === 'xp' && <DMXPManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
@@ -235,28 +236,30 @@ export default function DMDashboard({ onLogout }) {
         </div>
       )}
 
-      <header className="h-14 bg-slate-900 border-b-[3px] border-slate-950 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-[0_4px_0px_rgba(0,0,0,0.5)]">
-        <div className="flex items-center gap-4">
+      <header className="h-14 bg-slate-900 border-b-[3px] border-slate-950 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-[0_4px_0px_rgba(0,0,0,0.5)] overflow-x-auto custom-scrollbar">
+        <div className="flex items-center gap-4 shrink-0 pr-4">
           <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
             <ShieldAlert className="w-5 h-5"/> Arkla DM
           </h1>
-          <div className="hidden lg:flex items-center gap-2 border-l-2 border-slate-950 pl-4">
-            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Book className="w-4 h-4 font-black"/> Rules</button>
-            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Package className="w-4 h-4 font-black"/> Vault</button>
-            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><ImageIcon className="w-4 h-4 font-black"/> Media</button>
-            <div className="w-0.5 h-6 bg-slate-950 mx-1"></div>
-            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Star className="w-4 h-4 font-black"/> XP</button>
+          <div className="hidden lg:flex items-center gap-2 border-l border-slate-700 pl-4">
+            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Book className="w-4 h-4"/> Rules Ref</button>
+            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Package className="w-4 h-4"/> Items</button>
+            <button onClick={() => setActiveManager('spells')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Flame className="w-4 h-4"/> Spells</button>
+            <button onClick={() => setActiveManager('feats')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Sparkles className="w-4 h-4"/> Feats</button>
+            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><ImageIcon className="w-4 h-4"/> Handouts</button>
+            <div className="w-px h-4 bg-slate-700 mx-1"></div>
+            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Star className="w-4 h-4"/> XP</button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-500 hover:text-amber-400 hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Scratchpad"><PenTool className="w-4 h-4 font-black"/></button>
+        <div className="flex items-center gap-3 shrink-0">
+          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-500 hover:text-amber-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Scratchpad"><PenTool className="w-4 h-4"/></button>
           <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportCampaign} />
-          <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Import Campaign"><UploadCloud className="w-4 h-4 font-black"/></button>
-          <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Export Campaign"><DownloadCloud className="w-4 h-4 font-black"/></button>
-          <div className="h-6 w-0.5 bg-slate-950 hidden sm:block mx-1"></div>
-          <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Clear All Conditions"><Sparkles className="w-4 h-4 font-black"/></button>
-          <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4 font-black"/></button>
-          <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900 ml-2" title="Logout"><PowerOff className="w-4 h-4 font-black"/></button>
+          <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Import Campaign"><UploadCloud className="w-4 h-4"/></button>
+          <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Export Campaign"><DownloadCloud className="w-4 h-4"/></button>
+          <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
+          <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Clear All Conditions"><Sparkles className="w-4 h-4"/></button>
+          <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4"/></button>
+          <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Logout"><PowerOff className="w-4 h-4"/></button>
         </div>
       </header>
 
@@ -305,7 +308,6 @@ export default function DMDashboard({ onLogout }) {
             activeEnemies={activeEnemies}
             selectedEnemies={selectedEnemies}
             setActiveManager={setActiveManager}
-            setIsForgingSpell={setIsForgingSpell}
             setIsForgingEnemy={setIsForgingEnemy}
             selectAllEnemies={selectAllEnemies}
             massMathAmount={massMathAmount}
@@ -347,22 +349,17 @@ export default function DMDashboard({ onLogout }) {
           <button onClick={() => setActiveManager('rules')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-slate-400 border-slate-900 hover:text-white shadow-inner">
             <Book className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Rules</span>
           </button>
-          
           <button onClick={() => setActiveManager('items')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-slate-400 border-slate-900 hover:text-white shadow-inner">
-            <Package className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Vault</span>
+            <Package className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Items</span>
           </button>
-          
-          <button onClick={() => setActiveManager('handouts')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-slate-400 border-slate-900 hover:text-white shadow-inner">
-            <ImageIcon className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Media</span>
+          <button onClick={() => setActiveManager('spells')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-slate-400 border-slate-900 hover:text-white shadow-inner">
+            <Flame className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Spells</span>
           </button>
-          
-          <button onClick={() => setActiveManager('xp')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-amber-500 border-slate-900 hover:text-amber-400 shadow-inner">
-            <Star className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">XP</span>
+          <button onClick={() => setActiveManager('feats')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-slate-400 border-slate-900 hover:text-white shadow-inner">
+            <Sparkles className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Feats</span>
           </button>
-
         </div>
       </div>
-
     </div>
   );
 }
