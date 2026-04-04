@@ -29,6 +29,22 @@ export default function useCharacterVitals(char, charId, isDM, triggerAlert = co
     await updateField('inspiration', !char.inspiration); 
   };
 
+  // NEW: The Concentration Toggle Map Sync
+  const toggleConcentration = async () => {
+    const newVal = !char.isConcentrating;
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'characters', charId), { isConcentrating: newVal });
+      
+      const mapUpdates = { [`tokens.${charId}.isConcentrating`]: newVal };
+      batch.update(doc(db, 'campaign', 'battlemap'), mapUpdates);
+      
+      await batch.commit();
+    } catch (err) {
+      console.error("Concentration toggle failed", err);
+    }
+  };
+
   const adjustXp = async (amount) => {
     const charRef = doc(db, 'characters', charId);
     try {
@@ -57,7 +73,6 @@ export default function useCharacterVitals(char, charId, isDM, triggerAlert = co
        if (!updatedConditions.includes('Unconscious')) updatedConditions.push('Unconscious');
        if (!updatedConditions.includes('Prone')) updatedConditions.push('Prone');
        updates.conditions = updatedConditions;
-       // 5e Rule: Incapacitated instantly drops concentration
        updates.isConcentrating = false; 
     }
     
@@ -133,7 +148,6 @@ export default function useCharacterVitals(char, charId, isDM, triggerAlert = co
        if (!updatedConditions.includes('Unconscious')) updatedConditions.push('Unconscious');
        if (!updatedConditions.includes('Prone')) updatedConditions.push('Prone');
        updates.conditions = updatedConditions;
-       // 5e Rule: Incapacitated instantly drops concentration
        updates.isConcentrating = false;
     }
     
@@ -187,6 +201,7 @@ export default function useCharacterVitals(char, charId, isDM, triggerAlert = co
     updateField,
     updateDeathSaves,
     toggleInspiration,
+    toggleConcentration,
     adjustXp,
     submitHpUpdate,
     adjustHp,

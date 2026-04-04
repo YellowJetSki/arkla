@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Skull, Maximize, Star, Heart, Shield, Tent, Moon, Wind, Zap, Check } from 'lucide-react';
+import { Skull, Maximize, Star, Heart, Shield, Tent, Moon, Wind, Zap, Check, Brain } from 'lucide-react';
 import useCharacterVitals from '../../hooks/useCharacterVitals';
 import XPBar from '../shared/XPBar';
 import { getModifier, getConditionMechanics } from '../../services/arklaEngine';
@@ -15,7 +15,6 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
   const [displayXp, setDisplayXp] = useState(""); 
   const [isEditingXp, setIsEditingXp] = useState(false);
 
-  // New states for inline input replacement
   const [quickInput, setQuickInput] = useState(null); 
   const [quickVal, setQuickVal] = useState('');
   
@@ -30,6 +29,7 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
     updateField,
     updateDeathSaves,
     toggleInspiration,
+    toggleConcentration,
     adjustXp,
     submitHpUpdate,
     adjustHp,
@@ -297,13 +297,19 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
           </div>
 
           {/* Action Row */}
-          <div className="flex gap-2">
-            <div className="flex-1 bg-slate-950 border-2 border-slate-900 rounded-lg transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] relative overflow-hidden h-12">
+          <div className="flex gap-1.5 sm:gap-2">
+            
+            <button onClick={toggleConcentration} className={`flex-1 rounded-lg border-2 flex flex-col items-center justify-center py-1.5 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${char.isConcentrating ? 'bg-fuchsia-600 border-fuchsia-950 text-white' : 'bg-slate-950 border-slate-900 text-slate-400 hover:bg-slate-900 hover:text-fuchsia-400'}`}>
+              <Brain className="w-4 h-4 mb-0.5" />
+              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Focus</span>
+            </button>
+
+            <div className="flex-1 bg-slate-950 border-2 border-slate-900 rounded-lg transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] relative overflow-hidden h-[42px] sm:h-12">
                {quickInput === 'hitdie' ? (
-                  <div className="flex items-center gap-1 w-full px-2 h-full bg-slate-900 absolute inset-0 z-10">
-                     <input autoFocus type="number" placeholder="HP Heal" value={quickVal} onChange={e=>setQuickVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleQuickSubmit()} className="w-full bg-slate-950 border-2 border-emerald-500 rounded text-white font-black text-xs text-center p-1.5 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none shadow-inner" />
-                     <button onClick={handleQuickSubmit} className="text-emerald-400 hover:text-emerald-300 p-1 shrink-0"><Check className="w-5 h-5"/></button>
-                     <button onClick={() => setQuickInput(null)} className="text-slate-400 hover:text-red-400 p-1 shrink-0"><X className="w-5 h-5"/></button>
+                  <div className="flex items-center gap-0.5 sm:gap-1 w-full px-1 sm:px-2 h-full bg-slate-900 absolute inset-0 z-10">
+                     <input autoFocus type="number" placeholder="HP" value={quickVal} onChange={e=>setQuickVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleQuickSubmit()} className="w-full bg-slate-950 border-2 border-emerald-500 rounded text-white font-black text-[10px] sm:text-xs text-center p-1 sm:p-1.5 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none shadow-inner" />
+                     <button onClick={handleQuickSubmit} className="text-emerald-400 hover:text-emerald-300 p-0.5 sm:p-1 shrink-0"><Check className="w-4 h-4 sm:w-5 sm:h-5"/></button>
+                     <button onClick={() => setQuickInput(null)} className="text-slate-400 hover:text-red-400 p-0.5 sm:p-1 shrink-0"><X className="w-4 h-4 sm:w-5 sm:h-5"/></button>
                   </div>
                ) : (
                  <button 
@@ -312,22 +318,22 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
                      else triggerAlert('You have no Hit Dice remaining! Take a Long Rest to recover them.', 'Out of Resources');
                    }} 
                    disabled={isDead} 
-                   className="w-full h-full flex flex-col items-center justify-center px-2 py-1.5 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed bg-transparent"
+                   className="w-full h-full flex flex-col items-center justify-center px-1 sm:px-2 py-1.5 cursor-pointer group disabled:opacity-50 disabled:cursor-not-allowed bg-transparent"
                  >
-                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5 group-hover:text-slate-300">Hit Dice</span>
-                   <span className="text-sm font-black text-emerald-400">{char.hitDice?.current ?? (char.level || 1)}/{char.hitDice?.max ?? (char.level || 1)}</span>
+                   <span className="text-[8px] sm:text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5 group-hover:text-slate-300">Hit Dice</span>
+                   <span className="text-xs sm:text-sm font-black text-emerald-400 leading-none">{char.hitDice?.current ?? (char.level || 1)}/{char.hitDice?.max ?? (char.level || 1)}</span>
                  </button>
                )}
             </div>
 
-            <button onClick={onOpenShortRest} disabled={isDead} className="flex-1 bg-slate-950 text-slate-300 rounded-lg border-2 border-slate-900 flex flex-col items-center justify-center transition-colors py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed h-12">
+            <button onClick={onOpenShortRest} disabled={isDead} className="flex-1 bg-slate-950 text-slate-300 rounded-lg border-2 border-slate-900 flex flex-col items-center justify-center transition-colors py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed h-[42px] sm:h-12">
               <Tent className="w-4 h-4 text-emerald-400 mb-0.5" />
-              <span className="text-[9px] font-black uppercase tracking-widest">Short</span>
+              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Short</span>
             </button>
             
-            <button onClick={onOpenLongRest} disabled={isDead} className={`flex-1 bg-slate-950 ${activeTheme.text} rounded-lg border-2 border-slate-900 flex flex-col items-center justify-center transition-colors py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed h-12`}>
+            <button onClick={onOpenLongRest} disabled={isDead} className={`flex-1 bg-slate-950 ${activeTheme.text} rounded-lg border-2 border-slate-900 flex flex-col items-center justify-center transition-colors py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed h-[42px] sm:h-12`}>
               <Moon className="w-4 h-4 mb-0.5" />
-              <span className="text-[9px] font-black uppercase tracking-widest">Long</span>
+              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-widest">Long</span>
             </button>
           </div>
 
