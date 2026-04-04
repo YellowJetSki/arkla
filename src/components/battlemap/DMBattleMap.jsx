@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
@@ -47,7 +47,6 @@ export default function DMBattleMap() {
   
   const [imagePrompt, setImagePrompt] = useState({ isOpen: false, tokenId: null, url: '' });
 
-  // Keep a fresh reference to tokens for the cleanup effect
   useEffect(() => {
     tokensRef.current = tokens;
   }, [tokens]);
@@ -110,7 +109,6 @@ export default function DMBattleMap() {
     };
   }, []);
 
-  // Auto-remove Player tokens if they are booted/removed from active session
   useEffect(() => {
     const activePlayerIds = activePlayers.map(p => p.id);
     const tokensToRemove = Object.values(tokensRef.current).filter(
@@ -256,7 +254,6 @@ export default function DMBattleMap() {
   };
 
   const handleUpdateTokenHpLive = async (tokenId, newHpVal) => {
-    // Intercept deletion command from Quick HUD (-99999)
     if (newHpVal === -99999) {
       await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
       if (selectedTokenId === tokenId) setSelectedTokenId(null);
@@ -370,13 +367,14 @@ export default function DMBattleMap() {
   }, [isEditingMap, mapData.imageUrl, mapData.gridColor]);
 
   const launchDisplayTab = () => { window.open(window.location.pathname + '?display=true', '_blank'); };
+  const returnToDashboard = () => { window.location.href = window.location.pathname; };
 
   const unstagedPlayers = activePlayers.filter(p => !tokens[p.id]);
   const unstagedEnemies = activeEnemies.filter(e => !tokens[e.id]);
   const hasUnstagedActors = unstagedPlayers.length > 0 || unstagedEnemies.length > 0;
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 min-h-0 relative h-full">
+    <div className="flex-1 flex flex-col bg-slate-950 min-h-0 relative h-full w-full p-4 md:p-6 overflow-hidden">
       
       {imagePrompt.isOpen && (
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
@@ -407,9 +405,14 @@ export default function DMBattleMap() {
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-3 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 shrink-0 z-20">
-        <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pl-2">
-          <Map className="w-5 h-5" /> Battlefield
-        </h2>
+        <div className="flex items-center gap-4 pl-2">
+            <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pr-4 border-r-2 border-slate-950">
+            <Map className="w-5 h-5" /> War Table
+            </h2>
+            <button onClick={returnToDashboard} className="text-slate-400 hover:text-white text-xs font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors">
+            <LayoutDashboard className="w-4 h-4" /> Command Center
+            </button>
+        </div>
         
         <div className="flex flex-wrap items-center gap-y-2 gap-x-2 w-full xl:w-auto">
           <button 
@@ -499,9 +502,9 @@ export default function DMBattleMap() {
         </div>
       )}
 
-      <div className="flex-1 w-full bg-slate-950 relative min-h-0">
+      <div className="flex-1 w-full bg-slate-950 relative min-h-0 border-[3px] border-slate-950 rounded-2xl overflow-hidden shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]">
         {!mapData.imageUrl ? (
-          <div className="h-full flex flex-col items-center justify-center text-slate-500 border-[3px] border-dashed border-slate-900 rounded-2xl bg-slate-950 shadow-inner">
+          <div className="h-full flex flex-col items-center justify-center text-slate-500 border-4 border-dashed border-slate-900 rounded-2xl bg-slate-950/50 m-4">
             <Map className="w-12 h-12 mb-4 opacity-30 drop-shadow-sm" />
             <p className="font-black uppercase tracking-widest text-sm">No map active.</p>
             <button onClick={() => setIsEditingMap(true)} className="mt-4 bg-slate-900 hover:bg-slate-800 border-2 border-slate-950 text-white px-6 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none">Configure Map</button>
