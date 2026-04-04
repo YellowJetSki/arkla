@@ -3,7 +3,7 @@ import { db } from '../services/firebase';
 
 export const XP_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000];
 
-export default function useCharacterVitals(char, charId, isDM) {
+export default function useCharacterVitals(char, charId, isDM, triggerAlert = console.log) {
   
   const updateField = async (field, value) => {
     await updateDoc(doc(db, 'characters', charId), { [field]: value });
@@ -78,7 +78,7 @@ export default function useCharacterVitals(char, charId, isDM) {
     if (amount < 0 && char.isConcentrating) {
       const damageTaken = Math.abs(amount);
       const dc = Math.max(10, Math.floor(damageTaken / 2));
-      alert(`⚠️ CONCENTRATION CHECK!\nYou took ${damageTaken} damage. Roll a Constitution Saving Throw (DC ${dc}) to maintain your spell!`);
+      triggerAlert(`You took ${damageTaken} damage while concentrating. Roll a Constitution Saving Throw (DC ${dc}) to maintain your spell!`, 'Concentration Check');
     }
 
     let currentHp = char.hp || 0;
@@ -90,17 +90,15 @@ export default function useCharacterVitals(char, charId, isDM) {
     if (amount < 0) {
       const damage = Math.abs(amount);
       
-      // 5e Rule: Instant Death via Massive Damage
       const rolloverDamage = damage - currentTemp;
       if (rolloverDamage >= currentHp + maxHp) {
           newFailures = 3;
-          alert("☠️ MASSIVE DAMAGE! You took single-hit damage exceeding your max HP. You are instantly killed.");
+          triggerAlert("You took single-hit damage equal to or exceeding your max HP. You are instantly killed.", "Massive Damage");
       }
 
-      // 5e Rule: Taking Damage while at 0 HP causes a Death Save Failure
       if (currentHp === 0 && newFailures < 3) {
           newFailures += 1;
-          alert("⚠️ DAMAGE WHILE DYING! You suffered a Death Save Failure.\n(Note: If this was a melee attack from 5ft, manually add a 2nd failure for the auto-crit).");
+          triggerAlert("You suffered a Death Save Failure for taking damage while at 0 HP. (Note: If this was a melee attack from 5ft, manually add a 2nd failure for the auto-crit).", "Damage While Dying");
       }
 
       if (currentTemp >= damage) {
@@ -150,19 +148,12 @@ export default function useCharacterVitals(char, charId, isDM) {
     }
   };
 
-  const handleSpendHitDie = async () => {
+  const spendHitDie = async (healAmt) => {
     const currentHD = char.hitDice?.current ?? char.level;
     const maxHD = char.hitDice?.max ?? char.level;
-    
-    if (currentHD > 0) {
-      const amount = window.prompt(`Spending 1 Hit Die (${currentHD}/${maxHD} remaining).\nHow much HP did you heal?`);
-      const healAmt = parseInt(amount, 10);
-      if (!isNaN(healAmt) && healAmt > 0) {
-        await adjustHp(healAmt);
-        await updateField('hitDice', { current: currentHD - 1, max: maxHD });
-      }
-    } else {
-      alert("You have no Hit Dice remaining! Take a Long Rest to recover them.");
+    if (currentHD > 0 && healAmt > 0) {
+      await adjustHp(healAmt);
+      await updateField('hitDice', { current: currentHD - 1, max: maxHD });
     }
   };
 
@@ -192,7 +183,7 @@ export default function useCharacterVitals(char, charId, isDM) {
     adjustXp,
     submitHpUpdate,
     adjustHp,
-    handleSpendHitDie,
+    spendHitDie,
     activeConditions,
     isUnconscious,
     isDead,
