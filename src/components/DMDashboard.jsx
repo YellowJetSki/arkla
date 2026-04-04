@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch, setDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, ChevronLeft, ChevronRight, Map } from 'lucide-react';
+import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, Map } from 'lucide-react';
 
 import InitiativeTracker from './InitiativeTracker';
 import DMEncounterManager from './DMEncounterManager';
@@ -25,9 +25,6 @@ export default function DMDashboard({ onLogout }) {
   
   const [activeManager, setActiveManager] = useState(null); 
   const [isBattleMode, setIsBattleMode] = useState(false); 
-  
-  const [showPartyPanel, setShowPartyPanel] = useState(true);
-  const [showThreatsPanel, setShowThreatsPanel] = useState(true);
 
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [isForgingEnemy, setIsForgingEnemy] = useState(false);
@@ -55,11 +52,6 @@ export default function DMDashboard({ onLogout }) {
   };
 
   useEffect(() => {
-    if (window.innerWidth < 1024) {
-      setShowPartyPanel(false);
-      setShowThreatsPanel(false);
-    }
-
     const sessionRef = doc(db, 'campaign', 'main_session');
     const unsubscribeSession = onSnapshot(sessionRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -124,17 +116,6 @@ export default function DMDashboard({ onLogout }) {
           }
           const enemyDocs = await getDocs(collection(db, 'active_enemies'));
           enemyDocs.forEach((docSnap) => batch.update(docSnap.ref, { conditions: [] }));
-
-          const mapRef = doc(db, 'campaign', 'battlemap');
-          const mapSnap = await getDoc(mapRef);
-          if (mapSnap.exists() && mapSnap.data().tokens) {
-            const mapTokens = mapSnap.data().tokens;
-            Object.keys(mapTokens).forEach(tokenId => {
-               mapTokens[tokenId].conditions = [];
-               mapTokens[tokenId].isConcentrating = false;
-            });
-            batch.update(mapRef, { tokens: mapTokens });
-          }
           await batch.commit();
           closeDialog();
           showToast('All Conditions Swept');
@@ -150,20 +131,14 @@ export default function DMDashboard({ onLogout }) {
     try {
       const batch = writeBatch(db);
       const targets = selectedEnemies.length > 0 ? activeEnemies.filter(e => selectedEnemies.includes(e.id)) : activeEnemies;
-      const mapRef = doc(db, 'campaign', 'battlemap');
-      const mapSnap = await getDoc(mapRef);
-      let mapTokens = mapSnap.exists() ? mapSnap.data().tokens || {} : {};
-      let tokensChanged = false;
-
+      
       targets.forEach(enemy => {
         const ref = doc(db, 'active_enemies', enemy.id);
         const current = enemy.currentHp ?? enemy.hp;
         const newHp = isDamage ? Math.max(0, current - amt) : Math.min(enemy.hp, current + amt);
         batch.update(ref, { currentHp: newHp });
-        if (mapTokens[enemy.id]) { mapTokens[enemy.id].hp = newHp; tokensChanged = true; }
       });
       
-      if (tokensChanged) batch.update(mapRef, { tokens: mapTokens });
       await batch.commit();
       setMassMathAmount('');
       setSelectedEnemies([]); 
@@ -257,67 +232,59 @@ export default function DMDashboard({ onLogout }) {
         </div>
       )}
 
-      <header className="h-14 bg-slate-900 border-b-[3px] border-slate-950 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-[0_4px_0px_rgba(0,0,0,0.5)]">
+      <header className="h-14 bg-slate-900 border-b-2 border-slate-950 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-[0_4px_0px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-4">
           <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
-            <ShieldAlert className="w-6 h-6"/> Arkla DM
+            <ShieldAlert className="w-5 h-5"/> Arkla DM
           </h1>
-          <div className="hidden lg:flex items-center gap-2 border-l-2 border-slate-950 pl-4">
-            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Book className="w-4 h-4 font-black"/> Rules</button>
-            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Package className="w-4 h-4 font-black"/> Vault</button>
-            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><ImageIcon className="w-4 h-4 font-black"/> Media</button>
-            <div className="w-0.5 h-6 bg-slate-950 mx-1"></div>
-            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Star className="w-4 h-4 font-black"/> XP</button>
+          <div className="hidden lg:flex items-center gap-2 border-l border-slate-700 pl-4">
+            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Book className="w-4 h-4"/> Rules Ref</button>
+            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Package className="w-4 h-4"/> Item Vault</button>
+            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><ImageIcon className="w-4 h-4"/> Handouts</button>
+            <div className="w-px h-4 bg-slate-700 mx-1"></div>
+            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Star className="w-4 h-4"/> XP</button>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-500 hover:text-amber-400 hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Scratchpad"><PenTool className="w-4 h-4 font-black"/></button>
+          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-500 hover:text-amber-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Scratchpad"><PenTool className="w-4 h-4"/></button>
           <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportCampaign} />
-          <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Import Campaign"><UploadCloud className="w-4 h-4 font-black"/></button>
-          <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Export Campaign"><DownloadCloud className="w-4 h-4 font-black"/></button>
-          <div className="h-6 w-0.5 bg-slate-950 hidden sm:block mx-1"></div>
-          <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Clear All Conditions"><Sparkles className="w-4 h-4 font-black"/></button>
-          <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4 font-black"/></button>
-          <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ml-2" title="Logout"><PowerOff className="w-4 h-4 font-black"/></button>
+          <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Import Campaign"><UploadCloud className="w-4 h-4"/></button>
+          <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Export Campaign"><DownloadCloud className="w-4 h-4"/></button>
+          <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
+          <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Clear All Conditions"><Sparkles className="w-4 h-4"/></button>
+          <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4"/></button>
+          <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Logout"><PowerOff className="w-4 h-4"/></button>
         </div>
       </header>
 
-      <main className="flex-1 flex overflow-hidden relative z-10 bg-slate-950">
+      {/* 3-COLUMN LAYOUT: Party | Initiative/Commands | Threats */}
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 min-h-0 z-10 bg-slate-950">
         
-        {/* LEFT FLOATING PANEL: THE PARTY */}
-        <div className={`relative h-full transition-[width] duration-300 shrink-0 z-30 ${showPartyPanel ? 'w-72 lg:w-80' : 'w-0'}`}>
-          <div className={`absolute top-0 right-0 w-72 lg:w-80 h-full bg-slate-950 border-r-2 border-slate-900 transition-transform duration-300 ${showPartyPanel ? 'translate-x-0 shadow-[4px_0_15px_rgba(0,0,0,0.5)]' : '-translate-x-full shadow-none'}`}>
-            <DMPartyPanel 
-              unlockedCharacters={unlockedCharacters} 
-              setIsBuildingCharacter={setIsBuildingCharacter} 
-            />
-          </div>
-          <button 
-            onClick={() => setShowPartyPanel(!showPartyPanel)} 
-            className={`absolute top-1/2 -translate-y-1/2 w-8 h-24 bg-slate-900 hover:bg-slate-800 border-2 border-l-0 border-slate-950 rounded-r-xl flex items-center justify-center text-slate-400 hover:text-white shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all duration-300 z-40 ${showPartyPanel ? 'right-0 translate-x-full' : 'left-0'}`}
-          >
-             {showPartyPanel ? <ChevronLeft className="w-5 h-5"/> : <ChevronRight className="w-5 h-5"/>}
-          </button>
+        {/* COLUMN 1: The Party */}
+        <div className="border-r-2 border-slate-900 bg-slate-950 overflow-hidden flex flex-col">
+          <DMPartyPanel 
+            unlockedCharacters={unlockedCharacters} 
+            setIsBuildingCharacter={setIsBuildingCharacter} 
+          />
         </div>
 
-        {/* CENTER PANEL: COMMAND CENTER (Map Launcher + Full Initiative) */}
-        <section className="flex-1 flex flex-col min-w-0 h-full relative z-10 bg-slate-950 overflow-hidden p-4 md:p-6">
-          
-          <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-6 shadow-[8px_8px_0px_rgba(0,0,0,1)] flex flex-col items-center justify-center text-center relative overflow-hidden mb-6">
+        {/* COLUMN 2: Command Center & Initiative */}
+        <div className="bg-slate-950 flex flex-col p-4 md:p-6 overflow-hidden border-r-2 border-slate-900">
+          <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 shrink-0">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/20 via-transparent to-transparent pointer-events-none"></div>
-            <Map className="w-16 h-16 text-emerald-500/50 mb-4" />
-            <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">War Table</h2>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 max-w-md">Launch the dedicated battlemap interface in a new window for multi-monitor setups.</p>
+            <Map className="w-12 h-12 text-emerald-500/50 mb-3" />
+            <h2 className="text-xl font-black text-white uppercase tracking-widest mb-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">War Table</h2>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-5 max-w-sm">Launch the dedicated battlemap interface in a new window for multi-monitor setups.</p>
             
             <button 
               onClick={launchDMBattleMap} 
-              className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black uppercase tracking-widest px-8 py-4 rounded-xl border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)] active:translate-y-[6px] active:shadow-none transition-all flex items-center gap-2"
+              className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black uppercase tracking-widest px-6 py-3 rounded-xl border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none transition-all flex items-center gap-2"
             >
-              <Map className="w-5 h-5 font-black" /> Open Dual-Monitor Map
+              <Map className="w-4 h-4 font-black" /> Open Dual-Monitor Map
             </button>
           </div>
 
-          <div className="flex-1 min-h-0 relative z-20">
+          <div className="flex-1 min-h-0 w-full">
             <InitiativeTracker 
               unlockedCharacters={unlockedCharacters} 
               activeEnemies={activeEnemies} 
@@ -327,31 +294,22 @@ export default function DMDashboard({ onLogout }) {
               expandedOverride={true}
             />
           </div>
+        </div>
 
-        </section>
-
-        {/* RIGHT FLOATING PANEL: THREATS */}
-        <div className={`relative h-full transition-[width] duration-300 shrink-0 z-30 ${showThreatsPanel ? 'w-80 lg:w-[360px]' : 'w-0'}`}>
-          <div className={`absolute top-0 left-0 w-80 lg:w-[360px] h-full bg-slate-950 border-l-2 border-slate-900 transition-transform duration-300 ${showThreatsPanel ? 'translate-x-0 shadow-[-4px_0_15px_rgba(0,0,0,0.5)]' : 'translate-x-full shadow-none'}`}>
-            <DMThreatsPanel 
-              activeEnemies={activeEnemies}
-              selectedEnemies={selectedEnemies}
-              setActiveManager={setActiveManager}
-              setIsForgingSpell={setIsForgingSpell}
-              setIsForgingEnemy={setIsForgingEnemy}
-              selectAllEnemies={selectAllEnemies}
-              massMathAmount={massMathAmount}
-              setMassMathAmount={setMassMathAmount}
-              handleMassMath={handleMassMath}
-              toggleEnemySelection={toggleEnemySelection}
-            />
-          </div>
-          <button 
-            onClick={() => setShowThreatsPanel(!showThreatsPanel)} 
-            className={`absolute top-1/2 -translate-y-1/2 w-8 h-24 bg-slate-900 hover:bg-slate-800 border-2 border-r-0 border-slate-950 rounded-l-xl flex items-center justify-center text-slate-400 hover:text-white shadow-[-4px_4px_0px_rgba(0,0,0,1)] transition-all duration-300 z-40 ${showThreatsPanel ? 'left-0 -translate-x-full' : 'right-0'}`}
-          >
-             {showThreatsPanel ? <ChevronRight className="w-5 h-5"/> : <ChevronLeft className="w-5 h-5"/>}
-          </button>
+        {/* COLUMN 3: Threats */}
+        <div className="bg-slate-950 overflow-hidden flex flex-col">
+          <DMThreatsPanel 
+            activeEnemies={activeEnemies}
+            selectedEnemies={selectedEnemies}
+            setActiveManager={setActiveManager}
+            setIsForgingSpell={setIsForgingSpell}
+            setIsForgingEnemy={setIsForgingEnemy}
+            selectAllEnemies={selectAllEnemies}
+            massMathAmount={massMathAmount}
+            setMassMathAmount={setMassMathAmount}
+            handleMassMath={handleMassMath}
+            toggleEnemySelection={toggleEnemySelection}
+          />
         </div>
 
       </main>

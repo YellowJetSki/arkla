@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Book, Target, Shield, AlertCircle, Mountain, Swords, Sparkles, BookOpen, Anchor, Flame, Wind } from 'lucide-react';
+import { X, Book, Target, Shield, AlertCircle, Mountain, Swords, Sparkles, BookOpen, Anchor, Flame, Wind, Activity } from 'lucide-react';
 import ScrollableRow from './shared/ScrollableRow';
 
 const SPECIES_LORE = [
@@ -97,7 +97,6 @@ export default function DMReferenceModal({ onClose }) {
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-xl animate-in fade-in duration-500">
       
-      {/* Immersive ambient background glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 blur-[120px] rounded-full pointer-events-none"></div>
 
       <div className="bg-slate-900/80 backdrop-blur-2xl border-[3px] border-slate-950 rounded-3xl w-full max-w-5xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] relative overflow-hidden animate-in zoom-in-95 duration-500">
@@ -113,7 +112,7 @@ export default function DMReferenceModal({ onClose }) {
 
         <div className="bg-slate-950/50 border-b-[3px] border-slate-950 shrink-0 px-4 py-3 relative z-10">
           <ScrollableRow className="gap-2">
-            <button onClick={() => setActiveTab('dcs')} className={`px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap transition-all flex-1 text-center border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${activeTab === 'dcs' ? 'bg-indigo-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-950'}`}>DCs & Damage</button>
+            <button onClick={() => setActiveTab('dcs')} className={`px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap transition-all flex-1 text-center border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${activeTab === 'dcs' ? 'bg-indigo-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-950'}`}>Checks & Damage</button>
             <button onClick={() => setActiveTab('combat')} className={`px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap transition-all flex-1 text-center border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${activeTab === 'combat' ? 'bg-red-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-950'}`}>Combat & Rules</button>
             <button onClick={() => setActiveTab('environment')} className={`px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap transition-all flex-1 text-center border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${activeTab === 'environment' ? 'bg-emerald-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-950'}`}>Environment</button>
             <button onClick={() => setActiveTab('conditions')} className={`px-5 py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs whitespace-nowrap transition-all flex-1 text-center border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${activeTab === 'conditions' ? 'bg-fuchsia-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border-slate-950'}`}>Conditions</button>
@@ -126,6 +125,56 @@ export default function DMReferenceModal({ onClose }) {
           
           {activeTab === 'dcs' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-2">
+              
+              <div className="md:col-span-2 bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
+                <h3 className="font-black text-emerald-400 text-lg mb-4 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] flex items-center gap-2"><Activity className="w-5 h-5"/> Skill Associations</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                   <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                     <span className="text-red-400 font-black uppercase tracking-widest block mb-2 border-b-2 border-slate-900 pb-1">Strength (STR)</span>
+                     <ul className="text-slate-300 font-bold space-y-1.5">
+                       <li>Athletics <span className="text-slate-500 font-medium">(Climbing, jumping, grappling)</span></li>
+                     </ul>
+                   </div>
+                   <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                     <span className="text-sky-400 font-black uppercase tracking-widest block mb-2 border-b-2 border-slate-900 pb-1">Dexterity (DEX)</span>
+                     <ul className="text-slate-300 font-bold space-y-1.5">
+                       <li>Acrobatics <span className="text-slate-500 font-medium">(Balance, diving)</span></li>
+                       <li>Sleight of Hand <span className="text-slate-500 font-medium">(Pickpocket, conceal)</span></li>
+                       <li>Stealth <span className="text-slate-500 font-medium">(Hide, sneak)</span></li>
+                     </ul>
+                   </div>
+                   <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                     <span className="text-indigo-400 font-black uppercase tracking-widest block mb-2 border-b-2 border-slate-900 pb-1">Intelligence (INT)</span>
+                     <ul className="text-slate-300 font-bold space-y-1.5">
+                       <li>Arcana <span className="text-slate-500 font-medium">(Magic lore)</span></li>
+                       <li>History <span className="text-slate-500 font-medium">(Past events)</span></li>
+                       <li>Investigation <span className="text-slate-500 font-medium">(Deduction, searching)</span></li>
+                       <li>Nature <span className="text-slate-500 font-medium">(Plants, animals, weather)</span></li>
+                       <li>Religion <span className="text-slate-500 font-medium">(Deities, holy lore)</span></li>
+                     </ul>
+                   </div>
+                   <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner">
+                     <span className="text-amber-500 font-black uppercase tracking-widest block mb-2 border-b-2 border-slate-900 pb-1">Wisdom (WIS)</span>
+                     <ul className="text-slate-300 font-bold space-y-1.5">
+                       <li>Animal Handling <span className="text-slate-500 font-medium">(Calm, command beasts)</span></li>
+                       <li>Insight <span className="text-slate-500 font-medium">(Read intentions, spot lies)</span></li>
+                       <li>Medicine <span className="text-slate-500 font-medium">(Diagnose, stabilize)</span></li>
+                       <li>Perception <span className="text-slate-500 font-medium">(Spot, hear, detect)</span></li>
+                       <li>Survival <span className="text-slate-500 font-medium">(Track, forage, navigate)</span></li>
+                     </ul>
+                   </div>
+                   <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900 shadow-inner sm:col-span-2">
+                     <span className="text-fuchsia-400 font-black uppercase tracking-widest block mb-2 border-b-2 border-slate-900 pb-1">Charisma (CHA)</span>
+                     <ul className="text-slate-300 font-bold space-y-1.5 grid grid-cols-2">
+                       <li>Deception <span className="text-slate-500 font-medium">(Lie, con)</span></li>
+                       <li>Intimidation <span className="text-slate-500 font-medium">(Threaten, coerce)</span></li>
+                       <li>Performance <span className="text-slate-500 font-medium">(Entertain, act)</span></li>
+                       <li>Persuasion <span className="text-slate-500 font-medium">(Convince, negotiate)</span></li>
+                     </ul>
+                   </div>
+                </div>
+              </div>
+
               <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[4px_4px_0px_rgba(0,0,0,1)] h-fit">
                 <h3 className="font-black text-indigo-400 text-lg mb-4 flex items-center gap-2 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><Target className="w-5 h-5" /> Difficulty Classes (DC)</h3>
                 <table className="w-full text-sm text-left">
