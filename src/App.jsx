@@ -4,17 +4,18 @@ import { db } from './services/firebase';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import BattleMapDisplay from './components/battlemap/BattleMapDisplay';
+import DMBattleMap from './components/battlemap/DMBattleMap';
 
 export default function App() {
-  // Check if this tab was opened specifically as the Display screen via URL
-  const isDisplayMode = new URLSearchParams(window.location.search).get('display') === 'true';
+  const urlParams = new URLSearchParams(window.location.search);
+  const isDisplayMode = urlParams.get('display') === 'true';
+  const isDMMapMode = urlParams.get('dmmap') === 'true';
 
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('dnd_currentUser');
     if (!saved) return null;
     
     const parsedUser = JSON.parse(saved);
-    // THE FIX: If the old local storage 'display' role is detected, wipe it out to prevent crashes.
     if (parsedUser.role === 'display') {
       localStorage.removeItem('dnd_currentUser');
       return null;
@@ -31,7 +32,7 @@ export default function App() {
   }, [currentUser]);
 
   useEffect(() => {
-    if (isDisplayMode) return; 
+    if (isDisplayMode || isDMMapMode) return; 
 
     const campaignRef = doc(db, 'campaign', 'main_session');
     
@@ -44,7 +45,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [isDisplayMode]);
+  }, [isDisplayMode, isDMMapMode]);
 
   const handleLogin = async (user) => {
     setCurrentUser(user);
@@ -63,9 +64,26 @@ export default function App() {
     localStorage.removeItem('dnd_currentUser');
   };
 
-  // OVERRIDE: If this is the display tab, only render the Battle Map
+  // OVERRIDE: Player TV Display Screen
   if (isDisplayMode) {
     return <BattleMapDisplay onLogout={() => window.close()} />;
+  }
+
+  // OVERRIDE: DM Dual-Monitor Map Screen
+  if (isDMMapMode) {
+    // Only allow access if they are logged in as the DM
+    if (!currentUser || currentUser.role !== 'dm') {
+      return (
+         <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-black">
+           ACCESS DENIED: DM CREDENTIALS REQUIRED
+         </div>
+      );
+    }
+    return (
+       <div className="h-screen w-screen bg-slate-950 flex flex-col overflow-hidden">
+          <DMBattleMap />
+       </div>
+    );
   }
 
   return (
