@@ -107,6 +107,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [isLongRestOpen, setIsLongRestOpen] = useState(false); 
   const [isKicked, setIsKicked] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showBuilder, setShowBuilder] = useState(false);
+  
   const [isImageOpen, setIsImageOpen] = useState(false); 
   const [activeLoot, setActiveLoot] = useState(null); 
   const [isBattleMapOpen, setIsBattleMapOpen] = useState(false);
@@ -370,7 +372,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           </div>
         )}
 
-        <ImageModal isOpen={isImageOpen} url={`/${currentUser.charId}.png`} alt={char.name || 'Character'} onClose={() => setIsImageOpen(false)} />
+        <ImageModal isOpen={isImageOpen} url={char.imageUrl || char.img || ''} alt={char.name || 'Character'} onClose={() => setIsImageOpen(false)} />
         <ImageModal isOpen={!!activeLoot} url={activeLoot?.url} alt={activeLoot?.name} onClose={() => setActiveLoot(null)} />
 
         {/* LEFT ANCHOR PANEL (Desktop) / TOP HEADER (Mobile) */}
@@ -521,7 +523,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                         <textarea required value={customFeat.desc} onChange={e => setCustomFeat({...customFeat, desc: e.target.value})} className="w-full min-h-[100px] bg-slate-950 border-2 border-slate-800 rounded-xl px-3 py-3 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 resize-y font-medium leading-relaxed" placeholder="Describe the mechanics..." />
                       </div>
                     </div>
-                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl border-2 border-indigo-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] flex items-center justify-center gap-2 mt-4 transition-all">
+                    <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl border-2 border-indigo-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] flex items-center justify-center gap-2 mt-4 transition-all">
                       <Plus className="w-4 h-4" /> Inject Feature
                     </button>
                   </form>

@@ -75,13 +75,16 @@ export default function CombatTab({
 
   allAttacks.forEach(atk => {
     const scaled = parseAndScaleAttack(atk, char.stats, char.level, char.class);
-    // Weapons generally default to 1 Action unless specified in notes
+    
+    // Explicitly preserve the range property since parsing strips it
+    const finalAtk = { ...scaled, range: atk.range || scaled.range, isWeapon: true };
+
     if ((scaled.notes || '').toLowerCase().includes('bonus action')) {
-      categorizedActions.bonus.push({ ...scaled, isWeapon: true });
+      categorizedActions.bonus.push(finalAtk);
     } else if ((scaled.notes || '').toLowerCase().includes('reaction')) {
-      categorizedActions.reaction.push({ ...scaled, isWeapon: true });
+      categorizedActions.reaction.push(finalAtk);
     } else {
-      categorizedActions.action.push({ ...scaled, isWeapon: true });
+      categorizedActions.action.push(finalAtk);
     }
   });
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 
 export default function TokenLayer({
   tokens,
@@ -88,6 +89,10 @@ export default function TokenLayer({
                    <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp - 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">-1</button>
                    <span className={`text-[10px] font-black px-1.5 min-w-[24px] text-center ${isDead ? 'text-red-500' : 'text-white'}`}>{token.hp}</span>
                    <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, token.hp + 1); }} className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-600 text-white text-[10px] font-bold rounded cursor-pointer">+1</button>
+                   <div className="w-px h-4 bg-slate-700 mx-1"></div>
+                   <button onClick={(e) => { e.stopPropagation(); handleUpdateTokenHpLive(token.id, -99999); }} className="p-1 bg-slate-800 hover:bg-red-600 text-white rounded cursor-pointer" title="Remove Token">
+                     <Trash2 className="w-3 h-3 text-red-400 hover:text-white" />
+                   </button>
                  </div>
                )}
 

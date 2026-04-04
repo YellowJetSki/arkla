@@ -3,12 +3,16 @@ import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Image as ImageIcon, X, Send, Trash2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import ImageSelector from './shared/ImageSelector';
+import DialogModal from './shared/DialogModal';
 
 export default function DMHandoutManager({ onClose }) {
   const [handouts, setHandouts] = useState([]);
   const [currentDisplayId, setCurrentDisplayId] = useState(null);
   const [newHandout, setNewHandout] = useState({ name: '', url: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
+  const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     const lootRef = doc(db, 'campaign', 'shared_loot');
@@ -71,26 +75,35 @@ export default function DMHandoutManager({ onClose }) {
     }
   };
 
-  const handleRevoke = async (id) => {
-    if (window.confirm("Revoke this image? It will disappear from all player sheets.")) {
-      try {
-        const lootRef = doc(db, 'campaign', 'shared_loot');
-        const updatedItems = handouts.filter(item => item.id !== id);
-        
-        const updates = { items: updatedItems };
-        if (currentDisplayId && currentDisplayId.startsWith(id)) {
-          updates.displayHandoutId = null;
-        }
+  const handleRevoke = (id) => {
+    setDialog({
+      isOpen: true,
+      title: 'Revoke Handout',
+      message: "Revoke this image? It will completely disappear from all player sheets.",
+      type: 'confirm',
+      onConfirm: async () => {
+        try {
+          const lootRef = doc(db, 'campaign', 'shared_loot');
+          const updatedItems = handouts.filter(item => item.id !== id);
+          
+          const updates = { items: updatedItems };
+          if (currentDisplayId && currentDisplayId.startsWith(id)) {
+            updates.displayHandoutId = null;
+          }
 
-        await updateDoc(lootRef, updates);
-      } catch (error) {
-        console.error("Error revoking handout:", error);
+          await updateDoc(lootRef, updates);
+        } catch (error) {
+          console.error("Error revoking handout:", error);
+        }
+        closeDialog();
       }
-    }
+    });
   };
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
+      <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
+      
       <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl w-full max-w-4xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] animate-in zoom-in-95 duration-500 relative overflow-hidden">
         
         {/* Solid Color Header */}
@@ -213,10 +226,10 @@ export default function DMHandoutManager({ onClose }) {
                           )}
                           <button 
                             onClick={() => handleRevoke(item.id)} 
-                            className="bg-slate-950 text-slate-500 hover:text-red-500 hover:bg-slate-800 border-2 border-slate-900 hover:border-red-950 p-2 rounded-lg transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"
+                            className="bg-slate-900 text-slate-500 hover:text-red-500 hover:bg-slate-800 border-2 border-slate-950 p-2 rounded-lg transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"
                             title="Revoke Image"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4 font-black" />
                           </button>
                         </div>
                       </div>

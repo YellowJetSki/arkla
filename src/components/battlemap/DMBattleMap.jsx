@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
+import { useState, useEffect, useRef } from 'react';
+import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -23,6 +23,7 @@ export default function DMBattleMap() {
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [], fogOfWar: false });
   const [tokens, setTokens] = useState({});
   const [selectedTokenId, setSelectedTokenId] = useState(null);
+  const tokensRef = useRef(tokens);
   
   const [showRulerFor, setShowRulerFor] = useState(null);
   
@@ -45,6 +46,11 @@ export default function DMBattleMap() {
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
   
   const [imagePrompt, setImagePrompt] = useState({ isOpen: false, tokenId: null, url: '' });
+
+  // Keep a fresh reference to tokens for the cleanup effect
+  useEffect(() => {
+    tokensRef.current = tokens;
+  }, [tokens]);
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
@@ -103,6 +109,26 @@ export default function DMBattleMap() {
       unsubEnemies();
     };
   }, []);
+
+  // Auto-remove Player tokens if they are booted/removed from active session
+  useEffect(() => {
+    const activePlayerIds = activePlayers.map(p => p.id);
+    const tokensToRemove = Object.values(tokensRef.current).filter(
+      t => t.type === 'player' && !activePlayerIds.includes(t.id)
+    );
+    
+    if (tokensToRemove.length > 0) {
+      const updates = {};
+      tokensToRemove.forEach(t => {
+        updates[`tokens.${t.id}`] = deleteField();
+      });
+      updateDoc(doc(db, 'campaign', 'battlemap'), updates).catch(console.error);
+      
+      if (tokensToRemove.some(t => t.id === selectedTokenId)) {
+        setSelectedTokenId(null);
+      }
+    }
+  }, [activePlayers]);
 
   const handleUpdateMapSettings = () => {
     setIsSavingMap(true);
@@ -222,11 +248,21 @@ export default function DMBattleMap() {
       const collectionName = tokens[tokenId].type === 'player' ? 'characters' : 'active_enemies';
       batch.update(doc(db, collectionName, tokenId), { img: url });
       await batch.commit();
-    } catch (error) { console.error("Token image update failed", error); }
+    } catch (error) { 
+      console.warn("Source doc missing. Updating map token only."); 
+      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.img`]: url });
+    }
     setImagePrompt({ isOpen: false, tokenId: null, url: '' });
   };
 
   const handleUpdateTokenHpLive = async (tokenId, newHpVal) => {
+    // Intercept deletion command from Quick HUD (-99999)
+    if (newHpVal === -99999) {
+      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+      if (selectedTokenId === tokenId) setSelectedTokenId(null);
+      return;
+    }
+    
     const targetToken = tokens[tokenId];
     if (!targetToken) return;
     
@@ -245,7 +281,8 @@ export default function DMBattleMap() {
       }
       await batch.commit();
     } catch (e) {
-      console.error("Failed to sync HP to entity", e);
+      console.warn("Source doc missing. Updating map token only.");
+      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp });
     }
   };
 
@@ -275,12 +312,17 @@ export default function DMBattleMap() {
     if (!targetId || !tokens[targetId]) return;
     const t = tokens[targetId];
     const newConcState = !t.isConcentrating;
-    const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
-
-    const batch = writeBatch(db);
-    batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.isConcentrating`]: newConcState });
-    batch.update(doc(db, collectionName, targetId), { isConcentrating: newConcState });
-    await batch.commit();
+    
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.isConcentrating`]: newConcState });
+      const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
+      batch.update(doc(db, collectionName, targetId), { isConcentrating: newConcState });
+      await batch.commit();
+    } catch(e) {
+      console.warn("Source doc missing. Updating map token only.");
+      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.isConcentrating`]: newConcState });
+    }
   };
 
   const toggleCondition = async (tokenId, cond) => {
@@ -290,11 +332,16 @@ export default function DMBattleMap() {
     const currentConds = t.conditions || [];
     const newConds = currentConds.includes(cond) ? currentConds.filter(c => c !== cond) : [...currentConds, cond];
       
-    const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
-    const batch = writeBatch(db);
-    batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.conditions`]: newConds });
-    batch.update(doc(db, collectionName, targetId), { conditions: newConds });
-    await batch.commit();
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.conditions`]: newConds });
+      const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
+      batch.update(doc(db, collectionName, targetId), { conditions: newConds });
+      await batch.commit();
+    } catch(e) {
+      console.warn("Source doc missing. Updating map token only.");
+      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${targetId}.conditions`]: newConds });
+    }
   };
 
   const handleTileClick = async (x, y) => {
@@ -359,7 +406,6 @@ export default function DMBattleMap() {
 
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
-      {/* Control Bar - Refactored to wrap and fit nicely on mobile/laptop */}
       <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-3 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 shrink-0 z-20">
         <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pl-2">
           <Map className="w-5 h-5" /> Battlefield

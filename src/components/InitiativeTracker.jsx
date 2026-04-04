@@ -274,13 +274,13 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
           
           {/* TOOLBAR */}
           <div className="flex flex-wrap gap-2 justify-end mb-3 shrink-0">
-            <button onClick={autoRollEnemies} className="bg-indigo-500 hover:bg-indigo-400 text-slate-950 border-2 border-slate-950 p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+            <button onClick={autoRollEnemies} className="bg-indigo-500 hover:bg-indigo-400 text-slate-950 border-[3px] border-slate-950 p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none">
               <Dices className="w-3 h-3" /> Roll NPCs
             </button>
-            <button onClick={() => setShowCustomForm(!showCustomForm)} className="bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none border-2 border-slate-900">
+            <button onClick={() => setShowCustomForm(!showCustomForm)} className="bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none border-[3px] border-slate-900">
               <Plus className="w-3 h-3" /> Lair Action
             </button>
-            <button onClick={resetValues} className="bg-slate-950 hover:bg-slate-800 border-2 border-slate-900 text-amber-500 hover:text-amber-400 p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+            <button onClick={resetValues} className="bg-slate-950 hover:bg-slate-800 border-[3px] border-slate-900 text-amber-500 hover:text-amber-400 p-2 md:px-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none">
               <RotateCcw className="w-3 h-3" /> Reset
             </button>
           </div>
@@ -296,7 +296,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
                 className="flex-1 bg-slate-950 border-2 border-slate-900 rounded-lg px-3 py-2 text-white text-sm font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner"
                 autoFocus
               />
-              <button type="submit" disabled={!newCustomName.trim()} className="bg-fuchsia-500 hover:bg-fuchsia-400 disabled:opacity-50 text-slate-950 px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-black transition-all border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+              <button type="submit" disabled={!newCustomName.trim()} className="bg-fuchsia-500 hover:bg-fuchsia-400 disabled:opacity-50 text-slate-950 px-4 py-2 rounded-lg text-[10px] uppercase tracking-widest font-black transition-all border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none">
                 Add
               </button>
             </form>
@@ -314,7 +314,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
                 const hpColor = hpPercent > 50 ? 'bg-emerald-500' : hpPercent > 20 ? 'bg-amber-500' : 'bg-red-500';
 
                 return (
-                  <div key={actor.id + idx} className={`flex items-center gap-3 px-3 py-2 rounded-xl border-2 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)]
+                  <div key={actor.id + idx} className={`flex items-center gap-3 px-3 py-2 rounded-xl border-[3px] transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)]
                     ${activeTurn === idx ? 'bg-slate-800 border-fuchsia-500' : 'bg-slate-900 border-slate-950'}
                     ${isDead ? 'opacity-40 grayscale' : ''}
                   `}>
@@ -342,7 +342,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies })
                         value={actor.value} 
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => updateValue(idx, e.target.value)}
-                        className="w-12 bg-slate-950 border-2 border-slate-900 rounded-lg px-1 py-1.5 text-center text-white text-sm font-black focus:outline-none focus:border-fuchsia-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none shadow-inner"
+                        className="w-12 bg-slate-950 border-[3px] border-slate-900 rounded-lg px-1 py-1.5 text-center text-white text-sm font-black focus:outline-none focus:border-fuchsia-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none shadow-inner"
                       />
                     </div>
                   </div>

@@ -30,7 +30,7 @@ export default function DMThreatsPanel({
          <div className="p-4 border-b-[3px] border-slate-950 bg-slate-900 flex flex-col gap-3 shrink-0 relative z-10 shadow-[0_4px_15px_rgba(0,0,0,0.5)]">
            <div className="flex items-center justify-between">
              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mass Apply</span>
-             <button onClick={selectAllEnemies} className="text-[10px] font-black uppercase tracking-widest bg-slate-950 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 border-2 border-slate-800 shadow-inner transition-colors">
+             <button onClick={selectAllEnemies} className="text-[10px] font-black uppercase tracking-widest bg-slate-950 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all">
                {selectedEnemies.length > 0 ? <CheckSquare className="w-3.5 h-3.5 text-indigo-500"/> : <Square className="w-3.5 h-3.5"/>}
                {selectedEnemies.length > 0 ? `${selectedEnemies.length} Sel` : 'All'}
              </button>

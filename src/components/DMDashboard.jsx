@@ -254,28 +254,28 @@ export default function DMDashboard({ onLogout }) {
         </div>
       )}
 
-      <header className="h-14 bg-slate-900 border-b-2 border-slate-950 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-[0_4px_0px_rgba(0,0,0,0.5)]">
+      <header className="h-16 bg-slate-900 border-b-[3px] border-slate-950 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-[0_4px_0px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-4">
           <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
-            <ShieldAlert className="w-5 h-5"/> Arkla DM
+            <ShieldAlert className="w-6 h-6"/> Arkla DM
           </h1>
-          <div className="hidden lg:flex items-center gap-2 border-l border-slate-700 pl-4">
-            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Book className="w-4 h-4"/> Rules Ref</button>
-            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Package className="w-4 h-4"/> Item Vault</button>
-            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><ImageIcon className="w-4 h-4"/> Handouts</button>
-            <div className="w-px h-4 bg-slate-700 mx-1"></div>
-            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Star className="w-4 h-4"/> XP</button>
+          <div className="hidden lg:flex items-center gap-2 border-l-2 border-slate-950 pl-4">
+            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Book className="w-4 h-4 font-black"/> Rules</button>
+            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Package className="w-4 h-4 font-black"/> Vault</button>
+            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><ImageIcon className="w-4 h-4 font-black"/> Media</button>
+            <div className="w-0.5 h-6 bg-slate-950 mx-1"></div>
+            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 bg-slate-950 hover:bg-slate-800 px-3 py-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Star className="w-4 h-4 font-black"/> XP</button>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-500 hover:text-amber-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Scratchpad"><PenTool className="w-4 h-4"/></button>
+          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-500 hover:text-amber-400 hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Scratchpad"><PenTool className="w-4 h-4 font-black"/></button>
           <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportCampaign} />
-          <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Import Campaign"><UploadCloud className="w-4 h-4"/></button>
-          <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Export Campaign"><DownloadCloud className="w-4 h-4"/></button>
-          <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
-          <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Clear All Conditions"><Sparkles className="w-4 h-4"/></button>
-          <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4"/></button>
-          <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Logout"><PowerOff className="w-4 h-4"/></button>
+          <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Import Campaign"><UploadCloud className="w-4 h-4 font-black"/></button>
+          <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Export Campaign"><DownloadCloud className="w-4 h-4 font-black"/></button>
+          <div className="h-6 w-0.5 bg-slate-950 hidden sm:block mx-1"></div>
+          <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Clear All Conditions"><Sparkles className="w-4 h-4 font-black"/></button>
+          <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4 font-black"/></button>
+          <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 bg-slate-900 p-2 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ml-2" title="Logout"><PowerOff className="w-4 h-4 font-black"/></button>
         </div>
       </header>
 
