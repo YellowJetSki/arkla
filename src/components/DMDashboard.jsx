@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, doc, onSnapshot, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, Map } from 'lucide-react';
+import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, Map, Users, Swords, Skull } from 'lucide-react';
 
 import InitiativeTracker from './InitiativeTracker';
 import DMEncounterManager from './DMEncounterManager';
@@ -25,6 +25,9 @@ export default function DMDashboard({ onLogout }) {
   
   const [activeManager, setActiveManager] = useState(null); 
   const [isBattleMode, setIsBattleMode] = useState(false); 
+  
+  // Mobile Navigation State
+  const [mobileTab, setMobileTab] = useState('initiative');
 
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [isForgingEnemy, setIsForgingEnemy] = useState(false);
@@ -221,7 +224,7 @@ export default function DMDashboard({ onLogout }) {
       {activeManager === 'xp' && <DMXPManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
 
       {showScratchpad && (
-        <div className="fixed bottom-6 right-6 w-80 h-80 bg-amber-50 rounded-xl shadow-[8px_8px_0px_rgba(0,0,0,1)] z-[9999] border-[3px] border-slate-950 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
+        <div className="fixed bottom-24 lg:bottom-6 right-4 lg:right-6 w-80 h-80 bg-amber-50 rounded-xl shadow-[8px_8px_0px_rgba(0,0,0,1)] z-[9999] border-[3px] border-slate-950 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
           <div className="bg-amber-400 px-4 py-3 flex justify-between items-center border-b-[3px] border-slate-950 shrink-0">
             <span className="text-slate-950 font-black text-xs flex items-center gap-2 tracking-widest uppercase"><PenTool className="w-4 h-4"/> DM Scratchpad</span>
             <button onClick={() => setShowScratchpad(false)} className="text-slate-950 hover:bg-amber-300 p-1 rounded transition-colors"><X className="w-4 h-4 font-black"/></button>
@@ -232,36 +235,36 @@ export default function DMDashboard({ onLogout }) {
         </div>
       )}
 
-      <header className="h-14 bg-slate-900 border-b-2 border-slate-950 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-[0_4px_0px_rgba(0,0,0,0.5)]">
+      <header className="h-14 bg-slate-900 border-b-[3px] border-slate-950 flex items-center justify-between px-4 shrink-0 z-40 relative shadow-[0_4px_0px_rgba(0,0,0,0.5)]">
         <div className="flex items-center gap-4">
           <h1 className="font-black text-indigo-400 tracking-widest uppercase flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
             <ShieldAlert className="w-5 h-5"/> Arkla DM
           </h1>
-          <div className="hidden lg:flex items-center gap-2 border-l border-slate-700 pl-4">
-            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Book className="w-4 h-4"/> Rules Ref</button>
-            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Package className="w-4 h-4"/> Item Vault</button>
-            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><ImageIcon className="w-4 h-4"/> Handouts</button>
-            <div className="w-px h-4 bg-slate-700 mx-1"></div>
-            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-800 transition-colors shadow-inner"><Star className="w-4 h-4"/> XP</button>
+          <div className="hidden lg:flex items-center gap-2 border-l-2 border-slate-950 pl-4">
+            <button onClick={() => setActiveManager('rules')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Book className="w-4 h-4 font-black"/> Rules</button>
+            <button onClick={() => setActiveManager('items')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Package className="w-4 h-4 font-black"/> Vault</button>
+            <button onClick={() => setActiveManager('handouts')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><ImageIcon className="w-4 h-4 font-black"/> Media</button>
+            <div className="w-0.5 h-6 bg-slate-950 mx-1"></div>
+            <button onClick={() => setActiveManager('xp')} className="flex items-center gap-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-amber-500 hover:text-amber-400 bg-slate-950 hover:bg-slate-800 px-3 py-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Star className="w-4 h-4 font-black"/> XP</button>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-500 hover:text-amber-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Scratchpad"><PenTool className="w-4 h-4"/></button>
+          <button onClick={() => setShowScratchpad(!showScratchpad)} className="text-amber-500 hover:text-amber-400 hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Scratchpad"><PenTool className="w-4 h-4 font-black"/></button>
           <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportCampaign} />
-          <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Import Campaign"><UploadCloud className="w-4 h-4"/></button>
-          <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Export Campaign"><DownloadCloud className="w-4 h-4"/></button>
-          <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
-          <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Clear All Conditions"><Sparkles className="w-4 h-4"/></button>
-          <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4"/></button>
-          <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Logout"><PowerOff className="w-4 h-4"/></button>
+          <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Import Campaign"><UploadCloud className="w-4 h-4 font-black"/></button>
+          <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Export Campaign"><DownloadCloud className="w-4 h-4 font-black"/></button>
+          <div className="h-6 w-0.5 bg-slate-950 hidden sm:block mx-1"></div>
+          <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Clear All Conditions"><Sparkles className="w-4 h-4 font-black"/></button>
+          <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4 font-black"/></button>
+          <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded-lg border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none bg-slate-900 ml-2" title="Logout"><PowerOff className="w-4 h-4 font-black"/></button>
         </div>
       </header>
 
       {/* 3-COLUMN LAYOUT: Party | Initiative/Commands | Threats */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 min-h-0 z-10 bg-slate-950">
+      <main className="flex-1 flex flex-col lg:grid lg:grid-cols-3 min-h-0 z-10 bg-slate-950 pb-[76px] lg:pb-0">
         
         {/* COLUMN 1: The Party */}
-        <div className="border-r-2 border-slate-900 bg-slate-950 overflow-hidden flex flex-col">
+        <div className={`${mobileTab === 'party' ? 'flex' : 'hidden'} lg:flex border-r-2 border-slate-900 bg-slate-950 overflow-hidden flex-col h-full`}>
           <DMPartyPanel 
             unlockedCharacters={unlockedCharacters} 
             setIsBuildingCharacter={setIsBuildingCharacter} 
@@ -269,7 +272,7 @@ export default function DMDashboard({ onLogout }) {
         </div>
 
         {/* COLUMN 2: Command Center & Initiative */}
-        <div className="bg-slate-950 flex flex-col p-4 md:p-6 overflow-hidden border-r-2 border-slate-900">
+        <div className={`${mobileTab === 'initiative' ? 'flex' : 'hidden'} lg:flex bg-slate-950 flex-col p-4 md:p-6 overflow-hidden lg:border-r-2 border-slate-900 h-full w-full`}>
           <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col items-center justify-center text-center relative overflow-hidden mb-6 shrink-0">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/20 via-transparent to-transparent pointer-events-none"></div>
             <Map className="w-12 h-12 text-emerald-500/50 mb-3" />
@@ -297,7 +300,7 @@ export default function DMDashboard({ onLogout }) {
         </div>
 
         {/* COLUMN 3: Threats */}
-        <div className="bg-slate-950 overflow-hidden flex flex-col">
+        <div className={`${mobileTab === 'threats' ? 'flex' : 'hidden'} lg:flex bg-slate-950 overflow-hidden flex-col h-full`}>
           <DMThreatsPanel 
             activeEnemies={activeEnemies}
             selectedEnemies={selectedEnemies}
@@ -313,6 +316,53 @@ export default function DMDashboard({ onLogout }) {
         </div>
 
       </main>
+
+      {/* MOBILE NAV BAR */}
+      <div className="lg:hidden fixed bottom-0 left-0 w-full z-40 bg-slate-950 border-t-[3px] border-slate-900 shadow-[0_-4px_20px_rgba(0,0,0,0.8)] pb-safe">
+        <div className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] p-2 gap-2 bg-slate-900/90 backdrop-blur-md snap-x">
+          
+          <button 
+            onClick={() => setMobileTab('party')} 
+            className={`snap-center shrink-0 min-w-[80px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 ${mobileTab === 'party' ? 'bg-indigo-600 text-white border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-900 hover:text-white'}`}
+          >
+            <Users className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Party</span>
+          </button>
+          
+          <button 
+            onClick={() => setMobileTab('initiative')} 
+            className={`snap-center shrink-0 min-w-[80px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 ${mobileTab === 'initiative' ? 'bg-amber-500 text-slate-950 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-900 hover:text-white'}`}
+          >
+            <Swords className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Command</span>
+          </button>
+          
+          <button 
+            onClick={() => setMobileTab('threats')} 
+            className={`snap-center shrink-0 min-w-[80px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 ${mobileTab === 'threats' ? 'bg-red-600 text-white border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-900 hover:text-white'}`}
+          >
+            <Skull className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Threats</span>
+          </button>
+          
+          <div className="w-0.5 h-8 bg-slate-800 mx-1 shrink-0 self-center"></div>
+          
+          <button onClick={() => setActiveManager('rules')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-slate-400 border-slate-900 hover:text-white shadow-inner">
+            <Book className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Rules</span>
+          </button>
+          
+          <button onClick={() => setActiveManager('items')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-slate-400 border-slate-900 hover:text-white shadow-inner">
+            <Package className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Vault</span>
+          </button>
+          
+          <button onClick={() => setActiveManager('handouts')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-slate-400 border-slate-900 hover:text-white shadow-inner">
+            <ImageIcon className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Media</span>
+          </button>
+          
+          <button onClick={() => setActiveManager('xp')} className="snap-center shrink-0 min-w-[70px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 bg-slate-950 text-amber-500 border-slate-900 hover:text-amber-400 shadow-inner">
+            <Star className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">XP</span>
+          </button>
+
+        </div>
+      </div>
+
     </div>
   );
 }

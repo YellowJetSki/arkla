@@ -29,11 +29,14 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
   });
 
   const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '', savingThrows: '' });
+  
   const [speciesTraits, setSpeciesTraits] = useState([]);
   const [classFeatures, setClassFeatures] = useState([]);
+  
   const [spellcastingMeta, setSpellcastingMeta] = useState(null);
   const [spells, setSpells] = useState([]);
   const [forceShowSpells, setForceShowSpells] = useState(false);
+  
   const [srdSpeciesOffer, setSrdSpeciesOffer] = useState(null);
   const [srdClassOffer, setSrdClassOffer] = useState(null); 
 
@@ -44,7 +47,8 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
   });
 
   const [inventory, setInventory] = useState([]);
-  const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
+  // FIX: Added 'range' to the initial state
+  const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
   const [srdEquipmentList, setSrdEquipmentList] = useState([]);
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
@@ -172,10 +176,12 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
       id: `item_${Date.now()}`, name: newItem.name, category: newItem.category, quantity: Number(newItem.quantity) || 1,
       desc: newItem.desc, imageUrl: newItem.imageUrl || '', damageDice: newItem.category === 'Weapon' ? newItem.damageDice : null,
       damageType: newItem.category === 'Weapon' ? newItem.damageType : null, properties: newItem.category === 'Weapon' ? newItem.properties : null,
+      range: newItem.category === 'Weapon' ? newItem.range : null, // FIX: Properly save range
       ac: newItem.category === 'Armor' ? Number(newItem.ac) : null
     };
     setInventory(prev => [...prev, formattedItem]);
-    setNewItem({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
+    // FIX: reset range
+    setNewItem({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
   };
 
   const removeInventoryItem = (index) => setInventory(prev => prev.filter((_, i) => i !== index));
@@ -205,6 +211,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
       const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
       const totalMaxHp = levelOneHp + higherLevelHp;
 
+      // Merge existing spell slots with new meta if editing
       const slots = initialData?.spellSlots || {};
       if (spellcastingMeta) {
          Object.keys(spellcastingMeta).forEach(key => {
@@ -268,7 +275,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/10 blur-[150px] rounded-full pointer-events-none -z-10"></div>
 
         <div className="bg-slate-900 border border-indigo-500/50 rounded-3xl w-full max-w-3xl shadow-[0_0_60px_rgba(99,102,241,0.2)] flex flex-col h-[90dvh] relative overflow-hidden animate-in zoom-in-95 duration-300">
-          
           <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 relative z-10 shrink-0">
             <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest">
                 {initialData ? <><Edit3 className="w-5 h-5 text-amber-400" /> Edit Character</> : <><UserPlus className="w-5 h-5 text-indigo-400" /> Construct Character</>}
@@ -294,7 +300,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
             {currentStep === 'traits' && <StepTraits formData={formData} level={formData.level} updateField={updateField} customProfs={customProfs} updateProf={updateProf} speciesTraits={speciesTraits} setSpeciesTraits={setSpeciesTraits} />}
             {currentStep === 'features' && <StepFeatures classFeatures={classFeatures} setClassFeatures={setClassFeatures} forceShowSpells={forceShowSpells} setForceShowSpells={setForceShowSpells} />}
             {currentStep === 'spells' && <StepSpells spells={spells} setSpells={setSpells} spellcastingMeta={spellcastingMeta} />}
-            {currentStep === 'companion' && <StepCompanion hasCompanion={hasCompanion} setHasCompanion={setHasCompanion} companionData={companionData} updateCompField={updateCompField} updateCompStat={updateCompStat} />}
+            {currentStep === 'companion' && <StepCompanion hasCompanion={hasCompanion} setHasCompanion={setHasCompanion} companionData={companionData} updateCompField={(f, v) => updateCompField(f, v)} updateCompStat={(s, v) => updateCompStat(s, v)} />}
             {currentStep === 'inventory' && <StepInventory newItem={newItem} setNewItem={setNewItem} handleItemNameChange={handleItemNameChange} showEquipDropdown={showEquipDropdown} filteredEquip={filteredEquip} handleSelectSrdItem={handleSelectSrdItem} handleAddItem={handleAddItem} inventory={inventory} removeInventoryItem={removeInventoryItem} />}
             {currentStep === 'lore' && <StepLore formData={formData} updateField={updateField} />}
           </div>
