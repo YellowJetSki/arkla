@@ -214,7 +214,6 @@ export default function DMDashboard({ onLogout }) {
       )}
 
       {isForgingEnemy && <EnemyForge onClose={() => setIsForgingEnemy(false)} />}
-      {isForgingSpell && <DMSpellForge onClose={() => setIsForgingSpell(false)} />}
       {isBuildingCharacter && <DMCharacterBuilder onClose={() => setIsBuildingCharacter(false)} />}
       
       {activeManager === 'encounters' && <DMEncounterManager onClose={() => setActiveManager(null)} />}
