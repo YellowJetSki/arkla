@@ -226,9 +226,17 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
       message: `Are you sure you want to permanently delete ${featToRemove.name}?`,
       type: 'confirm',
       onConfirm: async () => {
-        await updateDoc(doc(db, 'characters', currentUser.charId), {
-          features: arrayRemove(featToRemove)
-        });
+        const updates = { features: arrayRemove(featToRemove) };
+        
+        // FIX: Detect and delete the associated custom tracker!
+        if (char.resources) {
+           const updatedResources = char.resources.filter(r => r.name !== featToRemove.name);
+           if (updatedResources.length !== char.resources.length) {
+             updates.resources = updatedResources;
+           }
+        }
+
+        await updateDoc(doc(db, 'characters', currentUser.charId), updates);
         closeDialog();
       },
       onCancel: closeDialog

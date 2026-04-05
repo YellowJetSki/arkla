@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, X, Droplets, Droplet, Backpack, ShieldPlus, Zap, Flame } from 'lucide-react';
+import { Target, Sword, Activity, Wind, AlertTriangle, Plus, Minus, X, Droplets, Backpack, ShieldPlus, Zap, Flame } from 'lucide-react';
 import { getModifier, parseAndScaleAttack, getConditionMechanics } from '../../services/arklaEngine';
 import { CONDITIONS_LIST, CONDITION_EFFECTS } from '../../data/campaignData';
 import TempBuffsModal from '../TempBuffsModal';
@@ -61,12 +61,8 @@ export default function CombatTab({
   // Parse Class/Species Features for Combat Keywords (with manual overrides)
   const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
   const combatFeatures = (char.features || []).filter(f => {
-      // 5e Rule Override: If the DM manually hid it, ALWAYS exclude it from combat!
       if (f.isHiddenFromCombat) return false;
-
-      // 5e Rule Override: If the DM manually tagged it as defensive, ALWAYS include it in combat!
       if (f.isDefensive) return true;
-      
       const text = `${f.name} ${f.desc}`.toLowerCase();
       return combatKeywords.some(kw => text.includes(kw));
   });
@@ -81,8 +77,6 @@ export default function CombatTab({
 
   allAttacks.forEach(atk => {
     const scaled = parseAndScaleAttack(atk, char.stats, char.level, char.class);
-    
-    // Explicitly preserve the range property since parsing strips it
     const finalAtk = { ...scaled, range: atk.range || scaled.range, isWeapon: true };
 
     if ((scaled.notes || '').toLowerCase().includes('bonus action')) {
@@ -107,10 +101,8 @@ export default function CombatTab({
     }
   });
 
-  // Spellcaster Detection Logic - Strictly requires spells to be inscribed
   const isSpellcaster = char.spells && char.spells.length > 0;
 
-  // Render helper for Weapons vs Traits inside the Action economy blocks
   const renderActionItem = (item, idx) => {
     if (item.isWeapon) {
       return (
@@ -238,7 +230,10 @@ export default function CombatTab({
                 <div className="pl-4">
                   <div className="flex justify-between items-start mb-3">
                     <span className="text-xs font-black text-white uppercase tracking-wider truncate pr-2 leading-tight">{res.name}</span>
-                    <span className="text-[8px] text-slate-400 uppercase font-black bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded shadow-inner shrink-0">{res.recharge} rest</span>
+                    {/* Hide the 'None Rest' display entirely */}
+                    {res.recharge && res.recharge.toLowerCase() !== 'none' && (
+                      <span className="text-[8px] text-slate-400 uppercase font-black bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded shadow-inner shrink-0">{res.recharge} rest</span>
+                    )}
                   </div>
                   
                   {res.isPool ? (
@@ -248,15 +243,13 @@ export default function CombatTab({
                       <button onClick={() => handleResourceToggle(idx, Math.min(res.max, res.current + 1))} className="w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 text-white font-black flex items-center justify-center border border-slate-700 shadow-sm">+</button>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {Array.from({ length: res.max }).map((_, slotIdx) => (
                         <button 
                           key={slotIdx}
                           onClick={() => handleResourceToggle(idx, slotIdx < res.current ? slotIdx : slotIdx + 1)}
-                          className={`w-6 h-6 rounded flex items-center justify-center border-[3px] transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${slotIdx < res.current ? `${activeTheme.bg} border-slate-950 text-white` : 'bg-slate-900 border-slate-800 text-transparent hover:bg-slate-800'}`}
-                        >
-                          <Droplet className="w-3 h-3 fill-current" />
-                        </button>
+                          className={`w-5 h-5 rounded-full border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${slotIdx < res.current ? `${activeTheme.bg} border-slate-950` : 'bg-slate-900 border-slate-800 hover:bg-slate-800'}`}
+                        />
                       ))}
                     </div>
                   )}

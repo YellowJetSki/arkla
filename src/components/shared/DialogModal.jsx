@@ -5,7 +5,6 @@ export default function DialogModal({ isOpen, title, message, type = 'alert', in
   const [inputValue, setInputValue] = useState('');
   const inputRef = useRef(null);
 
-  // Auto-focus the input field when a 'prompt' opens
   useEffect(() => {
     if (isOpen) {
       setInputValue('');
@@ -19,16 +18,17 @@ export default function DialogModal({ isOpen, title, message, type = 'alert', in
 
   const handleConfirm = () => {
     if (type === 'prompt') {
-      onConfirm(inputValue);
-    } else {
+      onConfirm?.(inputValue);
+    } else if (onConfirm) {
       onConfirm();
+    } else if (onCancel) {
+      onCancel(); 
     }
   };
 
   const isConfirm = type === 'confirm';
   const isPrompt = type === 'prompt';
   
-  // Theme logic for high-contrast graphic novel UI
   const headerBgColor = isConfirm ? 'bg-amber-500' : isPrompt ? 'bg-indigo-500' : 'bg-slate-300';
   const headerTextColor = 'text-slate-950';
   const btnColor = isConfirm 
@@ -60,7 +60,6 @@ export default function DialogModal({ isOpen, title, message, type = 'alert', in
         <div className="p-6 text-slate-300 text-sm md:text-base font-bold leading-relaxed whitespace-pre-wrap">
           {message}
           
-          {/* Prompt Input Field */}
           {type === 'prompt' && (
             <div className="mt-6 relative">
               <input 

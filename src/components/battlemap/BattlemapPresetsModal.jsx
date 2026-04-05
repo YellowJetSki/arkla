@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Upload, Trash2, Map } from 'lucide-react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import DialogModal from '../shared/DialogModal';
 
@@ -29,7 +29,6 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
     
     const cleanMapData = { ...currentMapData, isPublished: false };
     
-    // Grabs the token data AND merges it with the deep entity stats (actions, flavor, etc.)
     const enemyTokens = Object.keys(currentTokens).reduce((acc, key) => {
       if (currentTokens[key].type === 'enemy') {
         const fullEntityData = activeEnemies.find(e => e.id === key) || {};
@@ -70,7 +69,6 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
   };
 
   const handleDeploy = (name, data) => {
-    // Safely handle legacy preset formats missing tokens or mapData
     const safeData = {
       mapData: data.mapData || { cols: 20, rows: 15, imageUrl: '' },
       tokens: data.tokens || {}
@@ -81,11 +79,35 @@ export default function BattlemapPresetsModal({ isOpen, onClose, currentMapData,
       title: 'Deploy Preset',
       message: `Deploying "${name}" will wipe the current active enemies and replace them with this preset's enemies. Proceed?`,
       type: 'confirm',
-      onConfirm: () => {
-        onRestorePreset(safeData);
-        closeDialog();
-        onClose();
-      }
+      onConfirm: async () => {
+        try {
+          // Erase all existing Active Enemies
+          const activeSnap = await getDocs(collection(db, 'active_enemies'));
+          const batch = writeBatch(db);
+          activeSnap.docs.forEach(d => {
+            batch.delete(doc(db, 'active_enemies', d.id));
+          });
+          
+          // Repopulate with preset enemies
+          Object.keys(safeData.tokens).forEach(tokenId => {
+            const token = safeData.tokens[tokenId];
+            if (token.type === 'enemy' && token.entityData) {
+              const enemyRef = doc(db, 'active_enemies', tokenId);
+              batch.set(enemyRef, { ...token.entityData, id: tokenId });
+            }
+          });
+          
+          await batch.commit();
+
+          onRestorePreset(safeData);
+          closeDialog();
+          onClose();
+        } catch(e) {
+          console.error("Failed to deploy preset:", e);
+          setDialog({ isOpen: true, title: 'Error', message: 'Failed to deploy preset to database.', type: 'alert' });
+        }
+      },
+      onCancel: closeDialog
     });
   };
 

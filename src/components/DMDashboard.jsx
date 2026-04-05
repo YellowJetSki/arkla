@@ -4,7 +4,6 @@ import { db } from '../services/firebase';
 import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, Map, Users, Swords, Skull, Flame } from 'lucide-react';
 
 import InitiativeTracker from './InitiativeTracker';
-import DMEncounterManager from './DMEncounterManager';
 import DMItemManager from './DMItemManager'; 
 import DMSpellVault from './DMSpellVault';
 import DMFeatVault from './DMFeatVault';
@@ -241,7 +240,6 @@ export default function DMDashboard({ onLogout }) {
       {isForgingEnemy && <EnemyForge onClose={() => setIsForgingEnemy(false)} />}
       {isBuildingCharacter && <DMCharacterBuilder onClose={() => setIsBuildingCharacter(false)} />}
       
-      {activeManager === 'encounters' && <DMEncounterManager onClose={() => setActiveManager(null)} />}
       {activeManager === 'items' && <DMItemManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
       {activeManager === 'spells' && <DMSpellVault activePlayers={unlockedCharacters} activeEnemies={activeEnemies} onClose={() => setActiveManager(null)} />}
       {activeManager === 'feats' && <DMFeatVault activePlayers={unlockedCharacters} activeEnemies={activeEnemies} onClose={() => setActiveManager(null)} />}
@@ -333,7 +331,6 @@ export default function DMDashboard({ onLogout }) {
           <DMThreatsPanel 
             activeEnemies={activeEnemies}
             selectedEnemies={selectedEnemies}
-            setActiveManager={setActiveManager}
             setIsForgingEnemy={setIsForgingEnemy}
             selectAllEnemies={selectAllEnemies}
             massMathAmount={massMathAmount}

@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Skull, Map as MapIcon, Hammer, CheckSquare, Square, Flame, Search } from 'lucide-react';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import { Skull, Hammer, CheckSquare, Square, Flame, Search, MapPin } from 'lucide-react';
 import DMEnemyCard from './DMEnemyCard';
 
 export default function DMThreatsPanel({
   activeEnemies,
   selectedEnemies,
-  setActiveManager,
   setIsForgingEnemy,
   selectAllEnemies,
   massMathAmount,
@@ -19,6 +20,31 @@ export default function DMThreatsPanel({
     enemy.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const deployToBoard = async (enemy) => {
+    try {
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      const mapSnap = await getDoc(mapRef);
+      if (mapSnap.exists()) {
+        const tokens = mapSnap.data().tokens || {};
+        if (!tokens[enemy.id]) {
+          tokens[enemy.id] = {
+            type: 'enemy',
+            x: 0, 
+            y: 0,
+            size: enemy.size || 1,
+            hp: enemy.currentHp ?? enemy.hp ?? 10,
+            maxHp: enemy.maxHp ?? enemy.hp ?? 10,
+            img: enemy.img || enemy.imageUrl || '/icon.png',
+            conditions: enemy.conditions || []
+          };
+          await updateDoc(mapRef, { tokens });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to hot-drop enemy to board", err);
+    }
+  };
+
   return (
     <aside className="w-full h-full bg-slate-900 flex flex-col shrink-0">
       <div className="p-4 border-b-[3px] border-slate-950 flex justify-between items-center bg-red-600 shrink-0 relative z-10">
@@ -26,7 +52,6 @@ export default function DMThreatsPanel({
            <Skull className="w-5 h-5"/> Threats
          </h2>
          <div className="flex gap-2">
-            <button onClick={() => setActiveManager('encounters')} className="bg-slate-900 hover:bg-slate-800 text-white p-2 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all" title="Stage Encounters"><MapIcon className="w-4 h-4"/></button>
             <button onClick={() => setIsForgingEnemy(true)} className="bg-slate-950 text-red-500 hover:bg-slate-800 hover:text-white p-2 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all" title="Forge Monster"><Hammer className="w-4 h-4"/></button>
          </div>
       </div>
@@ -68,12 +93,20 @@ export default function DMThreatsPanel({
            </div>
          ) : (
            filteredEnemies.map(enemy => (
-             <DMEnemyCard 
-               key={enemy.id} 
-               enemy={enemy} 
-               isSelected={selectedEnemies.includes(enemy.id)}
-               onToggleSelect={() => toggleEnemySelection(enemy.id)}
-             />
+             <div key={enemy.id} className="relative group">
+               <DMEnemyCard 
+                 enemy={enemy} 
+                 isSelected={selectedEnemies.includes(enemy.id)}
+                 onToggleSelect={() => toggleEnemySelection(enemy.id)}
+               />
+               <button 
+                 onClick={() => deployToBoard(enemy)}
+                 className="absolute top-2 right-12 bg-sky-500 hover:bg-sky-400 text-slate-950 p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                 title="Hot-Drop to Map"
+               >
+                 <MapPin className="w-4 h-4 font-black" />
+               </button>
+             </div>
            ))
          )}
       </div>
