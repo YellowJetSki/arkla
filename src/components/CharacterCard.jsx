@@ -123,10 +123,17 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', inputPlaceholder: '', onConfirm: null });
 
-  const showDialog = (options) => setDialog({ ...options, isOpen: true });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
-  // Scroll active tab into view when it changes
+  // SAFELY INTERCEPT FALSE OPENS SO WE DON'T WIPE MODAL TEXT
+  const showDialog = (options) => {
+    if (options.isOpen === false) {
+      closeDialog();
+    } else {
+      setDialog(prev => ({ ...prev, ...options, isOpen: true }));
+    }
+  };
+
   useEffect(() => {
     const activeBtn = document.getElementById(`tab-btn-${activeTab}`);
     if (activeBtn) {
@@ -311,7 +318,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
   if (!char) return <CardWrapper><GlobalLoader /></CardWrapper>;
 
-  const activeConditions = char.conditions || [];
   const isExhausted = activeConditions.includes('Exhaustion');
   const activeTheme = THEMES[char.theme] || THEMES.indigo;
 
@@ -396,6 +402,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 <h1 className="text-sm font-black text-white uppercase tracking-widest hidden sm:block drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">CAMPAIGN COMPANION</h1>
               </div>
               <div className="flex items-center gap-2">
+                <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center justify-center px-2 py-1.5 h-9 ${isEditMode ? 'bg-amber-600 text-slate-950 border-amber-950' : `bg-slate-900 ${activeTheme.text} hover:text-white border-slate-950`} transition-all rounded-lg border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] text-[10px] font-black uppercase tracking-widest`}><Edit3 className="w-3 h-3 mr-1" /> {isEditMode ? 'Done' : 'Edit'}</button>
                 <button onClick={() => setIsGuideOpen(true)} className={`flex items-center justify-center w-9 h-9 ${activeTheme.text} hover:text-white transition-all bg-slate-900 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]`}><HelpCircle className="w-4 h-4" /></button>
                 <button onClick={onLogout} className="flex items-center gap-2 text-slate-400 hover:text-white transition-all bg-slate-900 px-3 py-1.5 h-9 rounded-lg border-2 border-slate-950 text-xs font-black uppercase tracking-widest shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"><LogOut className="w-3 h-3" /> Exit</button>
               </div>
@@ -429,7 +436,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             onOpenLevelUp={() => setIsLevelUpOpen(true)}
           />
 
-          {/* Collapsible Math (Core Stats) to save space on mobile */}
           <div className="mb-4 pt-2">
             <button 
               onClick={() => setShowCoreStats(!showCoreStats)}
@@ -451,7 +457,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         {/* RIGHT DYNAMIC PANEL (Desktop) / MAIN CONTENT (Mobile) */}
         <div className={`flex-1 flex flex-col min-w-0 ${isDM ? 'bg-slate-900 h-full overflow-hidden' : 'pt-0 md:pt-6'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} overflow-x-hidden`}>
           
-          {/* FLOATING APP-STYLE NAV BAR */}
           <div className={`${isDM ? 'shrink-0 bg-slate-950 border-b-[3px] border-slate-900 p-2 sm:p-3 z-40 w-full' : 'fixed bottom-0 left-0 w-full z-40 bg-slate-950 border-t-[3px] border-slate-900 shadow-[0_-4px_20px_rgba(0,0,0,0.8)] pb-safe md:sticky md:bottom-auto md:top-0 md:w-auto md:bg-transparent md:border-none md:shadow-none md:z-30 md:-mx-8 md:px-8 md:mb-6'}`}>
               <div className={`bg-slate-900 md:bg-slate-900/80 p-2 md:rounded-xl md:border-2 md:border-slate-950 md:shadow-[6px_6px_0px_rgba(0,0,0,1)] flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-2 snap-x snap-mandatory md:backdrop-blur-md`}>
                 {availableTabs.map(tab => (
@@ -594,7 +599,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           </div>
         </div>
 
-        {/* Outer Modals rendered at root container depth */}
         {showBuilder && <DMCharacterBuilder initialData={char} charId={currentUser.charId} onClose={() => setShowBuilder(false)} />}
         {isLevelUpOpen && <LevelUpModal char={char} charId={currentUser.charId} onClose={() => setIsLevelUpOpen(false)} />}
         {isShortRestOpen && <ShortRestModal char={char} charId={currentUser.charId} onClose={() => setIsShortRestOpen(false)} />}

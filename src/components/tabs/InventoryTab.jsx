@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, updateDoc, runTransaction, writeBatch } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Backpack, Coins, Search, Hammer, Plus, Minus, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon, Filter } from 'lucide-react';
+import { Backpack, Coins, Search, Hammer, Plus, Minus, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon, Filter, Edit3 } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
 import ImageSelector from '../shared/ImageSelector';
 
@@ -9,6 +9,7 @@ const INVENTORY_FILTERS = ['All', 'Weapon', 'Armor', 'Consumable', 'Potion', 'Ad
 
 export default function InventoryTab({ char, charId, isDM, updateField, activeTheme, showDialog }) {
   const [isForgingItem, setIsForgingItem] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState(null);
   const [openItems, setOpenItems] = useState({}); 
   const [activeFilter, setActiveFilter] = useState('All');
   
@@ -87,31 +88,71 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
     }
   };
 
+  const handleEditClick = (item, idx) => {
+    const realIndex = inventoryArray.findIndex(i => 
+      (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
+    );
+    if (realIndex === -1) return;
+
+    setEditingItemIndex(realIndex);
+    setCustomItem({
+      name: item.name || '',
+      category: item.category || 'Wondrous Item',
+      damageDice: item.damageDice || '1d8',
+      damageType: item.damageType || 'Slashing',
+      properties: item.properties || '',
+      range: item.range || '',
+      ac: item.ac || 14,
+      hpRecovery: item.hpRecovery || '',
+      desc: item.desc || '',
+      imageUrl: item.imageUrl || ''
+    });
+    setIsForgingItem(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleForgeCustomItem = async (e) => {
     e.preventDefault();
     if (!customItem.name) return;
     
-    const newItem = {
-       id: `item_${Date.now()}`,
-       name: customItem.name,
-       category: customItem.category,
-       desc: customItem.desc,
-       imageUrl: customItem.imageUrl || '',
-       quantity: 1,
-       damageDice: customItem.category === 'Weapon' ? customItem.damageDice : null,
-       damageType: customItem.category === 'Weapon' ? customItem.damageType : null,
-       properties: customItem.category === 'Weapon' ? customItem.properties : null,
-       range: customItem.category === 'Weapon' ? customItem.range : null,
-       ac: customItem.category === 'Armor' ? Number(customItem.ac) : null,
-       hpRecovery: customItem.category === 'Consumable' || customItem.category === 'Potion' ? customItem.hpRecovery : null
-    };
-    
     await runInventoryTransaction((inv) => {
-      return [...inv, newItem];
+      if (editingItemIndex !== null && inv[editingItemIndex]) {
+        inv[editingItemIndex] = {
+          ...inv[editingItemIndex],
+          name: customItem.name,
+          category: customItem.category,
+          desc: customItem.desc,
+          imageUrl: customItem.imageUrl || '',
+          damageDice: customItem.category === 'Weapon' ? customItem.damageDice : null,
+          damageType: customItem.category === 'Weapon' ? customItem.damageType : null,
+          properties: customItem.category === 'Weapon' ? customItem.properties : null,
+          range: customItem.category === 'Weapon' ? customItem.range : null,
+          ac: customItem.category === 'Armor' ? Number(customItem.ac) : null,
+          hpRecovery: customItem.category === 'Consumable' || customItem.category === 'Potion' ? customItem.hpRecovery : null
+        };
+        return inv;
+      } else {
+        const newItem = {
+           id: `item_${Date.now()}`,
+           name: customItem.name,
+           category: customItem.category,
+           desc: customItem.desc,
+           imageUrl: customItem.imageUrl || '',
+           quantity: 1,
+           damageDice: customItem.category === 'Weapon' ? customItem.damageDice : null,
+           damageType: customItem.category === 'Weapon' ? customItem.damageType : null,
+           properties: customItem.category === 'Weapon' ? customItem.properties : null,
+           range: customItem.category === 'Weapon' ? customItem.range : null,
+           ac: customItem.category === 'Armor' ? Number(customItem.ac) : null,
+           hpRecovery: customItem.category === 'Consumable' || customItem.category === 'Potion' ? customItem.hpRecovery : null
+        };
+        return [...inv, newItem];
+      }
     });
     
     setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' });
     setIsForgingItem(false);
+    setEditingItemIndex(null);
   };
 
   const updateQuantity = async (idx, delta) => {
@@ -288,8 +329,16 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         <div className="flex justify-between items-center border-b-2 border-slate-900 pb-2 mb-4 relative z-10">
           <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Backpack className={`w-5 h-5 ${activeTheme.text}`} /> Equipment</h3>
           {isDM && (
-            <button onClick={() => setIsForgingItem(!isForgingItem)} className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingItem ? 'bg-indigo-600 border-slate-950 text-white' : `bg-slate-900 border-slate-950 ${activeTheme.text} hover:bg-slate-800`}`}>
-              <Hammer className="w-3 h-3" /> {isForgingItem ? 'Close' : 'Add Item'}
+            <button onClick={() => {
+              if (isForgingItem) {
+                setIsForgingItem(false);
+                setEditingItemIndex(null);
+                setCustomItem({ name: '', category: 'Wondrous Item', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, hpRecovery: '', desc: '', imageUrl: '' });
+              } else {
+                setIsForgingItem(true);
+              }
+            }} className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingItem ? 'bg-indigo-600 border-slate-950 text-white' : `bg-slate-900 border-slate-950 ${activeTheme.text} hover:bg-slate-800`}`}>
+              <Hammer className="w-3 h-3" /> {isForgingItem ? 'Close Forge' : 'Add Item'}
             </button>
           )}
         </div>
@@ -311,7 +360,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         
         {isDM && isForgingItem && (
           <form onSubmit={handleForgeCustomItem} className="bg-slate-900 border-2 border-indigo-950 p-5 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
-            <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b-2 border-slate-950 pb-2"><Hammer className="w-4 h-4" /> Inject Item</h4>
+            <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b-2 border-slate-950 pb-2"><Hammer className="w-4 h-4" /> {editingItemIndex !== null ? 'Edit Item' : 'Inject Item'}</h4>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="relative">
@@ -399,7 +448,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
             </div>
             
             <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-black uppercase tracking-widest text-xs py-3.5 rounded-xl border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center gap-2 mt-2">
-              <Plus className="w-4 h-4" /> Inject into Bags
+              {editingItemIndex !== null ? <><Edit3 className="w-4 h-4" /> Save Changes</> : <><Plus className="w-4 h-4" /> Inject into Bags</>}
             </button>
           </form>
         )}
@@ -432,6 +481,11 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                   </div>
 
                   <div className="flex items-center gap-2 mt-2 sm:mt-0 self-end sm:self-auto">
+                    {isDM && (
+                       <button onClick={(e) => { e.stopPropagation(); handleEditClick(item, i); }} className="bg-slate-950 border-2 border-slate-800 p-2 rounded-lg hover:bg-indigo-950 transition-colors text-slate-500 hover:text-indigo-400 shadow-sm" title="Edit Item">
+                         <Edit3 className="w-4 h-4" />
+                       </button>
+                    )}
                     <button onClick={(e) => { e.stopPropagation(); promptDelete(item, i); }} className="bg-slate-950 border-2 border-slate-800 p-2 rounded-lg hover:bg-red-950 transition-colors text-slate-500 hover:text-red-500 shadow-sm" title="Delete Item">
                       <Trash2 className="w-4 h-4" />
                     </button>
