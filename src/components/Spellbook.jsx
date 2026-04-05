@@ -176,10 +176,21 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     return acc;
   }, {});
 
-  const highestLevelName = Object.keys(groupedSpells)
-    .filter(k => k !== 'Cantrips')
-    .sort((a, b) => parseInt(a.replace('Level ', '')) - parseInt(b.replace('Level ', '')))
-    .reverse()[0];
+  // NEW: Sort spells alphabetically within their respective levels
+  Object.keys(groupedSpells).forEach(lvl => {
+    groupedSpells[lvl].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  });
+
+  // NEW: Create a strictly sorted array of the level keys, forcing "Cantrips" to always be first
+  const sortedLevelNames = Object.keys(groupedSpells).sort((a, b) => {
+    if (a === 'Cantrips') return -1;
+    if (b === 'Cantrips') return 1;
+    const numA = parseInt(a.replace('Level ', ''), 10);
+    const numB = parseInt(b.replace('Level ', ''), 10);
+    return numA - numB;
+  });
+
+  const highestLevelName = sortedLevelNames.filter(k => k !== 'Cantrips').reverse()[0];
 
   const hasSpellStats = char.spellSave || char.spellAttack;
 
@@ -387,67 +398,70 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
             {spells.length === 0 ? (isDM ? 'Forge spells here.' : 'No magic inscribed.') : 'No spells match this filter.'}
           </div>
         ) : (
-          Object.entries(groupedSpells).map(([levelName, levelSpells]) => (
-            <CollapsibleSection 
-              key={levelName} 
-              title={`${levelName} (${levelSpells.length})`} 
-              icon={Sparkles} 
-              defaultOpen={levelName === 'Cantrips' || levelName === highestLevelName || activeFilter !== 'All'}
-            >
-              <div className="grid grid-cols-1 gap-4">
-                {levelSpells.map((spell, idx) => {
-                  const canCastAny = levelName === 'Cantrips' || Object.values(spellSlots).some(s => s.current > 0);
-                  const isConcentration = (spell.desc || '').toLowerCase().includes('concentration') || (spell.duration || '').toLowerCase().includes('concentration');
-                  
-                  return (
-                    <div key={idx} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col transition-all">
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
-                        <div>
-                          <h4 className="font-black text-fuchsia-300 text-xl flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] mb-2 leading-none">
-                            {spell.name}
-                            {isDM && (
+          sortedLevelNames.map((levelName) => {
+            const levelSpells = groupedSpells[levelName];
+            return (
+              <CollapsibleSection 
+                key={levelName} 
+                title={`${levelName} (${levelSpells.length})`} 
+                icon={Sparkles} 
+                defaultOpen={levelName === 'Cantrips' || levelName === highestLevelName || activeFilter !== 'All'}
+              >
+                <div className="grid grid-cols-1 gap-4">
+                  {levelSpells.map((spell, idx) => {
+                    const canCastAny = levelName === 'Cantrips' || Object.values(spellSlots).some(s => s.current > 0);
+                    const isConcentration = (spell.desc || '').toLowerCase().includes('concentration') || (spell.duration || '').toLowerCase().includes('concentration');
+                    
+                    return (
+                      <div key={idx} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-4 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col transition-all">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-3">
+                          <div>
+                            <h4 className="font-black text-fuchsia-300 text-xl flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] mb-2 leading-none">
+                              {spell.name}
+                              {isDM && (
+                                <button 
+                                  onClick={() => removeSpellFromGrimoire(spell)}
+                                  className="text-slate-500 hover:text-red-500 hover:bg-red-950 border-2 border-slate-950 bg-slate-950 p-1.5 rounded-lg transition-all ml-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </h4>
+                            <div className="flex gap-1.5 flex-wrap">
+                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner">{spell.castTime || spell.castingTime || spell.casting_time || '1 Action'}</span>
+                               {spell.range && <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner">{spell.range}</span>}
+                               {spell.duration && <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner">{spell.duration}</span>}
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-2 shrink-0">
+                            {!isDM && spell.level > 0 && (
                               <button 
-                                onClick={() => removeSpellFromGrimoire(spell)}
-                                className="text-slate-500 hover:text-red-500 hover:bg-red-950 border-2 border-slate-950 bg-slate-950 p-1.5 rounded-lg transition-all ml-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"
+                                onClick={() => setSpellToCast(spell)}
+                                disabled={!canCastAny}
+                                className={`text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${canCastAny ? 'bg-fuchsia-600 border-slate-950 hover:bg-fuchsia-500 text-white cursor-pointer' : 'bg-slate-800 border-slate-900 text-slate-600 cursor-not-allowed'}`}
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Wand2 className="w-3 h-3" /> {canCastAny ? 'Cast' : 'No Slots'}
                               </button>
                             )}
-                          </h4>
-                          <div className="flex gap-1.5 flex-wrap">
-                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner">{spell.castTime || spell.castingTime || spell.casting_time || '1 Action'}</span>
-                             {spell.range && <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner">{spell.range}</span>}
-                             {spell.duration && <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-950 border border-slate-800 px-2 py-0.5 rounded shadow-inner">{spell.duration}</span>}
+                            {!isDM && isConcentration && (
+                              <button 
+                                onClick={toggleConcentration}
+                                className={`text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${char.isConcentrating ? 'bg-amber-400 border-slate-950 text-slate-950 cursor-pointer animate-pulse' : 'bg-slate-800 border-slate-950 text-amber-500 hover:bg-slate-700 cursor-pointer'}`}
+                              >
+                                <BrainCircuit className="w-3 h-3" /> Conc.
+                              </button>
+                            )}
                           </div>
                         </div>
-                        
-                        <div className="flex gap-2 shrink-0">
-                          {!isDM && spell.level > 0 && (
-                            <button 
-                              onClick={() => setSpellToCast(spell)}
-                              disabled={!canCastAny}
-                              className={`text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${canCastAny ? 'bg-fuchsia-600 border-slate-950 hover:bg-fuchsia-500 text-white cursor-pointer' : 'bg-slate-800 border-slate-900 text-slate-600 cursor-not-allowed'}`}
-                            >
-                              <Wand2 className="w-3 h-3" /> {canCastAny ? 'Cast' : 'No Slots'}
-                            </button>
-                          )}
-                          {!isDM && isConcentration && (
-                            <button 
-                              onClick={toggleConcentration}
-                              className={`text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${char.isConcentrating ? 'bg-amber-400 border-slate-950 text-slate-950 cursor-pointer animate-pulse' : 'bg-slate-800 border-slate-950 text-amber-500 hover:bg-slate-700 cursor-pointer'}`}
-                            >
-                              <BrainCircuit className="w-3 h-3" /> Conc.
-                            </button>
-                          )}
-                        </div>
+                        <p className="text-[11px] md:text-xs text-slate-300 font-medium leading-relaxed whitespace-pre-wrap bg-slate-950/50 p-3 rounded-lg border border-slate-800/50 shadow-inner mt-2">{spell.desc}</p>
                       </div>
-                      <p className="text-[11px] md:text-xs text-slate-300 font-medium leading-relaxed whitespace-pre-wrap bg-slate-950/50 p-3 rounded-lg border border-slate-800/50 shadow-inner mt-2">{spell.desc}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </CollapsibleSection>
-          ))
+                    );
+                  })}
+                </div>
+              </CollapsibleSection>
+            );
+          })
         )}
       </div>
     </div>
