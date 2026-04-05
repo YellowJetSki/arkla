@@ -129,7 +129,7 @@ export default function StepInventory({
             inputClassName="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 appearance-none cursor-pointer"
           />
           <input 
-            type="url" 
+            type="text" 
             value={newItem.imageUrl || ''} 
             onChange={e => setNewItem({...newItem, imageUrl: e.target.value})} 
             className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 mt-1" 

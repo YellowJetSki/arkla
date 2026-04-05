@@ -1,4 +1,5 @@
 import { Wand2, Sparkles } from 'lucide-react';
+import ImageSelector from '../shared/ImageSelector';
 
 export default function StepIdentity({ 
   formData, 
@@ -82,12 +83,28 @@ export default function StepIdentity({
         </div>
       </div>
 
+      <div className="space-y-2">
+        <ImageSelector 
+          value={formData.imageUrl || ''} 
+          onChange={(val) => updateField('imageUrl', val)} 
+          label="Portrait / Token Image (Library)" 
+          inputClassName="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner appearance-none cursor-pointer"
+        />
+        <input 
+          type="text" 
+          value={formData.imageUrl || ''} 
+          onChange={e => updateField('imageUrl', e.target.value)} 
+          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner mt-1" 
+          placeholder="...or paste a custom image URL here" 
+        />
+      </div>
+
       <div>
         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Aura / Theme Color</label>
         <select 
           value={formData.theme} 
           onChange={e => updateField('theme', e.target.value)} 
-          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 shadow-inner"
+          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner appearance-none cursor-pointer"
         >
           <option value="indigo">Tenari Void (Indigo)</option>
           <option value="emerald">Smuggler's Emerald (Green)</option>

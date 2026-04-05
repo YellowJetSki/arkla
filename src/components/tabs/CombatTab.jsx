@@ -58,9 +58,12 @@ export default function CombatTab({
   const allAttacks = [...(char.attacks || []), ...inventoryWeapons];
   const resources = char.resources || [];
 
-  // Parse Class/Species Features for Combat Keywords
+  // Parse Class/Species Features for Combat Keywords (or manual DM override)
   const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
   const combatFeatures = (char.features || []).filter(f => {
+      // 5e Rule Override: If the DM manually tagged it as defensive, ALWAYS include it in combat!
+      if (f.isDefensive) return true;
+      
       const text = `${f.name} ${f.desc}`.toLowerCase();
       return combatKeywords.some(kw => text.includes(kw));
   });
@@ -145,8 +148,11 @@ export default function CombatTab({
       );
     } else {
       return (
-        <div key={idx} className="bg-slate-900 border-2 border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-           <span className={`font-black text-white text-xs uppercase tracking-wider block mb-1`}>{item.name}</span>
+        <div key={idx} className={`bg-slate-900 border-2 ${item.isDefensive ? 'border-indigo-900/80 shadow-[0_0_15px_rgba(99,102,241,0.15)]' : 'border-slate-950'} rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)]`}>
+           <span className={`font-black text-white text-xs uppercase tracking-wider flex items-center gap-1.5 mb-1`}>
+             {item.isDefensive && <ShieldPlus className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+             {item.name}
+           </span>
            <p className="text-[10px] font-bold text-slate-300 leading-relaxed line-clamp-3 hover:line-clamp-none transition-all">{item.desc}</p>
         </div>
       );

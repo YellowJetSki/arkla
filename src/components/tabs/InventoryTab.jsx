@@ -384,7 +384,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                   inputClassName="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner appearance-none cursor-pointer"
                 />
                 <input 
-                  type="url" 
+                  type="text" 
                   value={customItem.imageUrl} 
                   onChange={e => setCustomItem({...customItem, imageUrl: e.target.value})} 
                   className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner mt-1" 
