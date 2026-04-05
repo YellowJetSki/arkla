@@ -1,6 +1,6 @@
 import React from 'react';
-import { BookOpen, Wrench, MessageSquare, Target, Sword, Activity, ShieldAlert } from 'lucide-react';
-import { getProficiencyBonus, getModifier, getConditionMechanics } from '../../services/arklaEngine';
+import { BookOpen, Wrench, MessageSquare, Target, Sword, Activity } from 'lucide-react';
+import { getProficiencyBonus, getModifier, getConditionMechanics, ALL_SKILLS } from '../../services/arklaEngine';
 
 export default function StatGrid({ char, activeTheme, isEditMode, updateField }) {
   const stats = char?.stats || {};
@@ -12,8 +12,43 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
   
   const STAT_ORDER = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
   
-  // Safe parsing of saving throw proficiencies (assumes a comma-separated string)
-  const savingThrowProfs = (char?.proficiencies?.savingThrows || '').toLowerCase();
+  // Safe parsing of saving throw proficiencies (Handles both Arrays and Strings robustly)
+  const savingThrowsRaw = char?.proficiencies?.savingThrows;
+  const savingThrowProfs = (Array.isArray(savingThrowsRaw) ? savingThrowsRaw.join(', ') : (savingThrowsRaw || '')).toLowerCase();
+
+  // Automatically calculate and append stat modifiers to skill proficiencies
+  const renderSkills = () => {
+    const skillsRaw = char?.proficiencies?.skills;
+    if (!skillsRaw || skillsRaw.length === 0) return 'None';
+    
+    const skillsStr = Array.isArray(skillsRaw) ? skillsRaw.join(', ') : skillsRaw;
+    const skillArray = skillsStr.split(',').map(s => s.trim()).filter(Boolean);
+    
+    return skillArray.map(skill => {
+      // Clean up brackets in case someone manually typed "Acrobatics (DEX)"
+      const cleanSkill = skill.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim();
+      const foundSkill = ALL_SKILLS.find(s => s.toLowerCase().startsWith(cleanSkill));
+      
+      if (foundSkill) {
+        const statMatch = foundSkill.match(/\(([A-Z]{3})\)/);
+        if (statMatch) {
+          const statName = statMatch[1];
+          const statScore = stats[statName] || 10;
+          const statMod = getModifier(statScore);
+          
+          // Apply Expertise if the user typed it (e.g., "Acrobatics (Expertise)")
+          const isExpertise = skill.toLowerCase().includes('expertise');
+          const totalBonus = statMod + (isExpertise ? (profBonus * 2) : profBonus);
+          const formattedBonus = totalBonus >= 0 ? `+${totalBonus}` : `${totalBonus}`;
+          
+          // Extract just the name "Acrobatics" from "Acrobatics (DEX)"
+          const displayName = foundSkill.split(' (')[0]; 
+          return `${displayName} (${formattedBonus})`;
+        }
+      }
+      return skill; // Fallback if no match
+    }).join(', ');
+  };
 
   return (
     <div className="space-y-6">
@@ -36,12 +71,12 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
                 </span>
               </div>
 
-              {/* SAVING THROW DISPLAY */}
-              <div className={`w-full flex items-center justify-between bg-slate-950 px-2 py-1 rounded shadow-inner border border-slate-800 mt-1`}>
-                 <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Save</span>
-                 <div className="flex items-center gap-1">
-                   {isProficient && <div className={`w-1.5 h-1.5 rounded-full ${activeTheme.bg} shadow-[0_0_5px_currentColor]`}></div>}
-                   <span className={`text-[10px] font-black ${isProficient ? activeTheme.text : 'text-slate-400'}`}>
+              {/* SAVING THROW DISPLAY (Improved Contrast and Readability) */}
+              <div className={`w-full flex items-center justify-between bg-slate-950 px-2 py-1.5 rounded-lg shadow-inner border border-slate-800 mt-1`}>
+                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Save</span>
+                 <div className="flex items-center gap-1.5">
+                   {isProficient && <div className={`w-2 h-2 rounded-full ${activeTheme?.bg || 'bg-indigo-500'} shadow-[0_0_5px_currentColor]`}></div>}
+                   <span className={`text-xs font-black ${isProficient ? (activeTheme?.text || 'text-indigo-400') : 'text-slate-300'}`}>
                      {saveMod >= 0 ? `+${saveMod}` : saveMod}
                    </span>
                  </div>
@@ -55,7 +90,7 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
       <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 md:p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
         <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-4">
           <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-            <BookOpen className={`w-5 h-5 ${activeTheme.text}`} /> Proficiencies
+            <BookOpen className={`w-5 h-5 ${activeTheme?.text || 'text-indigo-400'}`} /> Proficiencies
           </h3>
           <span className="text-[10px] md:text-xs font-black text-slate-950 uppercase tracking-widest bg-emerald-500 border-2 border-slate-950 px-2 py-1 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] flex items-center gap-1">
             <Activity className="w-3 h-3" /> Prof +{profBonus}
@@ -64,7 +99,7 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-slate-900 p-3 rounded-xl border-2 border-slate-950 shadow-inner">
             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Target className="w-3 h-3"/> Skills</h4>
-            <p className="text-xs font-bold text-slate-300 leading-relaxed">{char?.proficiencies?.skills || 'None'}</p>
+            <p className="text-xs font-bold text-slate-300 leading-relaxed">{renderSkills()}</p>
           </div>
           <div className="bg-slate-900 p-3 rounded-xl border-2 border-slate-950 shadow-inner">
             <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1"><Sword className="w-3 h-3"/> Weapons & Armor</h4>
