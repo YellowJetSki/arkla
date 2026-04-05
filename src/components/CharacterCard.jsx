@@ -318,6 +318,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
   if (!char) return <CardWrapper><GlobalLoader /></CardWrapper>;
 
+  // RESTORED activeConditions VARIABLE HERE
+  const activeConditions = char.conditions || [];
   const isExhausted = activeConditions.includes('Exhaustion');
   const activeTheme = THEMES[char.theme] || THEMES.indigo;
 
