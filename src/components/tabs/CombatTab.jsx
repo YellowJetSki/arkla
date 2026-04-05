@@ -58,9 +58,12 @@ export default function CombatTab({
   const allAttacks = [...(char.attacks || []), ...inventoryWeapons];
   const resources = char.resources || [];
 
-  // Parse Class/Species Features for Combat Keywords (or manual DM override)
+  // Parse Class/Species Features for Combat Keywords (with manual overrides)
   const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
   const combatFeatures = (char.features || []).filter(f => {
+      // 5e Rule Override: If the DM manually hid it, ALWAYS exclude it from combat!
+      if (f.isHiddenFromCombat) return false;
+
       // 5e Rule Override: If the DM manually tagged it as defensive, ALWAYS include it in combat!
       if (f.isDefensive) return true;
       

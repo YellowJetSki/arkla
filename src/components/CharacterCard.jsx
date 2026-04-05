@@ -4,7 +4,7 @@ import { doc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'fir
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
-  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, ChevronDown, ChevronUp, ShieldPlus
+  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, ChevronDown, ChevronUp, ShieldPlus, EyeOff, Eye
 } from 'lucide-react';
 
 import StatGrid from './shared/StatGrid';
@@ -261,7 +261,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
       id: `feat_${Date.now()}`,
       name: customFeat.name, 
       desc: customFeat.desc,
-      isDefensive: false
+      isDefensive: false,
+      isHiddenFromCombat: false
     };
 
     let updates = { features: arrayUnion(newFeat) };
@@ -318,7 +319,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
   if (!char) return <CardWrapper><GlobalLoader /></CardWrapper>;
 
-  // RESTORED activeConditions VARIABLE HERE
   const activeConditions = char.conditions || [];
   const isExhausted = activeConditions.includes('Exhaustion');
   const activeTheme = THEMES[char.theme] || THEMES.indigo;
@@ -567,6 +567,13 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                                <span className="font-black uppercase tracking-widest">{feat.name}</span>
                                {(isDM || isEditMode) && (
                                  <div className="flex items-center gap-1">
+                                   <button onClick={async (e) => { 
+                                     e.stopPropagation(); 
+                                     const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isHiddenFromCombat: !f.isHiddenFromCombat } : f);
+                                     await updateDoc(doc(db, 'characters', currentUser.charId), { features: updatedFeatures });
+                                   }} className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${feat.isHiddenFromCombat ? 'bg-red-900/50 border-red-500 text-red-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-red-300'}`} title={feat.isHiddenFromCombat ? "Hidden from Combat Tab" : "Hide from Combat Tab"}>
+                                     <EyeOff className="w-3.5 h-3.5" />
+                                   </button>
                                    <button onClick={async (e) => { 
                                      e.stopPropagation(); 
                                      const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isDefensive: !f.isDefensive } : f);
