@@ -71,12 +71,12 @@ const THEMES = {
   },
 };
 
-export default function CharacterCard({ currentUser, onLogout, isDM = false, onClose = null }) {
-  const CardWrapper = isDM ? 
-    ({ children }) => createPortal(
+// FIX: Extracted CardWrapper outside the main component so it doesn't cause full DOM remounts on keystrokes
+const CardWrapper = ({ isDM, onClose, children }) => {
+  if (isDM) {
+    return createPortal(
       <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
         <div className="bg-slate-900 border-[3px] border-indigo-500 rounded-3xl w-full max-w-[98vw] xl:max-w-7xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col h-[95dvh] animate-in zoom-in-95 duration-500 relative overflow-hidden">
-          
           <button 
             onClick={onClose} 
             className="absolute top-4 right-4 z-[999999] bg-slate-950 text-slate-400 hover:text-white p-2 rounded-xl border-2 border-slate-800 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-500 hover:border-red-950 transition-all active:translate-y-[2px] active:shadow-none"
@@ -84,14 +84,16 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           >
              <X className="w-5 h-5" />
           </button>
-          
           {children}
         </div>
       </div>,
       document.body
-    ) 
-    : ({ children }) => <>{children}</>;
+    );
+  }
+  return <>{children}</>;
+};
 
+export default function CharacterCard({ currentUser, onLogout, isDM = false, onClose = null }) {
   const [activeTab, setActiveTab] = useState(() => {
     return localStorage.getItem(`activeTab_${currentUser.charId}`) || 'combat';
   });
@@ -317,7 +319,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   };
 
   if (isKicked) return isDM ? null : <SessionResetModal onLogout={onLogout} />;
-  if (!char) return <CardWrapper><GlobalLoader /></CardWrapper>;
+  if (!char) return <CardWrapper isDM={isDM} onClose={onClose}><GlobalLoader /></CardWrapper>;
 
   const activeConditions = char.conditions || [];
   const isExhausted = activeConditions.includes('Exhaustion');
@@ -351,7 +353,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   ];
 
   return (
-    <CardWrapper>
+    <CardWrapper isDM={isDM} onClose={onClose}>
       {!isDM && (
          <div className={`fixed inset-0 bg-gradient-to-b ${activeTheme.ambient} to-slate-950 pointer-events-none -z-10 transition-colors duration-1000`}></div>
       )}
@@ -449,7 +451,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
             
             {showCoreStats && (
               <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 fade-in duration-200">
-                <StatGrid char={char} activeTheme={activeTheme} isEditMode={isEditMode} updateField={updateField} />
+                {/* PASSING isDM SO THE GRID ADJUSTS DYNAMICALLY */}
+                <StatGrid char={char} activeTheme={activeTheme} isEditMode={isEditMode} updateField={updateField} isDM={isDM} />
                 <QuickTraits features={char.features} />
               </div>
             )}

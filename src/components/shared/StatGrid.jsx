@@ -2,7 +2,7 @@ import React from 'react';
 import { BookOpen, Wrench, MessageSquare, Target, Sword, Activity } from 'lucide-react';
 import { getProficiencyBonus, getModifier, getConditionMechanics, ALL_SKILLS } from '../../services/arklaEngine';
 
-export default function StatGrid({ char, activeTheme, isEditMode, updateField }) {
+export default function StatGrid({ char, activeTheme, isEditMode, updateField, isDM }) {
   const stats = char?.stats || {};
   const totalLevel = char?.classes ? char.classes.reduce((sum, c) => sum + c.level, 0) : (char?.level || 1);
   const profBonus = getProficiencyBonus(totalLevel);
@@ -12,11 +12,10 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
   
   const STAT_ORDER = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
   
-  // Safe parsing of saving throw proficiencies (Handles both Arrays and Strings robustly)
+  // Safe parsing of saving throw proficiencies
   const savingThrowsRaw = char?.proficiencies?.savingThrows;
   const savingThrowProfs = (Array.isArray(savingThrowsRaw) ? savingThrowsRaw.join(', ') : (savingThrowsRaw || '')).toLowerCase();
 
-  // Automatically calculate and append stat modifiers to skill proficiencies
   const renderSkills = () => {
     const skillsRaw = char?.proficiencies?.skills;
     if (!skillsRaw || skillsRaw.length === 0) return 'None';
@@ -25,7 +24,6 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
     const skillArray = skillsStr.split(',').map(s => s.trim()).filter(Boolean);
     
     return skillArray.map(skill => {
-      // Clean up brackets in case someone manually typed "Acrobatics (DEX)"
       const cleanSkill = skill.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim();
       const foundSkill = ALL_SKILLS.find(s => s.toLowerCase().startsWith(cleanSkill));
       
@@ -36,25 +34,23 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
           const statScore = stats[statName] || 10;
           const statMod = getModifier(statScore);
           
-          // Apply Expertise if the user typed it (e.g., "Acrobatics (Expertise)")
           const isExpertise = skill.toLowerCase().includes('expertise');
           const totalBonus = statMod + (isExpertise ? (profBonus * 2) : profBonus);
           const formattedBonus = totalBonus >= 0 ? `+${totalBonus}` : `${totalBonus}`;
           
-          // Extract just the name "Acrobatics" from "Acrobatics (DEX)"
           const displayName = foundSkill.split(' (')[0]; 
           return `${displayName} (${formattedBonus})`;
         }
       }
-      return skill; // Fallback if no match
+      return skill; 
     }).join(', ');
   };
 
   return (
     <div className="space-y-6">
 
-      {/* Core Stats & Saving Throws Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4">
+      {/* Core Stats & Saving Throws Grid - DYNAMICALLY ADJUSTS FOR DM VIEWS */}
+      <div className={`grid ${isDM ? 'grid-cols-3 gap-2 md:gap-3' : 'grid-cols-2 md:grid-cols-6 gap-3 md:gap-4'}`}>
         {STAT_ORDER.map((stat) => {
           const score = stats[stat] || 10;
           const statMod = getModifier(score);
@@ -71,12 +67,12 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField })
                 </span>
               </div>
 
-              {/* SAVING THROW DISPLAY (Improved Contrast and Readability) */}
-              <div className={`w-full flex items-center justify-between bg-slate-950 px-2 py-1.5 rounded-lg shadow-inner border border-slate-800 mt-1`}>
-                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Save</span>
-                 <div className="flex items-center gap-1.5">
-                   {isProficient && <div className={`w-2 h-2 rounded-full ${activeTheme?.bg || 'bg-indigo-500'} shadow-[0_0_5px_currentColor]`}></div>}
-                   <span className={`text-xs font-black ${isProficient ? (activeTheme?.text || 'text-indigo-400') : 'text-slate-300'}`}>
+              {/* SAVING THROW DISPLAY */}
+              <div className={`w-full flex items-center justify-between bg-slate-950 px-1.5 md:px-2 py-1.5 rounded-lg shadow-inner border border-slate-800 mt-1`}>
+                 <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest shrink-0">Save</span>
+                 <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
+                   {isProficient && <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full shrink-0 ${activeTheme?.bg || 'bg-indigo-500'} shadow-[0_0_5px_currentColor]`}></div>}
+                   <span className={`text-[10px] md:text-xs font-black truncate ${isProficient ? (activeTheme?.text || 'text-indigo-400') : 'text-slate-300'}`}>
                      {saveMod >= 0 ? `+${saveMod}` : saveMod}
                    </span>
                  </div>
