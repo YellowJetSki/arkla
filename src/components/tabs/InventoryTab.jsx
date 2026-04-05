@@ -3,6 +3,7 @@ import { doc, getDoc, updateDoc, runTransaction, writeBatch } from 'firebase/fir
 import { db } from '../../services/firebase';
 import { Backpack, Coins, Search, Hammer, Plus, Minus, ChevronDown, ChevronUp, Trash2, Sword, Utensils, Crosshair, Image as ImageIcon, Filter } from 'lucide-react';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../../services/srdApi';
+import ImageSelector from '../shared/ImageSelector';
 
 const INVENTORY_FILTERS = ['All', 'Weapon', 'Armor', 'Consumable', 'Potion', 'Adventuring Gear', 'Wondrous Item'];
 
@@ -204,7 +205,6 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
             let updates = { hp: newHp };
             let mapUpdates = { [`tokens.${charId}.hp`]: newHp };
 
-            // 5e Rule: Potion Wake Up Logic
             if (newHp > 0 && currentHp === 0) {
               updates['deathSaves.successes'] = 0;
               updates['deathSaves.failures'] = 0;
@@ -376,9 +376,20 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
                 </div>
               )}
 
-              <div className="sm:col-span-2">
-                <label className="flex items-center gap-1 block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1"><ImageIcon className="w-3 h-3" /> Image URL (Optional)</label>
-                <input type="url" value={customItem.imageUrl} onChange={e => setCustomItem({...customItem, imageUrl: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner" placeholder="https://..." />
+              <div className="sm:col-span-2 space-y-2">
+                <ImageSelector 
+                  value={customItem.imageUrl} 
+                  onChange={(val) => setCustomItem({...customItem, imageUrl: val})} 
+                  label="Image (Dropdown Library)" 
+                  inputClassName="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner appearance-none cursor-pointer"
+                />
+                <input 
+                  type="url" 
+                  value={customItem.imageUrl} 
+                  onChange={e => setCustomItem({...customItem, imageUrl: e.target.value})} 
+                  className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 shadow-inner mt-1" 
+                  placeholder="...or paste a custom URL here" 
+                />
               </div>
 
               <div className="sm:col-span-2">

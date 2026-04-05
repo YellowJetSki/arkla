@@ -28,8 +28,16 @@ export default function App() {
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('dnd_currentUser', JSON.stringify(currentUser));
+      
+      // FIX: Ensure players who refresh the page to re-join are injected back into the DM's active party board
+      if (currentUser.role === 'player' && !isDisplayMode && !isDMMapMode) {
+        const campaignRef = doc(db, 'campaign', 'main_session');
+        setDoc(campaignRef, {
+          unlockedCharacters: arrayUnion(currentUser.charId) 
+        }, { merge: true }).catch(err => console.error("Failed to re-join session:", err));
+      }
     }
-  }, [currentUser]);
+  }, [currentUser, isDisplayMode, isDMMapMode]);
 
   useEffect(() => {
     if (isDisplayMode || isDMMapMode) return; 
