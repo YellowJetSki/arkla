@@ -28,6 +28,68 @@ export const calculateInitiative = (dexScore) => {
   return mod >= 0 ? `+${mod}` : `${mod}`;
 };
 
+// NEW: Automated Smart AC Calculation
+export const calculateAC = (char) => {
+  if (!char) return 10;
+  
+  const dexMod = getModifier(char.stats?.DEX || 10);
+  const conMod = getModifier(char.stats?.CON || 10);
+  const wisMod = getModifier(char.stats?.WIS || 10);
+  
+  const armors = (char.inventory || []).filter(i => i.category === 'Armor');
+  
+  let baseArmor = null;
+  let shieldBonus = 0;
+
+  // Distinguish between wearable armor and shields based on AC value
+  armors.forEach(armor => {
+    const acVal = Number(armor.ac) || 0;
+    if (acVal > 0 && acVal <= 5) {
+      shieldBonus += acVal; // It's a shield or additive item
+    } else if (acVal > 5) {
+      if (!baseArmor || acVal > baseArmor.acVal) {
+        baseArmor = { acVal, name: (armor.name || '').toLowerCase() }; // Highest AC body armor
+      }
+    }
+  });
+
+  const classStr = (char.class || '').toLowerCase();
+  let unarmoredAc = 10 + dexMod;
+
+  // Unarmored Defense calculations
+  if (!baseArmor) {
+    if (classStr.includes('barbarian')) {
+      unarmoredAc = 10 + dexMod + conMod;
+    } else if (classStr.includes('monk')) {
+      unarmoredAc = 10 + dexMod + wisMod;
+    }
+  }
+
+  let finalAc = unarmoredAc;
+
+  // Apply 5e DEX caps based on armor weight
+  if (baseArmor) {
+    const name = baseArmor.name;
+    const isHeavy = name.includes('ring') || name.includes('chain mail') || name.includes('splint') || name.includes('plate');
+    const isMedium = name.includes('hide') || name.includes('chain shirt') || name.includes('scale') || name.includes('breastplate') || name.includes('half plate');
+    
+    if (isHeavy) {
+      finalAc = baseArmor.acVal; // No Dex
+    } else if (isMedium) {
+      finalAc = baseArmor.acVal + Math.min(2, dexMod); // Max 2 Dex
+    } else {
+      finalAc = baseArmor.acVal + dexMod; // Full Dex (Light Armor)
+    }
+  }
+
+  // 5e Rule: Monks lose unarmored defense if using a shield
+  if (!baseArmor && shieldBonus > 0 && classStr.includes('monk')) {
+    finalAc = 10 + dexMod; 
+  }
+
+  return finalAc + shieldBonus;
+};
+
 export const calculateSpellcastingStats = (classesArray, stats) => {
   let primaryCastingStat = 'CHA'; 
   let highestCasterLevel = 0;
@@ -106,7 +168,6 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, className = '') =
   let formattedDamage = attack.damage || ''; 
 
   if (formattedDamage) {
-    // Safely combine existing flat bonuses in the string with the active stat modifier
     formattedDamage = formattedDamage.replace(/(\d+d\d+)(?:\s*([+-])\s*(\d+))?/, (match, dice, sign, flat) => {
       let baseFlat = 0;
       if (sign && flat) {
@@ -117,7 +178,6 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, className = '') =
       return totalMod > 0 ? `${dice} + ${totalMod}` : `${dice} - ${Math.abs(totalMod)}`;
     });
     
-    // Apply the same math to Versatile damage inside parentheses
     if (formattedDamage.includes('(')) {
       formattedDamage = formattedDamage.replace(/\((\d+d\d+)(?:\s*([+-])\s*(\d+))?\)/, (match, dice, sign, flat) => {
         let baseFlat = 0;
@@ -134,7 +194,6 @@ export const parseAndScaleAttack = (attack, stats, totalLevel, className = '') =
   return { ...attack, hit: formattedHit, damage: formattedDamage };
 };
 
-// --- CONDITION AUTOMATION HOOKS ---
 export const getConditionMechanics = (activeConditions) => {
   let mechanics = {
     speedMultiplier: 1,
@@ -163,7 +222,6 @@ export const getConditionMechanics = (activeConditions) => {
   return mechanics;
 };
 
-// --- SANCTUARY TERMINOLOGY FILTER ---
 const SANCTUARY_REPLACEMENTS = {
   'fiend': 'powerful fey',
   'fiends': 'fey',

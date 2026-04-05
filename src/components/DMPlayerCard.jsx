@@ -4,6 +4,7 @@ import { db } from '../services/firebase';
 import { Shield, Activity, Heart, Eye, Target, Sparkles, Plus, Minus, PawPrint, Droplets, Flame, UserMinus } from 'lucide-react';
 import CharacterCard from './CharacterCard';
 import DialogModal from './shared/DialogModal';
+import { calculateAC } from '../services/arklaEngine';
 
 export default function DMPlayerCard({ charId }) {
   const [char, setChar] = useState(null);
@@ -84,12 +85,15 @@ export default function DMPlayerCard({ charId }) {
   const spellSlots = char.spellSlots || {};
 
   const wisMod = Math.floor(((char.stats?.WIS || 10) - 10) / 2);
-  const passivePerception = 10 + wisMod;
+  const pb = Math.floor(((char.level || 1) - 1) / 4) + 2;
+  const isPerceptionProf = (char.proficiencies?.skills || '').toLowerCase().includes('perception');
+  const passivePerception = 10 + wisMod + (isPerceptionProf ? pb : 0);
 
+  const autoAc = calculateAC(char);
   const acBuffTotal = (char.tempBuffs || [])
     .filter(b => b.target === 'AC')
     .reduce((sum, b) => sum + b.value, 0);
-  const displayAc = (char.ac || 10) + acBuffTotal;
+  const displayAc = autoAc + acBuffTotal;
 
   return (
     <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden group">

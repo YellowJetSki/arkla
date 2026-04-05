@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Skull, Maximize, Star, Heart, Shield, Tent, Moon, Wind, Zap, Check, Brain } from 'lucide-react';
+import { Skull, Maximize, Star, Heart, Shield, Tent, Moon, Wind, Zap, Check, Brain, Dices } from 'lucide-react';
 import useCharacterVitals from '../../hooks/useCharacterVitals';
 import XPBar from '../shared/XPBar';
-import { getModifier, getConditionMechanics } from '../../services/arklaEngine';
+import { getModifier, getConditionMechanics, calculateAC } from '../../services/arklaEngine';
 import DialogModal from '../shared/DialogModal';
 
 export default function CharacterHeader({ char, charId, isDM, isEditMode, activeTheme, onOpenImage, onOpenShortRest, onOpenLongRest, onOpenLevelUp }) {
@@ -34,6 +34,7 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
     submitHpUpdate,
     adjustHp,
     spendHitDie,
+    rollDeathSave,
     isUnconscious,
     isDead,
     isStable,
@@ -52,8 +53,10 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
   const mechanics = getConditionMechanics(activeConditions);
   const tempBuffs = char.tempBuffs || [];
   
+  // Fully automated Smart AC calculation
+  const autoAc = calculateAC(char);
   const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
-  const displayAc = (char.ac || 10) + acBuffTotal;
+  const displayAc = autoAc + acBuffTotal;
 
   const initBuffTotal = tempBuffs.filter(b => b.target === 'Initiative').reduce((sum, b) => sum + b.value, 0);
   let baseInit = char.initiative !== '--' ? parseInt(char.initiative, 10) : getModifier(char.stats?.DEX || 10);
@@ -135,20 +138,17 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
           {/* Graphic Novel Badges */}
           <div className="absolute -bottom-6 right-3 flex gap-2 pointer-events-auto z-30">
             
+            {/* The automated AC badge */}
             <div className={`w-12 h-14 rounded-lg border-[3px] border-slate-950 flex flex-col items-center justify-start shadow-[2px_2px_0px_rgba(0,0,0,1)] relative overflow-hidden pt-1 ${acBuffTotal > 0 ? 'bg-emerald-500' : acBuffTotal < 0 ? 'bg-red-500' : 'bg-slate-800'}`}>
               <Shield className="w-3 h-3 text-white/30 absolute top-1" />
-              {isEditMode ? (
-                <input type="number" defaultValue={char.ac || 10} onBlur={(e) => updateField('ac', Number(e.target.value))} className="w-8 mt-1.5 bg-transparent text-center text-sm font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none z-10 relative" />
-              ) : (
-                <div className="flex flex-col items-center mt-1 relative z-10">
-                  <span className={`font-black text-white leading-none ${acBuffTotal !== 0 ? 'text-xs' : 'text-sm mt-0.5'}`}>{displayAc}</span>
-                  {acBuffTotal !== 0 && (
-                     <span className="text-[7px] font-black text-slate-900 bg-white/70 px-1 rounded-sm mt-0.5 shadow-sm leading-none">
-                       {char.ac || 10}{acBuffTotal > 0 ? `+${acBuffTotal}` : acBuffTotal}
-                     </span>
-                  )}
-                </div>
-              )}
+              <div className="flex flex-col items-center mt-1 relative z-10">
+                <span className={`font-black text-white leading-none ${acBuffTotal !== 0 ? 'text-xs' : 'text-sm mt-0.5'}`}>{displayAc}</span>
+                {acBuffTotal !== 0 && (
+                   <span className="text-[7px] font-black text-slate-900 bg-white/70 px-1 rounded-sm mt-0.5 shadow-sm leading-none">
+                     {autoAc}{acBuffTotal > 0 ? `+${acBuffTotal}` : acBuffTotal}
+                   </span>
+                )}
+              </div>
               <div className="absolute bottom-0 left-0 w-full bg-slate-950 text-center py-0.5">
                  <span className="text-[8px] font-black uppercase text-white tracking-widest block">AC</span>
               </div>
@@ -247,24 +247,20 @@ export default function CharacterHeader({ char, charId, isDM, isEditMode, active
                   </div>
                 ) : (
                   <div className="flex items-center justify-between w-full">
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center shrink-0">
                       <span className="text-[10px] font-black text-slate-950 bg-emerald-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">PASS</span>
                       <div className="flex gap-1.5">
                         {[1, 2, 3].map(num => <button key={`pass-${num}`} onClick={() => updateDeathSaves('successes', (char.deathSaves?.successes || 0) === num ? num - 1 : num)} className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.successes || 0) >= num ? 'bg-emerald-500 border-emerald-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'}`} />)}
                       </div>
                     </div>
+
+                    <div className="flex flex-col items-center mx-2 shrink-0">
+                      <button onClick={rollDeathSave} className="bg-slate-950 border-2 border-slate-800 text-white font-black uppercase tracking-widest text-[9px] sm:text-[10px] px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-slate-800 hover:text-amber-400 transition-colors shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-px active:shadow-none flex items-center gap-1">
+                        <Dices className="w-3 h-3 sm:w-4 sm:h-4" /> Roll
+                      </button>
+                    </div>
                     
-                    {quickInput === 'heal' ? (
-                       <div className="flex items-center gap-1 shrink-0">
-                         <input autoFocus type="number" value={quickVal} onChange={e=>setQuickVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleQuickSubmit()} className="w-10 sm:w-14 bg-slate-900 border-2 border-emerald-500 rounded text-white font-black text-xs text-center px-1 py-1.5 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none shadow-inner" placeholder="HP" />
-                         <button onClick={handleQuickSubmit} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-2 py-1.5 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-px active:shadow-none"><Check className="w-3 h-3 sm:w-4 sm:h-4"/></button>
-                         <button onClick={() => setQuickInput(null)} className="text-slate-400 hover:text-red-400 px-1"><X className="w-3 h-3 sm:w-4 sm:h-4"/></button>
-                       </div>
-                    ) : (
-                      <button onClick={() => setQuickInput('heal')} className="bg-emerald-500 text-slate-950 px-2 py-1.5 sm:px-3 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-px active:shadow-none font-black text-[10px] uppercase border-[3px] border-slate-950 hover:bg-emerald-400 shrink-0">Heal</button>
-                    )}
-                    
-                    <div className="flex flex-col items-center">
+                    <div className="flex flex-col items-center shrink-0">
                       <span className="text-[10px] font-black text-slate-950 bg-red-500 px-2 py-0.5 rounded-sm uppercase tracking-widest mb-1 shadow-[1px_1px_0px_rgba(0,0,0,1)]">FAIL</span>
                       <div className="flex gap-1.5">
                         {[1, 2, 3].map(num => <button key={`fail-${num}`} onClick={() => updateDeathSaves('failures', (char.deathSaves?.failures || 0) === num ? num - 1 : num)} className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-[3px] transition-all ${(char.deathSaves?.failures || 0) >= num ? 'bg-red-600 border-red-950 shadow-[1px_1px_0px_rgba(0,0,0,1)]' : 'bg-slate-800 border-slate-900'}`} />)}
