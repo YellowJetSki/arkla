@@ -107,11 +107,8 @@ export default function CombatTab({
     }
   });
 
-  // Spellcaster Detection Logic
-  const hasSpellSlots = char.spellSlots && Object.values(char.spellSlots).some(slot => slot.max > 0);
-  const hasSpells = char.spells && char.spells.length > 0;
-  const isClassCaster = char.class && ['wizard', 'sorcerer', 'cleric', 'druid', 'bard', 'warlock', 'paladin', 'ranger', 'artificer'].some(c => char.class.toLowerCase().includes(c));
-  const isSpellcaster = hasSpellSlots || hasSpells || isClassCaster;
+  // Spellcaster Detection Logic - Strictly requires spells to be inscribed
+  const isSpellcaster = char.spells && char.spells.length > 0;
 
   // Render helper for Weapons vs Traits inside the Action economy blocks
   const renderActionItem = (item, idx) => {
