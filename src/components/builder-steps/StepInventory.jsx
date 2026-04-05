@@ -1,4 +1,5 @@
 import { Backpack, Search, Sword, Shield, Plus, Trash2, Crosshair, Image as ImageIcon } from 'lucide-react';
+import ImageSelector from '../shared/ImageSelector';
 
 export default function StepInventory({ 
   newItem, 
@@ -120,16 +121,19 @@ export default function StepInventory({
           </div>
         )}
 
-        <div>
-          <label className="flex items-center gap-1 block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-            <ImageIcon className="w-3 h-3" /> Image URL (Optional)
-          </label>
+        <div className="space-y-2">
+          <ImageSelector 
+            value={newItem.imageUrl || ''} 
+            onChange={(val) => setNewItem({...newItem, imageUrl: val})} 
+            label="Image (Dropdown Library)" 
+            inputClassName="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-indigo-500 appearance-none cursor-pointer"
+          />
           <input 
             type="url" 
             value={newItem.imageUrl || ''} 
             onChange={e => setNewItem({...newItem, imageUrl: e.target.value})} 
-            className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500" 
-            placeholder="https://..." 
+            className="w-full bg-slate-950 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 mt-1" 
+            placeholder="...or paste a custom image URL here" 
           />
         </div>
 
