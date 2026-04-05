@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, updateDoc, getDoc, writeBatch } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { X, Backpack, Send, PackagePlus, Hammer, Search, Plus, Sword, Shield, Image as ImageIcon, Users, Crosshair } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
@@ -7,6 +7,7 @@ import { fetchAllEquipment, fetchEquipmentDetails } from '../services/srdApi';
 
 export default function DMItemManager({ onClose, activePlayers }) {
   const [stashedItems, setStashedItems] = useState([]);
+  const [stashSearch, setStashSearch] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState('');
   const [playerMap, setPlayerMap] = useState({});
   
@@ -29,7 +30,8 @@ export default function DMItemManager({ onClose, activePlayers }) {
       if (snap.exists()) {
         setStashedItems(snap.data().items || []);
       } else {
-        await updateDoc(doc(db, 'campaign', 'dm_stash'), { items: [] });
+        // FIX: Use setDoc to safely initialize the stash if it doesn't exist yet
+        await setDoc(stashRef, { items: [] });
       }
     };
     
@@ -93,7 +95,7 @@ export default function DMItemManager({ onClose, activePlayers }) {
     if (!newItem.name) return;
     
     const structuredItem = {
-       id: `item_${Date.now()}`,
+       id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
        name: newItem.name,
        category: newItem.category,
        desc: newItem.desc,
@@ -126,11 +128,14 @@ export default function DMItemManager({ onClose, activePlayers }) {
       if (playerSnap.exists()) {
         const currentInv = playerSnap.data().inventory || [];
         const invArray = Array.isArray(currentInv) ? currentInv : []; 
-        const newInv = [...invArray, item];
+        
+        // Generate a new ID for the player's copy so the original stays in the vault securely
+        const itemCopy = { ...item, id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` };
+        const newInv = [...invArray, itemCopy];
         
         await updateDoc(playerRef, { inventory: newInv });
-        await saveStashToDb(stashedItems.filter(i => i.id !== item.id));
-        setDialog({ isOpen: true, title: 'Item Sent', message: `${item.name} has been mysteriously placed in their backpack.`, type: 'alert' });
+        
+        setDialog({ isOpen: true, title: 'Item Sent', message: `${item.name} has been mysteriously placed in their backpack. The original remains in your Vault.`, type: 'alert' });
       }
     } catch (err) {
       console.error(err);
@@ -148,7 +153,7 @@ export default function DMItemManager({ onClose, activePlayers }) {
 
     setDialog({
       title: 'Grant to All Party Members?',
-      message: `This will place a copy of ${item.name} into the inventory of every active player. The original will be removed from your vault.`,
+      message: `This will place a copy of ${item.name} into the inventory of every active player. The original will remain in your vault.`,
       type: 'confirm',
       onConfirm: async () => {
         try {
@@ -161,17 +166,15 @@ export default function DMItemManager({ onClose, activePlayers }) {
               const currentInv = pSnap.data().inventory || [];
               const invArray = Array.isArray(currentInv) ? currentInv : [];
               
-              const itemCopy = { ...item, id: `item_${Date.now()}_${playerId}` };
+              const itemCopy = { ...item, id: `item_${Date.now()}_${playerId}_${Math.random().toString(36).substr(2, 5)}` };
               batch.update(pRef, { inventory: [...invArray, itemCopy] });
             }
           }
           
           await batch.commit();
-          await saveStashToDb(stashedItems.filter(i => i.id !== item.id));
-          
           closeDialog();
           setTimeout(() => {
-            setDialog({ isOpen: true, title: 'Mass Grant Complete', message: `All ${validPlayers.length} players received the item.`, type: 'alert' });
+            setDialog({ isOpen: true, title: 'Mass Grant Complete', message: `All ${validPlayers.length} players received a copy of the item.`, type: 'alert' });
           }, 300);
         } catch(e) {
           console.error(e);
@@ -183,6 +186,11 @@ export default function DMItemManager({ onClose, activePlayers }) {
   };
 
   const removeStashedItem = (id) => saveStashToDb(stashedItems.filter(i => i.id !== id));
+
+  const displayedStash = stashedItems.filter(item => 
+    item.name.toLowerCase().includes(stashSearch.toLowerCase()) || 
+    item.category.toLowerCase().includes(stashSearch.toLowerCase())
+  );
 
   return (
     <>
@@ -369,26 +377,41 @@ export default function DMItemManager({ onClose, activePlayers }) {
             </div>
 
             {/* RIGHT: The Stash & Assignment */}
-            <div className="space-y-5 lg:border-l-[3px] lg:border-slate-900 lg:pl-8">
+            <div className="space-y-5 lg:border-l-[3px] lg:border-slate-900 lg:pl-8 flex flex-col">
               <h3 className="font-black text-white border-b-[3px] border-slate-900 pb-3 flex items-center justify-between uppercase tracking-widest text-lg drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
                 <span className="flex items-center gap-2"><Backpack className="w-6 h-6 text-emerald-500" /> 2. Your Vault</span>
               </h3>
               
-              {/* Single Player Assignment */}
-              <div className="bg-slate-900 p-4 rounded-xl border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] mb-4 flex gap-2">
-                <select value={selectedPlayer} onChange={e => setSelectedPlayer(e.target.value)} className="flex-1 bg-slate-950 text-white font-bold border-2 border-slate-900 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 shadow-inner">
-                  <option value="">-- Target Player --</option>
-                  {activePlayers?.filter(id => playerMap[id]).map(id => (
-                    <option key={id} value={id}>{playerMap[id]}</option>
-                  ))}
-                </select>
+              {/* Single Player Assignment & Search Block */}
+              <div className="flex flex-col gap-3 shrink-0">
+                <div className="bg-slate-900 p-3 rounded-xl border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex gap-2">
+                  <select value={selectedPlayer} onChange={e => setSelectedPlayer(e.target.value)} className="flex-1 bg-slate-950 text-white font-bold border-2 border-slate-900 rounded-lg p-2.5 text-sm focus:outline-none focus:border-emerald-500 shadow-inner">
+                    <option value="">-- Target Player --</option>
+                    {activePlayers?.filter(id => playerMap[id]).map(id => (
+                      <option key={id} value={id}>{playerMap[id]}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="bg-slate-900 p-2.5 rounded-xl border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex items-center gap-2">
+                  <Search className="w-4 h-4 text-emerald-500 ml-2" />
+                  <input 
+                    type="text" 
+                    value={stashSearch}
+                    onChange={e => setStashSearch(e.target.value)}
+                    placeholder="Search vault items..."
+                    className="flex-1 bg-transparent text-white font-bold text-sm focus:outline-none placeholder:text-slate-500"
+                  />
+                </div>
               </div>
 
-              {stashedItems.length === 0 ? (
-                <p className="text-sm text-slate-500 font-bold uppercase tracking-widest bg-slate-900 p-8 rounded-2xl border-2 border-slate-950 border-dashed text-center shadow-inner mt-4">Your vault is empty. Forge items to store them here.</p>
+              {displayedStash.length === 0 ? (
+                <p className="text-sm text-slate-500 font-bold uppercase tracking-widest bg-slate-900 p-8 rounded-2xl border-2 border-slate-950 border-dashed text-center shadow-inner mt-4">
+                  {stashedItems.length === 0 ? "Your vault is empty. Forge items to store them here." : "No items match your search."}
+                </p>
               ) : (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar pr-2 mt-4">
-                  {stashedItems.map((item) => (
+                <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2 min-h-[400px]">
+                  {displayedStash.map((item) => (
                     <div key={item.id} className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative group hover:border-emerald-500 transition-colors">
                       <button onClick={() => removeStashedItem(item.id)} className="absolute top-3 right-3 text-slate-950 bg-slate-500 hover:bg-red-500 hover:text-white transition-colors p-1.5 rounded-lg z-10 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><X className="w-4 h-4 font-black" /></button>
                       
