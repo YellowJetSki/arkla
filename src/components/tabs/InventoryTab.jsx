@@ -38,6 +38,19 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   const inventoryArray = Array.isArray(char.inventory) ? char.inventory : [];
   const filteredInventoryArray = inventoryArray.filter(item => activeFilter === 'All' || item.category === activeFilter);
 
+  // NEW: Smart Sorting Algorithm to hoist Consumables and Potions to the top
+  const sortedInventoryArray = [...filteredInventoryArray].sort((a, b) => {
+    const aIsConsumable = a.category === 'Consumable' || a.category === 'Potion';
+    const bIsConsumable = b.category === 'Consumable' || b.category === 'Potion';
+    
+    // Hoist consumables
+    if (aIsConsumable && !bIsConsumable) return -1;
+    if (!aIsConsumable && bIsConsumable) return 1;
+    
+    // Alphabetize within their respective groups
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
   const runInventoryTransaction = async (mutationFn) => {
     try {
       await runTransaction(db, async (transaction) => {
@@ -156,7 +169,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   };
 
   const updateQuantity = async (idx, delta) => {
-    const item = filteredInventoryArray[idx];
+    const item = sortedInventoryArray[idx];
     const realIndex = inventoryArray.findIndex(i => 
       (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
     );
@@ -173,7 +186,7 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
   };
 
   const deleteItem = async (idx) => {
-    const item = filteredInventoryArray[idx];
+    const item = sortedInventoryArray[idx];
     const realIndex = inventoryArray.findIndex(i => 
       (i.id && i.id === item.id) || (!i.id && i.name === item.name && i.desc === item.desc)
     );
@@ -454,10 +467,10 @@ export default function InventoryTab({ char, charId, isDM, updateField, activeTh
         )}
 
         <div className="space-y-4 relative z-10">
-          {filteredInventoryArray.length === 0 ? (
+          {sortedInventoryArray.length === 0 ? (
              <p className="text-slate-500 font-bold uppercase tracking-widest text-sm text-center bg-slate-900 p-8 rounded-xl border-2 border-slate-950 border-dashed shadow-inner">No items found.</p>
           ) : (
-            filteredInventoryArray.map((item, i) => (
+            sortedInventoryArray.map((item, i) => (
               <div key={item.id || i} className={`bg-slate-900 border-2 rounded-xl overflow-hidden transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-col ${openItems[i] ? `${activeTheme.activeBorder}` : 'border-slate-950'}`}>
                 <div className="flex justify-between items-start sm:items-center p-3 sm:p-4 cursor-pointer" onClick={() => toggleItemOpen(i)}>
                   
