@@ -25,7 +25,10 @@
       "/duku_belt.png",
       "/kehrfuffle.png",
       "/strider.png",
-      "/wendy.png"
+      "/wendy.png",
+      "/wendy_belt.png",
+      "/wendy_parents.png",
+      "/wendy_resto.png"
     ]
   }
 ]
