@@ -4,7 +4,7 @@ import { doc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'fir
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
-  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, ChevronDown, ChevronUp, ShieldPlus, EyeOff, Eye, Zap, ZapOff
+  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, ChevronDown, ChevronUp, ShieldPlus, EyeOff, Zap, ZapOff
 } from 'lucide-react';
 
 import StatGrid from './shared/StatGrid';
@@ -107,6 +107,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [isShortRestOpen, setIsShortRestOpen] = useState(false); 
   const [isLongRestOpen, setIsLongRestOpen] = useState(false); 
   const [isKicked, setIsKicked] = useState(false);
+  
+  // Players no longer have access to Edit Mode. This will remain false for them.
   const [isEditMode, setIsEditMode] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
   
@@ -122,7 +124,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [filteredFeats, setFilteredFeats] = useState([]);
   const [showFeatDropdown, setShowFeatDropdown] = useState(false);
   
-  // NEW: State for dynamically adding a tracker to an existing feat
   const [addingTrackerFor, setAddingTrackerFor] = useState(null);
   const [newTrackerConfig, setNewTrackerConfig] = useState({ max: 1, recharge: 'long' });
 
@@ -222,7 +223,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     await updateDoc(doc(db, 'characters', currentUser.charId), { resources: updatedResources });
   };
 
-  // NEW: Dedicated function to delete a resource tracker directly
   const handleRemoveResource = async (resourceIndex) => {
     const resName = char.resources[resourceIndex].name;
     showDialog({
@@ -238,7 +238,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     });
   };
 
-  // NEW: Confirm dynamically adding a tracker to an existing feat
   const confirmAddTracker = async (featName) => {
     const newRes = {
       id: `res_${Date.now()}`,
@@ -449,7 +448,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 <h1 className="text-sm font-black text-white uppercase tracking-widest hidden sm:block drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">CAMPAIGN COMPANION</h1>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center justify-center px-2 py-1.5 h-9 ${isEditMode ? 'bg-amber-600 text-slate-950 border-amber-950' : `bg-slate-900 ${activeTheme.text} hover:text-white border-slate-950`} transition-all rounded-lg border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] text-[10px] font-black uppercase tracking-widest`}><Edit3 className="w-3 h-3 mr-1" /> {isEditMode ? 'Done' : 'Edit'}</button>
+                {/* PLayer Edit Mode toggle has been completely removed from here */}
                 <button onClick={() => setIsGuideOpen(true)} className={`flex items-center justify-center w-9 h-9 ${activeTheme.text} hover:text-white transition-all bg-slate-900 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]`}><HelpCircle className="w-4 h-4" /></button>
                 <button onClick={onLogout} className="flex items-center gap-2 text-slate-400 hover:text-white transition-all bg-slate-900 px-3 py-1.5 h-9 rounded-lg border-2 border-slate-950 text-xs font-black uppercase tracking-widest shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"><LogOut className="w-3 h-3" /> Exit</button>
               </div>
@@ -539,14 +538,14 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 <div className="space-y-6">
                   <div className="flex justify-between items-center px-1 border-b-2 border-slate-950 pb-2">
                     <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
-                    {(isDM || isEditMode) && (
+                    {isDM && (
                       <button onClick={() => setIsForgingFeat(!isForgingFeat)} className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingFeat ? 'bg-amber-600 border-amber-950 text-slate-950' : `bg-slate-900 border-slate-950 ${activeTheme.text} hover:bg-slate-800`}`}>
                         <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Close' : 'Forge'}
                       </button>
                     )}
                   </div>
 
-                  {(isDM || isEditMode) && isForgingFeat && (
+                  {isDM && isForgingFeat && (
                     <form onSubmit={handleForgeCustomFeat} className="bg-slate-900 border-2 border-indigo-950 p-5 rounded-2xl mb-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 space-y-4">
                       <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b-2 border-indigo-950/50 pb-2"><Hammer className="w-4 h-4" /> Feature Forge</h4>
                       <div className="grid grid-cols-1 gap-4">
@@ -615,7 +614,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                              title={
                                <div className="flex items-center gap-2 w-full justify-between pr-2">
                                  <span className="font-black uppercase tracking-widest">{feat.name}</span>
-                                 {(isDM || isEditMode) && (
+                                 {isDM && (
                                    <div className="flex items-center gap-1">
                                      <button 
                                        onClick={async (e) => { 
