@@ -56,7 +56,9 @@ export default function DMDashboard({ onLogout }) {
     const sessionRef = doc(db, 'campaign', 'main_session');
     const unsubscribeSession = onSnapshot(sessionRef, (docSnap) => {
       if (docSnap.exists()) {
-        setUnlockedCharacters(docSnap.data().unlockedCharacters || []);
+        // FIX: Force deduplication on the DM screen to prevent duplicate party members
+        const rawChars = docSnap.data().unlockedCharacters || [];
+        setUnlockedCharacters([...new Set(rawChars)]);
       }
     });
 
@@ -173,7 +175,6 @@ export default function DMDashboard({ onLogout }) {
     } catch (error) { console.error(error); }
   };
 
-  // FIX: Export now grabs all 3 core collections, ensuring Enemies and Tokens are preserved!
   const handleExportCampaign = async () => {
     try {
       const exportData = { characters: {}, campaign: {}, active_enemies: {}, timestamp: new Date().toISOString() };
@@ -200,7 +201,6 @@ export default function DMDashboard({ onLogout }) {
     } catch (error) { console.error("Export failed:", error); }
   };
 
-  // FIX: Import now uses a Batch to safely wipe all ghost documents before restoring the backup
   const handleImportCampaign = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -221,7 +221,6 @@ export default function DMDashboard({ onLogout }) {
             try {
               const batch = writeBatch(db);
               
-              // 1. Wipe existing databases clean to prevent ghost files
               const currentChars = await getDocs(collection(db, 'characters'));
               currentChars.forEach(docSnap => batch.delete(docSnap.ref));
               
@@ -231,7 +230,6 @@ export default function DMDashboard({ onLogout }) {
               const currentEnemies = await getDocs(collection(db, 'active_enemies'));
               currentEnemies.forEach(docSnap => batch.delete(docSnap.ref));
 
-              // 2. Repopulate with the Backup Data
               Object.entries(importedData.characters || {}).forEach(([id, data]) => batch.set(doc(db, 'characters', id), data));
               Object.entries(importedData.campaign || {}).forEach(([id, data]) => batch.set(doc(db, 'campaign', id), data));
               Object.entries(importedData.active_enemies || {}).forEach(([id, data]) => batch.set(doc(db, 'active_enemies', id), data));
