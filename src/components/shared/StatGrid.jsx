@@ -24,7 +24,8 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField, i
     const skillArray = skillsStr.split(',').map(s => s.trim()).filter(Boolean);
     
     return skillArray.map(skill => {
-      const cleanSkill = skill.toLowerCase().replace(/\s*\([^)]*\)/g, '').trim();
+      // Clean the string so it finds the base skill even if they type "Deception Expertise" without parentheses
+      const cleanSkill = skill.toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/expertise/g, '').trim();
       const foundSkill = ALL_SKILLS.find(s => s.toLowerCase().startsWith(cleanSkill));
       
       if (foundSkill) {
@@ -39,7 +40,8 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField, i
           const formattedBonus = totalBonus >= 0 ? `+${totalBonus}` : `${totalBonus}`;
           
           const displayName = foundSkill.split(' (')[0]; 
-          return `${displayName} (${formattedBonus})`;
+          // Append the (Exp) badge so the DM visually knows the math triggered
+          return `${displayName}${isExpertise ? ' (Exp)' : ''} (${formattedBonus})`;
         }
       }
       return skill; 
