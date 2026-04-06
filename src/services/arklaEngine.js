@@ -36,7 +36,9 @@ export const calculateAC = (char) => {
   const conMod = getModifier(char.stats?.CON || 10);
   const wisMod = getModifier(char.stats?.WIS || 10);
   
-  const armors = (char.inventory || []).filter(i => i.category === 'Armor');
+  // FIX: Safely parse inventory to prevent crash when Firebase converts array to object
+  const safeInventory = Array.isArray(char.inventory) ? char.inventory : Object.values(char.inventory || {});
+  const armors = safeInventory.filter(i => i?.category === 'Armor');
   
   let baseArmor = null;
   let shieldBonus = 0;
