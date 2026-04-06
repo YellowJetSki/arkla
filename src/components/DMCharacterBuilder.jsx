@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, writeBatch, updateDoc } from 'firebase/firestore';
+import { doc, writeBatch, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { UserPlus, ChevronRight, ChevronLeft, X, Edit3 } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
@@ -47,7 +47,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
   });
 
   const [inventory, setInventory] = useState([]);
-  // FIX: Added 'range' to the initial state
   const [newItem, setNewItem] = useState({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
   const [srdEquipmentList, setSrdEquipmentList] = useState([]);
   const [filteredEquip, setFilteredEquip] = useState([]);
@@ -176,11 +175,10 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
       id: `item_${Date.now()}`, name: newItem.name, category: newItem.category, quantity: Number(newItem.quantity) || 1,
       desc: newItem.desc, imageUrl: newItem.imageUrl || '', damageDice: newItem.category === 'Weapon' ? newItem.damageDice : null,
       damageType: newItem.category === 'Weapon' ? newItem.damageType : null, properties: newItem.category === 'Weapon' ? newItem.properties : null,
-      range: newItem.category === 'Weapon' ? newItem.range : null, // FIX: Properly save range
+      range: newItem.category === 'Weapon' ? newItem.range : null,
       ac: newItem.category === 'Armor' ? Number(newItem.ac) : null
     };
     setInventory(prev => [...prev, formattedItem]);
-    // FIX: reset range
     setNewItem({ name: '', category: 'Adventuring Gear', damageDice: '1d8', damageType: 'Slashing', properties: '', range: '', ac: 14, quantity: 1, desc: '', imageUrl: '' });
   };
 
@@ -203,7 +201,22 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         ...classFeatures.filter(f => f.name && f.desc).map(f => ({ name: f.name.includes('Class Feature') ? f.name : `Class Feature: ${f.name}`, desc: f.desc, isDefensive: f.isDefensive || false }))
       ];
       
-      const startLevel = Math.max(1, Number(formData.level) || 1);
+      let startLevel = Math.max(1, Number(formData.level) || 1);
+      
+      // NEW: Multiclass Parsing Engine
+      // If the DM types "Fighter 3 / Wizard 2" it automatically derives the combined classes and total level
+      let classesToPass = [];
+      if (formData.class && formData.class.includes('/')) {
+          classesToPass = formData.class.split('/').map(c => {
+              const parts = c.trim().split(' ');
+              return { name: parts[0] || 'Unknown', level: parseInt(parts[1]) || 1 };
+          });
+          // Auto-calculate the true total character level
+          startLevel = classesToPass.reduce((sum, c) => sum + (c.level || 1), 0);
+      } else {
+          classesToPass = [{ name: formData.class || 'Fighter', level: startLevel }];
+      }
+
       const hitDieValue = parseInt((formData.hitDie || 'd10').replace('d', ''), 10);
       const hitDieAvg = Math.floor(hitDieValue / 2) + 1; 
       
@@ -227,7 +240,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
          });
       }
 
-      const classesToPass = [{ name: formData.class || 'Fighter', level: startLevel }];
       const spellStats = calculateSpellcastingStats(classesToPass, formData.stats);
 
       const payload = {
@@ -241,18 +253,24 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         stats: formData.stats, imageUrl: formData.imageUrl, img: formData.tokenImg,
         spellSlots: slots, spells: spells, proficiencies: customProfs, features: combinedFeatures, inventory: inventory,
         backstory: formData.backstory,
-        companion: hasCompanion ? { ...companionData, hp: Number(companionData.hp), ac: Number(companionData.ac), speed: Number(companionData.speed), awakeLevel: Number(companionData.awakeLevel) } : null
+        companion: hasCompanion ? { ...companionData, hp: Number(companionData.hp), ac: Number(companionData.ac), speed: Number(companionData.speed), awakeLevel: Number(companionData.awakeLevel) } : null,
+        levelUpPending: false // Instantly clears the Level Up alert once saved!
       };
 
       if (initialData) {
-        await updateDoc(doc(db, 'characters', finalCharId), payload);
+        if (!initialData.currency) payload.currency = { assarions: 0, quadrans: 0, leptons: 0 };
+        if (!initialData.attacks) payload.attacks = [];
+        if (!initialData.resources) payload.resources = [];
+        if (!initialData.deathSaves) payload.deathSaves = { successes: 0, failures: 0 };
+        
+        await setDoc(doc(db, 'characters', finalCharId), payload, { merge: true });
       } else {
         const newChar = {
           ...payload,
           exp: 0, hp: totalMaxHp, tempHp: 0, initiative: '--',
           combatInitiative: null, inspiration: false, isConcentrating: false, conditions: [], hasCompletedTutorial: false, journal: '',
           currency: { assarions: 0, quadrans: 0, leptons: 0 }, deathSaves: { successes: 0, failures: 0 }, resources: [],
-          dmNotes: '', attacks: [], traits: { personality: '', ideal: '', bond: '', flaws: '' }, notes: '', levelUpPending: false
+          dmNotes: '', attacks: [], traits: { personality: '', ideal: '', bond: '', flaws: '' }, notes: ''
         };
         const batch = writeBatch(db);
         batch.set(doc(db, 'characters', finalCharId), newChar);

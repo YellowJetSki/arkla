@@ -4,7 +4,7 @@ import { doc, setDoc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'fir
 import { db } from '../services/firebase';
 import { 
   LogOut, Swords, Sparkles, Backpack, BookOpen, 
-  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, ChevronDown, ChevronUp, ShieldPlus, EyeOff, Zap, ZapOff
+  PenTool, Gem, X, HelpCircle, User, Edit3, Flame, Settings, Hammer, Trash2, Plus, BellRing, PawPrint, Search, ChevronDown, ChevronUp, ShieldPlus, EyeOff, Zap, ZapOff, Save
 } from 'lucide-react';
 
 import StatGrid from './shared/StatGrid';
@@ -78,12 +78,15 @@ const CardWrapper = ({ isDM, onClose, children }) => {
         <div className="bg-slate-900 border-[3px] border-indigo-500 rounded-3xl w-full max-w-[98vw] xl:max-w-7xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col h-[95dvh] animate-in zoom-in-95 duration-500 relative overflow-hidden">
           <button 
             onClick={onClose} 
-            className="absolute top-4 right-4 z-[999999] bg-slate-950 text-slate-400 hover:text-white p-2 rounded-xl border-2 border-slate-800 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-500 hover:border-red-950 transition-all active:translate-y-[2px] active:shadow-none"
+            className="absolute top-4 right-4 z-[50] bg-slate-950 text-slate-400 hover:text-white p-2 rounded-xl border-2 border-slate-800 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-500 hover:border-red-950 transition-all active:translate-y-[2px] active:shadow-none"
             title="Close Sheet"
           >
              <X className="w-5 h-5" />
           </button>
-          {children}
+          {/* FIX: Handled scrolling natively inside the wrapper to fix DM views */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+             {children}
+          </div>
         </div>
       </div>,
       document.body
@@ -110,6 +113,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   
   const [isEditMode, setIsEditMode] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [isSavingSheet, setIsSavingSheet] = useState(false);
   
   const [isImageOpen, setIsImageOpen] = useState(false); 
   const [activeLoot, setActiveLoot] = useState(null); 
@@ -201,6 +205,21 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
       setSaveToast('Saved to Cloud');
       setTimeout(() => setSaveToast(''), 2500);
     }
+  };
+
+  // NEW: Manual Force Sync for DM peace of mind
+  const handleForceSave = async () => {
+    if (!char) return;
+    setIsSavingSheet(true);
+    try {
+      await setDoc(doc(db, 'characters', currentUser.charId), char);
+      setSaveToast('Sheet Force Saved!');
+    } catch (err) {
+      console.error(err);
+      showDialog({ title: 'Error', message: 'Failed to save sheet to database.', type: 'alert' });
+    }
+    setIsSavingSheet(false);
+    setTimeout(() => setSaveToast(''), 2500);
   };
 
   const handleAddCondition = async (condition) => {
@@ -319,7 +338,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
       
       let updates = { features: updatedFeatures };
       
-      // If the feature name was updated, ensure any attached trackers have their names updated too!
       if (editingFeat.name !== customFeat.name && char.resources) {
          updates.resources = char.resources.map(r => r.name === editingFeat.name ? { ...r, name: customFeat.name } : r);
       }
@@ -428,8 +446,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
          <div className={`fixed inset-0 bg-gradient-to-b ${activeTheme.ambient} to-slate-950 pointer-events-none -z-10 transition-colors duration-1000`}></div>
       )}
 
-      {/* Main Container */}
-      <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} ${isDM ? 'h-full overflow-hidden rounded-3xl' : 'pb-28 md:pb-12 relative h-full'} flex flex-col md:flex-row w-full`}>
+      {/* Main Container - FIX: Removed broken DM split classes */}
+      <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} pb-28 md:pb-12 relative min-h-full flex flex-col md:flex-row w-full`}>
         
         <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} inputPlaceholder={dialog.inputPlaceholder} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
@@ -456,14 +474,17 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         <ImageModal isOpen={!!activeLoot} url={activeLoot?.url} alt={activeLoot?.name} onClose={() => setActiveLoot(null)} />
 
         {/* LEFT ANCHOR PANEL (Desktop) / TOP HEADER (Mobile) */}
-        <div className={`w-full md:w-[350px] lg:w-[400px] shrink-0 ${isDM ? 'p-4 md:p-6 border-r-[3px] border-slate-950 bg-slate-900/50 h-full overflow-y-auto' : 'p-3 md:p-6 md:sticky md:top-0 md:h-screen md:overflow-y-auto'} transition-all duration-700 custom-scrollbar z-20`}>
+        <div className="w-full md:w-[350px] lg:w-[400px] shrink-0 p-3 md:p-6 md:sticky md:top-0 md:h-[95dvh] md:overflow-y-auto transition-all duration-700 custom-scrollbar z-20 bg-slate-900/40 md:bg-transparent border-b-[3px] md:border-b-0 md:border-r-[3px] border-slate-950">
           
           {isDM ? (
-            <div className="flex justify-between items-center mb-4 border-b-2 border-slate-950 pb-4 pr-8">
-              <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><User className="w-6 h-6 text-indigo-400" /> {char.name || 'Unknown'} (DM)</h2>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setShowBuilder(true)} className={`flex items-center gap-2 transition-all px-3 py-1.5 rounded-lg border-2 text-xs uppercase tracking-widest font-black shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] text-amber-400 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
-                  <Edit3 className="w-3 h-3" /> Edit Stats
+            <div className="flex justify-between items-center mb-4 border-b-2 border-slate-950 pb-4 pr-6">
+              <h2 className="text-xl font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><User className="w-6 h-6 text-indigo-400" /> {char.name || 'Unknown'}</h2>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <button onClick={handleForceSave} disabled={isSavingSheet} className="flex items-center gap-1.5 transition-all px-3 py-1.5 rounded-lg border-2 text-[10px] uppercase tracking-widest font-black shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] text-emerald-400 bg-slate-900 border-slate-950 hover:bg-slate-800 disabled:opacity-50">
+                   <Save className="w-3 h-3" /> Save
+                </button>
+                <button onClick={() => setShowBuilder(true)} className={`flex items-center gap-1.5 transition-all px-3 py-1.5 rounded-lg border-2 text-[10px] uppercase tracking-widest font-black shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] text-amber-400 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
+                  <Edit3 className="w-3 h-3" /> Stats
                 </button>
               </div>
             </div>
@@ -528,9 +549,9 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         </div>
 
         {/* RIGHT DYNAMIC PANEL (Desktop) / MAIN CONTENT (Mobile) */}
-        <div className={`flex-1 flex flex-col min-w-0 ${isDM ? 'bg-slate-900 h-full overflow-hidden' : 'pt-0 md:pt-6'} transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} overflow-x-hidden`}>
+        <div className={`flex-1 flex flex-col min-w-0 pt-0 md:pt-6 transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} overflow-x-hidden`}>
           
-          <div className={`${isDM ? 'shrink-0 bg-slate-950 border-b-[3px] border-slate-900 p-2 sm:p-3 z-40 w-full' : 'fixed bottom-0 left-0 w-full z-40 bg-slate-950 border-t-[3px] border-slate-900 shadow-[0_-4px_20px_rgba(0,0,0,0.8)] pb-safe md:sticky md:bottom-auto md:top-0 md:w-auto md:bg-transparent md:border-none md:shadow-none md:z-30 md:-mx-8 md:px-8 md:mb-6'}`}>
+          <div className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-md border-b-[3px] md:border-none md:bg-transparent border-slate-900 shadow-sm md:shadow-none pb-2 md:pb-0 md:-mx-8 md:px-8 md:mb-6 pt-2">
               <div className={`bg-slate-900 md:bg-slate-900/80 p-2 md:rounded-xl md:border-2 md:border-slate-950 md:shadow-[6px_6px_0px_rgba(0,0,0,1)] flex overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full gap-2 snap-x snap-mandatory md:backdrop-blur-md`}>
                 {availableTabs.map(tab => (
                   <button 
@@ -545,7 +566,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
               </div>
           </div>
 
-          <div className={`flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar ${isDM ? 'p-4 md:p-6' : 'p-3 md:p-6 pb-32 md:pb-12 pt-4 md:pt-0'}`}>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar p-3 md:p-6 pb-32 md:pb-12 pt-4 md:pt-0">
             <div className="space-y-6 animate-in fade-in duration-500 max-w-4xl mx-auto">
               
               {activeTab === 'combat' && (

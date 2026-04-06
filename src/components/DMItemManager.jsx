@@ -3,6 +3,7 @@ import { doc, updateDoc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { X, Backpack, Send, PackagePlus, Hammer, Search, Plus, Sword, Shield, Image as ImageIcon, Users, Crosshair } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
+import ImageSelector from './shared/ImageSelector';
 import { fetchAllEquipment, fetchEquipmentDetails } from '../services/srdApi';
 
 export default function DMItemManager({ onClose, activePlayers }) {
@@ -30,7 +31,6 @@ export default function DMItemManager({ onClose, activePlayers }) {
       if (snap.exists()) {
         setStashedItems(snap.data().items || []);
       } else {
-        // FIX: Use setDoc to safely initialize the stash if it doesn't exist yet
         await setDoc(stashRef, { items: [] });
       }
     };
@@ -334,16 +334,20 @@ export default function DMItemManager({ onClose, activePlayers }) {
                     </div>
                   )}
 
-                  <div>
-                    <label className="flex items-center gap-1 block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                      <ImageIcon className="w-4 h-4" /> Image URL (Optional)
-                    </label>
+                  <div className="space-y-2">
+                    <ImageSelector
+                      value={newItem.imageUrl}
+                      onChange={(val) => setNewItem({...newItem, imageUrl: val})}
+                      label="Image (Dropdown Library)"
+                      iconColor="text-emerald-500"
+                      inputClassName="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-emerald-500 shadow-inner appearance-none cursor-pointer"
+                    />
                     <input 
-                      type="url" 
+                      type="text" 
                       value={newItem.imageUrl} 
                       onChange={e => setNewItem({...newItem, imageUrl: e.target.value})} 
-                      className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-emerald-500 shadow-inner" 
-                      placeholder="https://..." 
+                      className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-emerald-500 shadow-inner mt-1" 
+                      placeholder="...or paste a custom URL here" 
                     />
                   </div>
 
