@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, getDocs, getDoc, writeBatch, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { PenTool, X, Sparkles, DownloadCloud, PowerOff, UploadCloud, Star, Book, Package, Image as ImageIcon, ShieldAlert, Trash2, Map, Users, Swords, Skull, Flame } from 'lucide-react';
 
@@ -56,7 +56,6 @@ export default function DMDashboard({ onLogout }) {
     const sessionRef = doc(db, 'campaign', 'main_session');
     const unsubscribeSession = onSnapshot(sessionRef, (docSnap) => {
       if (docSnap.exists()) {
-        // FIX: Force deduplication on the DM screen to prevent duplicate party members
         const rawChars = docSnap.data().unlockedCharacters || [];
         setUnlockedCharacters([...new Set(rawChars)]);
       }
@@ -101,6 +100,22 @@ export default function DMDashboard({ onLogout }) {
           setIsBattleMode(false);
           closeDialog();
           showToast('Board & Enemies Wiped');
+        } catch (error) { console.error(error); }
+      }
+    });
+  };
+
+  // NEW: Hard resets the active player array and forces clients to wipe their cache
+  const confirmClearParty = () => {
+    setDialog({
+      isOpen: true, title: 'Refresh Party?',
+      message: 'This clears the active party list and forces all players to refresh their connection. This permanently fixes ghost duplicate bugs!',
+      type: 'confirm',
+      onConfirm: async () => {
+        try {
+          await setDoc(doc(db, 'campaign', 'main_session'), { unlockedCharacters: [] }, { merge: true });
+          closeDialog();
+          showToast('Party List Cleared');
         } catch (error) { console.error(error); }
       }
     });
@@ -311,6 +326,10 @@ export default function DMDashboard({ onLogout }) {
           <button onClick={() => fileInputRef.current.click()} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Import Campaign"><UploadCloud className="w-4 h-4"/></button>
           <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Export Campaign"><DownloadCloud className="w-4 h-4"/></button>
           <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
+          
+          {/* NEW: Refresh Party Button */}
+          <button onClick={confirmClearParty} className="text-sky-500 hover:text-sky-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Refresh Party Connections"><Users className="w-4 h-4"/></button>
+          
           <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Clear All Conditions"><Sparkles className="w-4 h-4"/></button>
           <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4"/></button>
           <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Logout"><PowerOff className="w-4 h-4"/></button>
