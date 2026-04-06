@@ -173,13 +173,19 @@ export default function DMDashboard({ onLogout }) {
     } catch (error) { console.error(error); }
   };
 
+  // FIX: Export now grabs all 3 core collections, ensuring Enemies and Tokens are preserved!
   const handleExportCampaign = async () => {
     try {
-      const exportData = { characters: {}, campaign: {}, timestamp: new Date().toISOString() };
+      const exportData = { characters: {}, campaign: {}, active_enemies: {}, timestamp: new Date().toISOString() };
+      
       const charsSnap = await getDocs(collection(db, 'characters'));
       charsSnap.forEach(doc => { exportData.characters[doc.id] = doc.data(); });
+      
       const campSnap = await getDocs(collection(db, 'campaign'));
       campSnap.forEach(doc => { exportData.campaign[doc.id] = doc.data(); });
+      
+      const enemiesSnap = await getDocs(collection(db, 'active_enemies'));
+      enemiesSnap.forEach(doc => { exportData.active_enemies[doc.id] = doc.data(); });
 
       const dataStr = JSON.stringify(exportData, null, 2);
       const blob = new Blob([dataStr], { type: "application/json" });
@@ -194,6 +200,7 @@ export default function DMDashboard({ onLogout }) {
     } catch (error) { console.error("Export failed:", error); }
   };
 
+  // FIX: Import now uses a Batch to safely wipe all ghost documents before restoring the backup
   const handleImportCampaign = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -201,22 +208,48 @@ export default function DMDashboard({ onLogout }) {
     reader.onload = async (event) => {
       try {
         const importedData = JSON.parse(event.target.result);
-        if (!importedData.characters || !importedData.campaign) return;
+        if (!importedData.characters || !importedData.campaign) {
+          showToast('Invalid backup file format.');
+          return;
+        }
 
         setDialog({
           isOpen: true, title: 'DANGEROUS OVERWRITE',
-          message: 'This will completely wipe and replace ALL characters, encounters, and stashes. Are you absolutely sure?',
+          message: 'This will completely wipe and replace ALL characters, encounters, stashes, and map data. Are you absolutely sure?',
           type: 'confirm',
           onConfirm: async () => {
-            const batch = writeBatch(db);
-            Object.entries(importedData.characters).forEach(([id, data]) => batch.set(doc(db, 'characters', id), data));
-            Object.entries(importedData.campaign).forEach(([id, data]) => batch.set(doc(db, 'campaign', id), data));
-            await batch.commit();
-            closeDialog();
-            showToast('Campaign Restored Successfully!');
+            try {
+              const batch = writeBatch(db);
+              
+              // 1. Wipe existing databases clean to prevent ghost files
+              const currentChars = await getDocs(collection(db, 'characters'));
+              currentChars.forEach(docSnap => batch.delete(docSnap.ref));
+              
+              const currentCamp = await getDocs(collection(db, 'campaign'));
+              currentCamp.forEach(docSnap => batch.delete(docSnap.ref));
+              
+              const currentEnemies = await getDocs(collection(db, 'active_enemies'));
+              currentEnemies.forEach(docSnap => batch.delete(docSnap.ref));
+
+              // 2. Repopulate with the Backup Data
+              Object.entries(importedData.characters || {}).forEach(([id, data]) => batch.set(doc(db, 'characters', id), data));
+              Object.entries(importedData.campaign || {}).forEach(([id, data]) => batch.set(doc(db, 'campaign', id), data));
+              Object.entries(importedData.active_enemies || {}).forEach(([id, data]) => batch.set(doc(db, 'active_enemies', id), data));
+
+              await batch.commit();
+              closeDialog();
+              showToast('Campaign Restored Perfectly!');
+            } catch (batchErr) {
+              console.error("Batch commit failed:", batchErr);
+              closeDialog();
+              showToast('Restore Failed! Check console.');
+            }
           }
         });
-      } catch (err) { console.error(err); }
+      } catch (err) { 
+        console.error("JSON Parse error", err); 
+        showToast('Failed to parse JSON file.');
+      }
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsText(file);
@@ -331,6 +364,7 @@ export default function DMDashboard({ onLogout }) {
           <DMThreatsPanel 
             activeEnemies={activeEnemies}
             selectedEnemies={selectedEnemies}
+            setActiveManager={setActiveManager}
             setIsForgingEnemy={setIsForgingEnemy}
             selectAllEnemies={selectAllEnemies}
             massMathAmount={massMathAmount}
