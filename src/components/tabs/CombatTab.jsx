@@ -21,14 +21,19 @@ export default function CombatTab({
   const mechanics = getConditionMechanics(activeConditions);
 
   let displaySpeed = mechanics.speedOverride !== null ? mechanics.speedOverride : Math.floor((char.speed || 30) * mechanics.speedMultiplier);
-  const isEncumbered = (char.inventory || '').length > 500 && char.stats?.STR < 15;
+  
+  // FIX: Safely parse inventory as an array to prevent Firebase object conversion crashes
+  const safeInventory = Array.isArray(char.inventory) ? char.inventory : [];
+  
+  const isEncumbered = safeInventory.length > 500 && char.stats?.STR < 15;
   if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
 
   const tempBuffs = char.tempBuffs || [];
   const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
   const displayAc = (char.ac || 10) + acBuffTotal;
 
-  const inventoryWeapons = (char.inventory || []).filter(item => item.category === 'Weapon').map(w => {
+  // Use the safely parsed array here
+  const inventoryWeapons = safeInventory.filter(item => item.category === 'Weapon').map(w => {
     let propsStr = '';
     if (Array.isArray(w.properties)) {
       propsStr = w.properties.map(p => p.name).join(', ');
