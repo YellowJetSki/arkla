@@ -8,12 +8,14 @@ export default function CombatTab({
   char, 
   charId, 
   isDM, 
+  isEditMode,
   activeTheme, 
   combatWarnings, 
   activeConditions, 
   handleAddCondition, 
   handleRemoveCondition, 
   handleResourceToggle,
+  handleRemoveResource,
   showDialog
 }) {
   const [showBuffsModal, setShowBuffsModal] = useState(false);
@@ -22,8 +24,7 @@ export default function CombatTab({
 
   let displaySpeed = mechanics.speedOverride !== null ? mechanics.speedOverride : Math.floor((char.speed || 30) * mechanics.speedMultiplier);
   
-  // FIX: Safely parse inventory as an array to prevent Firebase object conversion crashes
-  const safeInventory = Array.isArray(char.inventory) ? char.inventory : [];
+  const safeInventory = Array.isArray(char.inventory) ? char.inventory : Object.values(char.inventory || {});
   
   const isEncumbered = safeInventory.length > 500 && char.stats?.STR < 15;
   if (isEncumbered && displaySpeed > 20 && mechanics.speedOverride === null) displaySpeed -= 10;
@@ -32,7 +33,6 @@ export default function CombatTab({
   const acBuffTotal = tempBuffs.filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
   const displayAc = (char.ac || 10) + acBuffTotal;
 
-  // Use the safely parsed array here
   const inventoryWeapons = safeInventory.filter(item => item.category === 'Weapon').map(w => {
     let propsStr = '';
     if (Array.isArray(w.properties)) {
@@ -63,7 +63,6 @@ export default function CombatTab({
   const allAttacks = [...(char.attacks || []), ...inventoryWeapons];
   const resources = char.resources || [];
 
-  // Parse Class/Species Features for Combat Keywords (with manual overrides)
   const combatKeywords = ['attack', 'damage', 'action', 'bonus', 'reaction', 'martial', 'rage', 'smite', 'sneak', 'strike', 'initiative', 'unarmed', 'ki', 'spell', 'save', 'dc'];
   const combatFeatures = (char.features || []).filter(f => {
       if (f.isHiddenFromCombat) return false;
@@ -72,7 +71,6 @@ export default function CombatTab({
       return combatKeywords.some(kw => text.includes(kw));
   });
 
-  // Action Categorization Logic
   const categorizedActions = {
     action: [],
     bonus: [],
@@ -235,10 +233,22 @@ export default function CombatTab({
                 <div className="pl-4">
                   <div className="flex justify-between items-start mb-3">
                     <span className="text-xs font-black text-white uppercase tracking-wider truncate pr-2 leading-tight">{res.name}</span>
-                    {/* Hide the 'None Rest' display entirely */}
-                    {res.recharge && res.recharge.toLowerCase() !== 'none' && (
-                      <span className="text-[8px] text-slate-400 uppercase font-black bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded shadow-inner shrink-0">{res.recharge} rest</span>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {res.recharge && res.recharge.toLowerCase() !== 'none' && (
+                        <span className="text-[8px] text-slate-400 uppercase font-black bg-slate-950 border border-slate-800 px-1.5 py-0.5 rounded shadow-inner">{res.recharge} rest</span>
+                      )}
+                      
+                      {/* NEW: Dedicated Delete Button inside Combat Tab */}
+                      {(isDM || isEditMode) && (
+                        <button 
+                          onClick={() => handleRemoveResource(idx)} 
+                          className="text-slate-500 hover:text-red-400 bg-slate-950 hover:bg-red-950 border-2 border-slate-800 hover:border-red-900 p-1 rounded-md shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all" 
+                          title="Delete Tracker"
+                        >
+                          <X className="w-3 h-3 font-black" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   
                   {res.isPool ? (
