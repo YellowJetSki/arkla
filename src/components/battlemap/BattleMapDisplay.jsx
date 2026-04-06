@@ -10,6 +10,7 @@ export default function BattleMapDisplay({ onLogout }) {
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, fogOfWar: false, drawings: [] });
   const [tokens, setTokens] = useState({});
   const [activeHandout, setActiveHandout] = useState(null);
+  const [initiative, setInitiative] = useState(null);
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
@@ -26,6 +27,17 @@ export default function BattleMapDisplay({ onLogout }) {
           drawings: data.drawings || []
         });
         setTokens(data.tokens || {});
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // NEW: Directly subscribe to the Initiative order to control the Turn Banner
+  useEffect(() => {
+    const initRef = doc(db, 'campaign', 'initiative');
+    const unsub = onSnapshot(initRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setInitiative(docSnap.data());
       }
     });
     return () => unsub();
@@ -57,19 +69,20 @@ export default function BattleMapDisplay({ onLogout }) {
     return <DisplayWaitingScreen mapData={mapData} onLogout={onLogout} />;
   }
 
+  const activeActor = initiative && initiative.activeTurn >= 0 ? initiative.order[initiative.activeTurn] : null;
+
   return (
     <div className="fixed inset-0 bg-black z-[99999] flex items-center justify-center overflow-hidden">
       
-      {/* Invisible Preloader just in case */}
       {mapData.imageUrl && <img src={mapData.imageUrl} alt="Preload Cache" style={{ display: 'none' }} />}
 
       <DisplayHandoutOverlay activeHandout={activeHandout} setActiveHandout={setActiveHandout} />
 
-      {/* Battlemap Container - Centered with Soft Vignette Fade */}
       <div className="relative w-full h-full flex items-center justify-center">
         <MapGrid 
           mapData={mapData} 
           tokens={tokens} 
+          activeActor={activeActor} 
           onTileClick={() => {}} 
           onTokenClick={() => {}}
           selectedTokenId={null}
@@ -77,7 +90,6 @@ export default function BattleMapDisplay({ onLogout }) {
           isDisplayMode={true}
         />
         
-        {/* Cinematic Edge Fade (Vignette) */}
         <div 
           className="absolute inset-0 pointer-events-none z-[10000]"
           style={{

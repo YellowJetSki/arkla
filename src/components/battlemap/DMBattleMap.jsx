@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -77,13 +77,14 @@ export default function DMBattleMap() {
     return () => unsub();
   }, []);
 
+  // FIX: Robust Session and Characters Subscription for Map Staging
   useEffect(() => {
     let unsubChars = () => {};
     
-    const unsubSession = onSnapshot(doc(db, 'campaign', 'main_session'), (sessionSnap) => {
+    const unsubSession = onSnapshot(doc(db, 'campaign', 'main_session'), async (sessionSnap) => {
       if (sessionSnap.exists()) {
-        const playerIds = sessionSnap.data().unlockedCharacters || [];
-        const validIds = playerIds.filter(id => id && typeof id === 'string');
+        const rawIds = sessionSnap.data().unlockedCharacters || [];
+        const validIds = [...new Set(rawIds.filter(id => id && typeof id === 'string'))]; // Deduplicate map players too!
         
         unsubChars();
         if (validIds.length > 0) {
@@ -126,7 +127,7 @@ export default function DMBattleMap() {
         setSelectedTokenId(null);
       }
     }
-  }, [activePlayers]);
+  }, [activePlayers, selectedTokenId]);
 
   const handleUpdateMapSettings = () => {
     setIsSavingMap(true);
@@ -165,6 +166,8 @@ export default function DMBattleMap() {
   const handleRestorePreset = async (presetData) => {
     try {
       const batch = writeBatch(db);
+      
+      // FIX: Ensure active_enemies is completely wiped before dropping in the preset tokens
       const enemyDocs = await getDocs(collection(db, 'active_enemies'));
       enemyDocs.forEach((docSnap) => batch.delete(docSnap.ref));
 
@@ -253,6 +256,7 @@ export default function DMBattleMap() {
     setImagePrompt({ isOpen: false, tokenId: null, url: '' });
   };
 
+  // FIX: -99999 aggressively deletes ghost tokens from the map even if their db file doesn't exist
   const handleUpdateTokenHpLive = async (tokenId, newHpVal) => {
     if (newHpVal === -99999) {
       await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
