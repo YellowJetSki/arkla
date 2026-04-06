@@ -46,7 +46,8 @@ export default function Login({ onLogin }) {
           const dbFirstName = dbName.split(' ')[0];
           
           if (dbName === normalizedName || dbFirstName === normalizedName) {
-            foundCharId = doc.id;
+            // FIX: Ensure we ONLY grab the exact document ID to prevent duplicate logins
+            foundCharId = doc.id; 
             foundCharName = data.name;
           }
         }

@@ -29,10 +29,10 @@ export default function App() {
     if (currentUser) {
       localStorage.setItem('dnd_currentUser', JSON.stringify(currentUser));
       
-      // FIX: Ensure players who refresh the page to re-join are injected back into the DM's active party board
       if (currentUser.role === 'player' && !isDisplayMode && !isDMMapMode) {
         const campaignRef = doc(db, 'campaign', 'main_session');
         setDoc(campaignRef, {
+          // arrayUnion is safe here as long as currentUser.charId is the exact doc.id
           unlockedCharacters: arrayUnion(currentUser.charId) 
         }, { merge: true }).catch(err => console.error("Failed to re-join session:", err));
       }
@@ -46,7 +46,10 @@ export default function App() {
     
     const unsubscribe = onSnapshot(campaignRef, (docSnap) => {
       if (docSnap.exists()) {
-        setUnlockedCharacters(docSnap.data().unlockedCharacters || []);
+        // FIX: Force deduplication on read just in case ghost data got stuck
+        const rawChars = docSnap.data().unlockedCharacters || [];
+        const dedupedChars = [...new Set(rawChars)];
+        setUnlockedCharacters(dedupedChars);
       } else {
         setDoc(campaignRef, { unlockedCharacters: [] });
       }
@@ -72,14 +75,11 @@ export default function App() {
     localStorage.removeItem('dnd_currentUser');
   };
 
-  // OVERRIDE: Player TV Display Screen
   if (isDisplayMode) {
     return <BattleMapDisplay onLogout={() => window.close()} />;
   }
 
-  // OVERRIDE: DM Dual-Monitor Map Screen
   if (isDMMapMode) {
-    // Only allow access if they are logged in as the DM
     if (!currentUser || currentUser.role !== 'dm') {
       return (
          <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white font-black">
@@ -101,6 +101,7 @@ export default function App() {
       ) : (
         <Dashboard 
           currentUser={currentUser} 
+          // Pass the deduped array down to the rest of the app
           unlockedCharacters={unlockedCharacters} 
           onLogout={handleLogout} 
         />
