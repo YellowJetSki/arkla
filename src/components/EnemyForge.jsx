@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Skull, X, Shield, Heart, Wind, Swords, Search, Loader2, Plus, Wand2 } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
@@ -101,7 +101,6 @@ export default function EnemyForge({ onClose }) {
 
       const newEnemyId = `enemy_${Date.now()}`;
 
-      // Save directly to active_enemies so it populates the Threats panel!
       const newEnemy = {
         ...enemy,
         id: newEnemyId,
@@ -121,7 +120,33 @@ export default function EnemyForge({ onClose }) {
         isHomebrew: true
       };
 
-      await addDoc(collection(db, 'active_enemies'), newEnemy);
+      const batch = writeBatch(db);
+
+      // 1. Save directly to active_enemies so it populates the Threats panel
+      const enemyRef = doc(db, 'active_enemies', newEnemyId);
+      batch.set(enemyRef, newEnemy);
+
+      // 2. Instantly deploy token to the Battlemap
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      const mapSnap = await getDoc(mapRef);
+      if (mapSnap.exists()) {
+        const mapTokens = mapSnap.data().tokens || {};
+        mapTokens[newEnemyId] = {
+          id: newEnemyId,
+          type: 'enemy',
+          x: 0,
+          y: 0,
+          size: tokenSize,
+          hp: Number(enemy.hp),
+          maxHp: Number(enemy.hp),
+          img: newEnemy.img,
+          conditions: [],
+          name: enemy.name.split(' ')[0] || 'Unknown'
+        };
+        batch.update(mapRef, { tokens: mapTokens });
+      }
+
+      await batch.commit();
       onClose();
     } catch (error) {
       console.error("Error forging enemy:", error);
@@ -342,7 +367,7 @@ export default function EnemyForge({ onClose }) {
                 </div>
                 
                 <button type="submit" disabled={isSaving} className="w-full bg-red-600 hover:bg-red-500 text-slate-950 font-black uppercase tracking-widest text-sm py-5 rounded-xl transition-all border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)] active:translate-y-[6px] active:shadow-none mt-4">
-                  {isSaving ? 'Summoning...' : 'Deploy to Active Threats Board'}
+                  {isSaving ? 'Summoning...' : 'Deploy to Board & Threats'}
                 </button>
               </form>
             ) : (
