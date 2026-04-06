@@ -52,7 +52,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
   const [filteredEquip, setFilteredEquip] = useState([]);
   const [showEquipDropdown, setShowEquipDropdown] = useState(false);
 
-  // RE-HYDRATION LOGIC
   useEffect(() => {
     if (initialData) {
       setFormData({
@@ -136,7 +135,10 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
     updateProf('armor', srdClassOffer.armor);
     updateProf('weapons', srdClassOffer.weapons);
     updateProf('savingThrows', srdClassOffer.savingThrows);
-    if (srdClassOffer.skills) updateProf('skills', srdClassOffer.skills);
+    
+    // Automatically translate Arcana to Books when importing class choices
+    if (srdClassOffer.skills) updateProf('skills', srdClassOffer.skills.replace(/Arcana/g, 'Books'));
+    
     if (srdClassOffer.tools) updateProf('tools', customProfs.tools ? `${customProfs.tools}, ${srdClassOffer.tools}` : srdClassOffer.tools);
     
     const startLevel = Math.max(1, Number(formData.level) || 1);
@@ -203,15 +205,12 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
       
       let startLevel = Math.max(1, Number(formData.level) || 1);
       
-      // NEW: Multiclass Parsing Engine
-      // If the DM types "Fighter 3 / Wizard 2" it automatically derives the combined classes and total level
       let classesToPass = [];
       if (formData.class && formData.class.includes('/')) {
           classesToPass = formData.class.split('/').map(c => {
               const parts = c.trim().split(' ');
               return { name: parts[0] || 'Unknown', level: parseInt(parts[1]) || 1 };
           });
-          // Auto-calculate the true total character level
           startLevel = classesToPass.reduce((sum, c) => sum + (c.level || 1), 0);
       } else {
           classesToPass = [{ name: formData.class || 'Fighter', level: startLevel }];
@@ -224,7 +223,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
       const higherLevelHp = (startLevel - 1) * Math.max(1, hitDieAvg + conMod);
       const totalMaxHp = levelOneHp + higherLevelHp;
 
-      // Merge existing spell slots with new meta if editing
       const slots = initialData?.spellSlots || {};
       if (spellcastingMeta) {
          Object.keys(spellcastingMeta).forEach(key => {
@@ -254,7 +252,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         spellSlots: slots, spells: spells, proficiencies: customProfs, features: combinedFeatures, inventory: inventory,
         backstory: formData.backstory,
         companion: hasCompanion ? { ...companionData, hp: Number(companionData.hp), ac: Number(companionData.ac), speed: Number(companionData.speed), awakeLevel: Number(companionData.awakeLevel) } : null,
-        levelUpPending: false // Instantly clears the Level Up alert once saved!
+        levelUpPending: false 
       };
 
       if (initialData) {

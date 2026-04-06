@@ -87,7 +87,14 @@ export default function StepTraits({
 
   useEffect(() => { 
     fetchAllTraitsAndFeatures().then(setSrdTraitsList); 
-    fetchAllProficiencies().then(setSrdProfsList);
+    fetchAllProficiencies().then(data => {
+      // Map Arcana to Books for the dropdown injector
+      const mappedProfs = data.map(item => {
+         if (item.name === 'Skill: Arcana') return { ...item, name: 'Skill: Books' };
+         return item;
+      });
+      setSrdProfsList(mappedProfs);
+    });
     fetchAllLanguages().then(setSrdLangsList);
   }, []);
 

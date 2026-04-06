@@ -12,7 +12,6 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField, i
   
   const STAT_ORDER = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'];
   
-  // Safe parsing of saving throw proficiencies
   const savingThrowsRaw = char?.proficiencies?.savingThrows;
   const savingThrowProfs = (Array.isArray(savingThrowsRaw) ? savingThrowsRaw.join(', ') : (savingThrowsRaw || '')).toLowerCase();
 
@@ -24,8 +23,9 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField, i
     const skillArray = skillsStr.split(',').map(s => s.trim()).filter(Boolean);
     
     return skillArray.map(skill => {
-      // Clean the string so it finds the base skill even if they type "Deception Expertise" without parentheses
-      const cleanSkill = skill.toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/expertise/g, '').trim();
+      // Auto-translate legacy Arcana references into Books before processing math
+      const mappedSkill = skill.replace(/Arcana/ig, 'Books');
+      const cleanSkill = mappedSkill.toLowerCase().replace(/\s*\([^)]*\)/g, '').replace(/expertise/g, '').trim();
       const foundSkill = ALL_SKILLS.find(s => s.toLowerCase().startsWith(cleanSkill));
       
       if (foundSkill) {
@@ -35,23 +35,21 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField, i
           const statScore = stats[statName] || 10;
           const statMod = getModifier(statScore);
           
-          const isExpertise = skill.toLowerCase().includes('expertise');
+          const isExpertise = mappedSkill.toLowerCase().includes('expertise');
           const totalBonus = statMod + (isExpertise ? (profBonus * 2) : profBonus);
           const formattedBonus = totalBonus >= 0 ? `+${totalBonus}` : `${totalBonus}`;
           
           const displayName = foundSkill.split(' (')[0]; 
-          // Append the (Exp) badge so the DM visually knows the math triggered
           return `${displayName}${isExpertise ? ' (Exp)' : ''} (${formattedBonus})`;
         }
       }
-      return skill; 
+      return mappedSkill; 
     }).join(', ');
   };
 
   return (
     <div className="space-y-6">
 
-      {/* Core Stats & Saving Throws Grid - DYNAMICALLY ADJUSTS FOR DM VIEWS */}
       <div className={`grid ${isDM ? 'grid-cols-3 gap-2 md:gap-3' : 'grid-cols-2 md:grid-cols-6 gap-3 md:gap-4'}`}>
         {STAT_ORDER.map((stat) => {
           const score = stats[stat] || 10;
@@ -69,7 +67,6 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField, i
                 </span>
               </div>
 
-              {/* SAVING THROW DISPLAY */}
               <div className={`w-full flex items-center justify-between bg-slate-950 px-1.5 md:px-2 py-1.5 rounded-lg shadow-inner border border-slate-800 mt-1`}>
                  <span className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest shrink-0">Save</span>
                  <div className="flex items-center gap-1 md:gap-1.5 min-w-0">
@@ -84,7 +81,6 @@ export default function StatGrid({ char, activeTheme, isEditMode, updateField, i
         })}
       </div>
 
-      {/* Skills & Proficiencies */}
       <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-4 md:p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
         <div className="flex justify-between items-center border-b-2 border-slate-900 pb-3 mb-4">
           <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">

@@ -6,7 +6,7 @@
 // ==========================================
 
 export const ALL_SKILLS = [
-  'Acrobatics (DEX)', 'Animal Handling (WIS)', 'Arcana (INT)', 'Athletics (STR)',
+  'Acrobatics (DEX)', 'Animal Handling (WIS)', 'Books (INT)', 'Athletics (STR)',
   'Deception (CHA)', 'History (INT)', 'Insight (WIS)', 'Intimidation (CHA)',
   'Investigation (INT)', 'Medicine (WIS)', 'Nature (INT)', 'Perception (WIS)',
   'Performance (CHA)', 'Persuasion (CHA)', 'Religion (INT)', 'Sleight of Hand (DEX)',
@@ -36,7 +36,6 @@ export const calculateAC = (char) => {
   const conMod = getModifier(char.stats?.CON || 10);
   const wisMod = getModifier(char.stats?.WIS || 10);
   
-  // FIX: Safely parse inventory to prevent crash when Firebase converts array to object
   const safeInventory = Array.isArray(char.inventory) ? char.inventory : Object.values(char.inventory || {});
   const armors = safeInventory.filter(i => i?.category === 'Armor');
   
@@ -225,6 +224,7 @@ export const getConditionMechanics = (activeConditions) => {
 };
 
 const SANCTUARY_REPLACEMENTS = {
+  'arcana': 'books',
   'fiend': 'powerful fey',
   'fiends': 'fey',
   'fiendish': 'fey-touched',

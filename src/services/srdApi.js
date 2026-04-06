@@ -13,10 +13,10 @@ const classDataCache = new Map();
 const spellDetailsCache = new Map();
 
 // ==========================================
-// CUSTOM KNOWLEDGE BASE INTERCEPTOR
+// CUSTOM KNOWLEDGE BASE INTERCEPTORS
 // ==========================================
-// This bypasses the OGL limitations of the public SRD API.
-// Add any homebrew species or missing official sub-species here!
+// Bypasses the OGL limitations of the public SRD API for homebrew or non-SRD content.
+
 const CUSTOM_SPECIES = {
   "wood elf": {
     name: "Wood Elf",
@@ -98,13 +98,55 @@ const CUSTOM_SPECIES = {
     ]
   }
 };
-// ==========================================
 
+const CUSTOM_CLASSES = {
+  "artificer": {
+    name: "Artificer",
+    hitDie: "d8",
+    armor: "Light Armor, Medium Armor, Shields",
+    weapons: "Simple Weapons",
+    savingThrows: "CON, INT",
+    tools: "Thieves' tools, Tinker's tools, one type of artisan's tools",
+    skills: "Choose two from Books, History, Investigation, Medicine, Nature, Perception, Sleight of Hand"
+  }
+};
+
+const ARTIFICER_FEATURES = [
+  { level: 1, name: "Magical Tinkering", desc: "You've learned how to invest a spark of magic into mundane objects. To use this ability, you must have thieves' tools or artisan's tools in hand. You then touch a Tiny nonmagical object as an action and give it one of the following magical properties of your choice: \n\n- The object sheds bright light in a 5-foot radius and dim light for an additional 5 feet.\n- Whenever tapped by a creature, the object emits a recorded message that can be heard up to 10 feet away.\n- The object continuously emits your choice of an odor or a nonverbal sound.\n- A static visual effect appears on one of the object's surfaces." },
+  { level: 1, name: "Spellcasting (Artificer)", desc: "You have studied the workings of magic and how to channel it through objects. As a result, you have gained the ability to cast spells. To observers, you don't appear to be casting spells in a conventional way; you look as if you're producing wonders using mundane items or outlandish inventions." },
+  { level: 2, name: "Infuse Item", desc: "You gain the ability to imbue mundane items with certain magical properties. The magic items you create with this feature are effectively prototypes of permanent items. You learn 4 infusions of your choice. You can infuse more objects as you gain levels." },
+  { level: 3, name: "Artificer Specialist", desc: "You choose the type of specialist you are: Alchemist, Armorer, Artillerist, or Battle Smith. Your choice grants you features at 5th, 9th, and 15th level." },
+  { level: 3, name: "The Right Tool for the Job", desc: "You learn how to produce exactly the tool you need: with thieves' tools or artisan's tools in hand, you can magically create one set of artisan's tools in an unoccupied space within 5 feet of you." },
+  { level: 6, name: "Tool Expertise", desc: "Your proficiency bonus is doubled for any ability check you make that uses your proficiency with a tool." },
+  { level: 7, name: "Flash of Genius", desc: "You gain the ability to come up with solutions under pressure. When you or another creature you can see within 30 feet of you makes an ability check or a saving throw, you can use your reaction to add your Intelligence modifier to the roll. You can use this feature a number of times equal to your Intelligence modifier." },
+  { level: 10, name: "Magic Item Adept", desc: "You achieve a profound understanding of how to use and make magic items: You can attune to up to four magic items at once. If you craft a magic item with a rarity of common or uncommon, it takes you a quarter of the normal time, and it costs you half as much of the usual gold." },
+  { level: 11, name: "Spell-Storing Item", desc: "You can store a spell in an object. Whenever you finish a long rest, you can touch one simple or martial weapon or one item that you can use as a spellcasting focus, and you store a spell in it, choosing a 1st- or 2nd-level spell from the artificer spell list that requires 1 action to cast (you needn't have it prepared)." },
+  { level: 14, name: "Magic Item Savant", desc: "Your skill with magic items deepens: You can attune to up to five magic items at once. You ignore all class, race, spell, and level requirements on attuning to or using a magic item." },
+  { level: 18, name: "Magic Item Master", desc: "You can attune to up to six magic items at once." },
+  { level: 20, name: "Soul of Artifice", desc: "You gain a +1 bonus to all saving throws per magic item you are currently attuned to. If you're reduced to 0 hit points but not killed outright, you can use your reaction to end one of your artificer infusions, causing you to drop to 1 hit point instead of 0." }
+];
+
+const getArtificerSpellcasting = (level) => {
+  const slots = {
+    1: {1:2}, 2: {1:2}, 3: {1:3}, 4: {1:3},
+    5: {1:4, 2:2}, 6: {1:4, 2:2}, 7: {1:4, 2:3}, 8: {1:4, 2:3},
+    9: {1:4, 2:3, 3:2}, 10: {1:4, 2:3, 3:2}, 11: {1:4, 2:3, 3:3}, 12: {1:4, 2:3, 3:3},
+    13: {1:4, 2:3, 3:3, 4:1}, 14: {1:4, 2:3, 3:3, 4:1}, 15: {1:4, 2:3, 3:3, 4:2}, 16: {1:4, 2:3, 3:3, 4:2},
+    17: {1:4, 2:3, 3:3, 4:3, 5:1}, 18: {1:4, 2:3, 3:3, 4:3, 5:1}, 19: {1:4, 2:3, 3:3, 4:3, 5:2}, 20: {1:4, 2:3, 3:3, 4:3, 5:2}
+  };
+  
+  const current = slots[level] || {};
+  const spellcasting = {};
+  Object.keys(current).forEach(lvl => {
+    spellcasting[`spell_slots_level_${lvl}`] = current[lvl];
+  });
+  return spellcasting;
+};
+// ==========================================
 
 export const fetchAllEquipment = async () => {
   if (equipmentListCache) return equipmentListCache;
   try {
-    // Fetch BOTH standard equipment and magic items
     const [equipRes, magicRes] = await Promise.all([
       fetch(`${BASE_URL}/equipment`),
       fetch(`${BASE_URL}/magic-items`)
@@ -112,7 +154,6 @@ export const fetchAllEquipment = async () => {
     const equipData = await equipRes.json();
     const magicData = await magicRes.json();
     
-    // Combine and sort alphabetically
     equipmentListCache = [
       ...(equipData.results || []),
       ...(magicData.results || [])
@@ -125,7 +166,6 @@ export const fetchAllEquipment = async () => {
 export const fetchEquipmentDetails = async (urlOrIndex) => {
   if (equipmentDetailsCache.has(urlOrIndex)) return equipmentDetailsCache.get(urlOrIndex);
   try {
-    // Check if we were passed a full URL (for magic items) or just an index
     const endpoint = urlOrIndex.startsWith('/api/') ? urlOrIndex : `/api/equipment/${urlOrIndex}`;
     const res = await fetch(`https://www.dnd5eapi.co${endpoint}`);
     const data = await res.json();
@@ -135,7 +175,6 @@ export const fetchEquipmentDetails = async (urlOrIndex) => {
     if (data.equipment_category?.index === 'armor') category = 'Armor';
     if (data.equipment_category?.index === 'potion') category = 'Potion';
     
-    // Magic Items use the name field instead of index
     if (data.equipment_category?.name?.includes('Wondrous')) category = 'Wondrous Item';
     if (data.equipment_category?.name?.includes('Weapon')) category = 'Weapon';
     if (data.equipment_category?.name?.includes('Armor')) category = 'Armor';
@@ -154,18 +193,11 @@ export const fetchEquipmentDetails = async (urlOrIndex) => {
 
     let descText = '';
     if (data.desc && Array.isArray(data.desc)) {
-      // 1. Strip out pure Markdown table formatting if the API leaks it
       let cleanDesc = data.desc.filter(p => !p.includes('|---') && !p.startsWith('| '));
-      
-      // 2. Strip out literal book references
       cleanDesc = cleanDesc.filter(p => !/(refer to|see the|roll on).*table/i.test(p));
-
       descText = cleanDesc.join('\n\n').trim();
     }
 
-    // 3. Smart Muting: Standard weapons/armor have useless descriptions ("See weapons table").
-    // We already display their mechanics in the UI, so we wipe the text.
-    // We ONLY keep descriptions for Magic Items (which have a URL rather than an index in this check) or Wondrous gear.
     if ((category === 'Weapon' || category === 'Armor') && !urlOrIndex.includes('magic-items')) {
        descText = '';
     }
@@ -191,12 +223,10 @@ export const fetchSpeciesData = async (speciesInput) => {
   
   const lowerInput = speciesInput.toLowerCase().trim();
   
-  // 1. Intercept with Custom Knowledge Base First
   if (CUSTOM_SPECIES[lowerInput]) {
     return CUSTOM_SPECIES[lowerInput];
   }
 
-  // 2. Fallback to the Public SRD API
   const formattedInput = lowerInput.replace(/\s+/g, '-');
   const baseRaceFallback = lowerInput.split(' ').pop(); 
   if (speciesDataCache.has(formattedInput)) return speciesDataCache.get(formattedInput);
@@ -259,6 +289,12 @@ export const fetchClassData = async (classInput) => {
   const normalized = classInput.toLowerCase().replace(/\s+/g, '-');
   if (classDataCache.has(normalized)) return classDataCache.get(normalized);
 
+  if (CUSTOM_CLASSES[normalized]) {
+    const result = CUSTOM_CLASSES[normalized];
+    classDataCache.set(normalized, result);
+    return result;
+  }
+
   try {
     const res = await fetch(`${BASE_URL}/classes/${normalized}`);
     if (!res.ok) return null;
@@ -310,6 +346,13 @@ export const fetchClassData = async (classInput) => {
 export const fetchClassProgression = async (classInput, targetLevel) => {
   if (!classInput) return null;
   const normalized = classInput.toLowerCase().replace(/\s+/g, '-');
+  
+  if (normalized === 'artificer') {
+    const features = ARTIFICER_FEATURES.filter(f => f.level <= targetLevel).map(f => ({ name: f.name, desc: f.desc }));
+    const spellcasting = getArtificerSpellcasting(targetLevel);
+    return { features, spellcasting };
+  }
+
   try {
     let featureUrls = new Map();
     let spellcasting = null;
