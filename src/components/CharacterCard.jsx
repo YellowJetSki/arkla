@@ -448,7 +448,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                 <h1 className="text-sm font-black text-white uppercase tracking-widest hidden sm:block drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">CAMPAIGN COMPANION</h1>
               </div>
               <div className="flex items-center gap-2">
-                {/* PLayer Edit Mode toggle has been completely removed from here */}
                 <button onClick={() => setIsGuideOpen(true)} className={`flex items-center justify-center w-9 h-9 ${activeTheme.text} hover:text-white transition-all bg-slate-900 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]`}><HelpCircle className="w-4 h-4" /></button>
                 <button onClick={onLogout} className="flex items-center gap-2 text-slate-400 hover:text-white transition-all bg-slate-900 px-3 py-1.5 h-9 rounded-lg border-2 border-slate-950 text-xs font-black uppercase tracking-widest shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"><LogOut className="w-3 h-3" /> Exit</button>
               </div>
@@ -609,53 +608,57 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                          const hasTracker = char.resources && char.resources.some(r => r.name === feat.name);
                          
                          return (
-                           <CollapsibleSection 
-                             key={`feat-${i}`} 
-                             title={
-                               <div className="flex items-center gap-2 w-full justify-between pr-2">
-                                 <span className="font-black uppercase tracking-widest">{feat.name}</span>
-                                 {isDM && (
-                                   <div className="flex items-center gap-1">
-                                     <button 
-                                       onClick={async (e) => { 
+                           <div key={`feat-${i}`} className="space-y-2">
+                             <CollapsibleSection 
+                               title={
+                                 <div className="flex items-center gap-2 w-full justify-between pr-2">
+                                   <span className="font-black uppercase tracking-widest">{feat.name}</span>
+                                   {isDM && (
+                                     <div className="flex items-center gap-1">
+                                       <button 
+                                         onClick={async (e) => { 
+                                           e.stopPropagation(); 
+                                           if (hasTracker) {
+                                              const updatedResources = char.resources.filter(r => r.name !== feat.name);
+                                              await updateDoc(doc(db, 'characters', currentUser.charId), { resources: updatedResources });
+                                           } else {
+                                              setAddingTrackerFor(addingTrackerFor === feat.name ? null : feat.name);
+                                           }
+                                         }} 
+                                         className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${hasTracker ? 'bg-amber-900 border-amber-500 text-amber-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-amber-300'}`} 
+                                         title={hasTracker ? "Remove Attached Tracker" : "Attach Tracker to Feature"}
+                                       >
+                                         {hasTracker ? <ZapOff className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
+                                       </button>
+                                       <button onClick={async (e) => { 
                                          e.stopPropagation(); 
-                                         if (hasTracker) {
-                                            const updatedResources = char.resources.filter(r => r.name !== feat.name);
-                                            await updateDoc(doc(db, 'characters', currentUser.charId), { resources: updatedResources });
-                                         } else {
-                                            setAddingTrackerFor(addingTrackerFor === feat.name ? null : feat.name);
-                                         }
-                                       }} 
-                                       className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${hasTracker ? 'bg-amber-900 border-amber-500 text-amber-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-amber-300'}`} 
-                                       title={hasTracker ? "Remove Attached Tracker" : "Attach Tracker to Feature"}
-                                     >
-                                       {hasTracker ? <ZapOff className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
-                                     </button>
-                                     <button onClick={async (e) => { 
-                                       e.stopPropagation(); 
-                                       const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isHiddenFromCombat: !f.isHiddenFromCombat } : f);
-                                       await updateDoc(doc(db, 'characters', currentUser.charId), { features: updatedFeatures });
-                                     }} className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${feat.isHiddenFromCombat ? 'bg-red-900/50 border-red-500 text-red-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-red-300'}`} title={feat.isHiddenFromCombat ? "Hidden from Combat Tab" : "Hide from Combat Tab"}>
-                                       <EyeOff className="w-3.5 h-3.5" />
-                                     </button>
-                                     <button onClick={async (e) => { 
-                                       e.stopPropagation(); 
-                                       const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isDefensive: !f.isDefensive } : f);
-                                       await updateDoc(doc(db, 'characters', currentUser.charId), { features: updatedFeatures });
-                                     }} className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${feat.isDefensive ? 'bg-indigo-900 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-indigo-300'}`} title={feat.isDefensive ? "Tagged as Defensive" : "Tag as Defensive"}>
-                                       <ShieldPlus className="w-3.5 h-3.5" />
-                                     </button>
-                                     <button onClick={(e) => { e.stopPropagation(); removeFeature(feat); }} className="text-slate-500 hover:text-red-400 bg-slate-950 border-2 border-slate-800 p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]" title="Delete Feature">
-                                       <Trash2 className="w-3.5 h-3.5" />
-                                     </button>
-                                   </div>
-                                 )}
-                               </div>
-                             } 
-                             defaultOpen={i === 0}
-                           >
+                                         const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isHiddenFromCombat: !f.isHiddenFromCombat } : f);
+                                         await updateDoc(doc(db, 'characters', currentUser.charId), { features: updatedFeatures });
+                                       }} className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${feat.isHiddenFromCombat ? 'bg-red-900/50 border-red-500 text-red-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-red-300'}`} title={feat.isHiddenFromCombat ? "Hidden from Combat Tab" : "Hide from Combat Tab"}>
+                                         <EyeOff className="w-3.5 h-3.5" />
+                                       </button>
+                                       <button onClick={async (e) => { 
+                                         e.stopPropagation(); 
+                                         const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isDefensive: !f.isDefensive } : f);
+                                         await updateDoc(doc(db, 'characters', currentUser.charId), { features: updatedFeatures });
+                                       }} className={`p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 ${feat.isDefensive ? 'bg-indigo-900 border-indigo-500 text-indigo-400' : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-indigo-300'}`} title={feat.isDefensive ? "Tagged as Defensive" : "Tag as Defensive"}>
+                                         <ShieldPlus className="w-3.5 h-3.5" />
+                                       </button>
+                                       <button onClick={(e) => { e.stopPropagation(); removeFeature(feat); }} className="text-slate-500 hover:text-red-400 bg-slate-950 border-2 border-slate-800 p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]" title="Delete Feature">
+                                         <Trash2 className="w-3.5 h-3.5" />
+                                       </button>
+                                     </div>
+                                   )}
+                                 </div>
+                               } 
+                               defaultOpen={i === 0}
+                             >
+                               <p className="text-slate-300 font-medium text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
+                             </CollapsibleSection>
+
+                             {/* Render the form OUTSIDE the collapsible body so it's always visible when activated! */}
                              {addingTrackerFor === feat.name && (
-                               <div className="mb-4 p-4 bg-slate-950 border-2 border-amber-900/50 rounded-xl flex flex-wrap gap-3 items-end shadow-inner" onClick={e => e.stopPropagation()}>
+                               <div className="p-4 bg-slate-950 border-2 border-amber-900/50 rounded-xl flex flex-wrap gap-3 items-end shadow-inner animate-in fade-in slide-in-from-top-2">
                                  <div className="flex-1 min-w-[80px]">
                                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Max Uses</label>
                                    <input type="number" value={newTrackerConfig.max} onChange={e => setNewTrackerConfig({...newTrackerConfig, max: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-2 py-2 text-white font-bold text-sm focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
@@ -669,13 +672,12 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                                    </select>
                                  </div>
                                  <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                                    <button onClick={() => confirmAddTracker(feat.name)} className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 rounded-lg font-black uppercase tracking-widest text-[10px] border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">Attach</button>
-                                    <button onClick={() => setAddingTrackerFor(null)} className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg font-black uppercase tracking-widest text-[10px] border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">Cancel</button>
+                                    <button onClick={() => confirmAddTracker(feat.name)} className="flex-1 sm:flex-none bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 rounded-lg font-black uppercase tracking-widest text-[10px] border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all">Attach</button>
+                                    <button onClick={() => setAddingTrackerFor(null)} className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg font-black uppercase tracking-widest text-[10px] border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all">Cancel</button>
                                  </div>
                                </div>
                              )}
-                             <p className="text-slate-300 font-medium text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
-                           </CollapsibleSection>
+                           </div>
                          );
                        })}
                      </div>
