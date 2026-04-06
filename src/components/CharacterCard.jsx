@@ -108,7 +108,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [isLongRestOpen, setIsLongRestOpen] = useState(false); 
   const [isKicked, setIsKicked] = useState(false);
   
-  // Players no longer have access to Edit Mode. This will remain false for them.
   const [isEditMode, setIsEditMode] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
   
@@ -119,6 +118,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const [showCoreStats, setShowCoreStats] = useState(false);
 
   const [isForgingFeat, setIsForgingFeat] = useState(false);
+  const [editingFeat, setEditingFeat] = useState(null);
   const [customFeat, setCustomFeat] = useState({ name: '', desc: '', hasTracker: false, trackerMax: 1, trackerRecharge: 'long' });
   const [srdFeatsList, setSrdFeatsList] = useState([]);
   const [filteredFeats, setFilteredFeats] = useState([]);
@@ -277,6 +277,18 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     });
   };
 
+  const handleEditFeatClick = (feat) => {
+    setEditingFeat(feat);
+    setCustomFeat({
+      name: feat.name,
+      desc: feat.desc,
+      hasTracker: false, 
+      trackerMax: 1,
+      trackerRecharge: 'long'
+    });
+    setIsForgingFeat(true);
+  };
+
   const handleFeatNameChange = (e) => {
     const val = e.target.value;
     setCustomFeat(prev => ({ ...prev, name: val }));
@@ -300,39 +312,55 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
   const handleForgeCustomFeat = async (e) => {
     e.preventDefault();
     if (!customFeat.name || !customFeat.desc) return;
-    
-    const newFeat = { 
-      id: `feat_${Date.now()}`,
-      name: customFeat.name, 
-      desc: customFeat.desc,
-      isDefensive: false,
-      isHiddenFromCombat: false
-    };
 
-    let updates = { features: arrayUnion(newFeat) };
-
-    if (customFeat.hasTracker) {
-      const newRes = {
-        id: `res_${Date.now()}`,
-        name: customFeat.name,
-        max: Number(customFeat.trackerMax),
-        current: Number(customFeat.trackerMax),
-        recharge: customFeat.trackerRecharge,
-        isPool: false
-      };
+    if (editingFeat) {
+      const updatedFeat = { ...editingFeat, name: customFeat.name, desc: customFeat.desc };
+      const updatedFeatures = char.features.map(f => (f.id === editingFeat.id || f.name === editingFeat.name) ? updatedFeat : f);
       
-      if (char.resources) {
-         updates.resources = [...char.resources, newRes];
-      } else {
-         updates.resources = [newRes];
+      let updates = { features: updatedFeatures };
+      
+      // If the feature name was updated, ensure any attached trackers have their names updated too!
+      if (editingFeat.name !== customFeat.name && char.resources) {
+         updates.resources = char.resources.map(r => r.name === editingFeat.name ? { ...r, name: customFeat.name } : r);
       }
+      
+      await updateDoc(doc(db, 'characters', currentUser.charId), updates);
+      setSaveToast('Feature Updated!');
+    } else {
+      const newFeat = { 
+        id: `feat_${Date.now()}`,
+        name: customFeat.name, 
+        desc: customFeat.desc,
+        isDefensive: false,
+        isHiddenFromCombat: false
+      };
+
+      let updates = { features: arrayUnion(newFeat) };
+
+      if (customFeat.hasTracker) {
+        const newRes = {
+          id: `res_${Date.now()}`,
+          name: customFeat.name,
+          max: Number(customFeat.trackerMax),
+          current: Number(customFeat.trackerMax),
+          recharge: customFeat.trackerRecharge,
+          isPool: false
+        };
+        
+        if (char.resources) {
+           updates.resources = [...char.resources, newRes];
+        } else {
+           updates.resources = [newRes];
+        }
+      }
+      
+      await updateDoc(doc(db, 'characters', currentUser.charId), updates);
+      setSaveToast(customFeat.hasTracker ? 'Feature & Tracker Added!' : 'Feature Added!');
     }
     
-    await updateDoc(doc(db, 'characters', currentUser.charId), updates);
-    
     setIsForgingFeat(false);
+    setEditingFeat(null);
     setCustomFeat({ name: '', desc: '', hasTracker: false, trackerMax: 1, trackerRecharge: 'long' });
-    setSaveToast(customFeat.hasTracker ? 'Feature & Tracker Added!' : 'Feature Added!');
     setTimeout(() => setSaveToast(''), 2500);
   };
 
@@ -538,18 +566,33 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                   <div className="flex justify-between items-center px-1 border-b-2 border-slate-950 pb-2">
                     <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><Sparkles className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Feats</h3>
                     {isDM && (
-                      <button onClick={() => setIsForgingFeat(!isForgingFeat)} className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingFeat ? 'bg-amber-600 border-amber-950 text-slate-950' : `bg-slate-900 border-slate-950 ${activeTheme.text} hover:bg-slate-800`}`}>
-                        <Hammer className="w-3 h-3" /> {isForgingFeat ? 'Close' : 'Forge'}
+                      <button onClick={() => {
+                        setEditingFeat(null);
+                        setCustomFeat({ name: '', desc: '', hasTracker: false, trackerMax: 1, trackerRecharge: 'long' });
+                        setIsForgingFeat(!isForgingFeat);
+                      }} className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingFeat && !editingFeat ? 'bg-amber-600 border-amber-950 text-slate-950' : `bg-slate-900 border-slate-950 ${activeTheme.text} hover:bg-slate-800`}`}>
+                        <Hammer className="w-3 h-3" /> {(isForgingFeat && !editingFeat) ? 'Close' : 'Forge'}
                       </button>
                     )}
                   </div>
 
                   {isDM && isForgingFeat && (
                     <form onSubmit={handleForgeCustomFeat} className="bg-slate-900 border-2 border-indigo-950 p-5 rounded-2xl mb-6 shadow-[6px_6px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 space-y-4">
-                      <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest border-b-2 border-indigo-950/50 pb-2"><Hammer className="w-4 h-4" /> Feature Forge</h4>
+                      <div className="flex justify-between items-center border-b-2 border-indigo-950/50 pb-2">
+                        <h4 className="text-sm font-black text-indigo-400 flex items-center gap-2 uppercase tracking-widest">
+                          {editingFeat ? <Edit3 className="w-4 h-4" /> : <Hammer className="w-4 h-4" />}
+                          {editingFeat ? 'Edit Feature' : 'Feature Forge'}
+                        </h4>
+                        {editingFeat && (
+                          <button type="button" onClick={() => { setEditingFeat(null); setIsForgingFeat(false); }} className="text-slate-500 hover:text-white">
+                            <X className="w-4 h-4 font-black" />
+                          </button>
+                        )}
+                      </div>
+                      
                       <div className="grid grid-cols-1 gap-4">
                         <div className="relative">
-                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> SRD Search</label>
+                          <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> SRD Search / Name</label>
                           <input type="text" required value={customFeat.name} onChange={handleFeatNameChange} className="w-full bg-slate-950 border-2 border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 font-bold" placeholder="e.g. Action Surge" />
                           
                           {showFeatDropdown && filteredFeats.length > 0 && (
@@ -563,29 +606,31 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                           )}
                         </div>
 
-                        <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900">
-                          <label className="flex items-center gap-2 cursor-pointer mb-3">
-                            <input type="checkbox" checked={customFeat.hasTracker} onChange={(e) => setCustomFeat({...customFeat, hasTracker: e.target.checked})} className="w-4 h-4 rounded border-slate-600 text-amber-500 bg-slate-800 focus:ring-amber-500" />
-                            <span className="text-sm font-black text-slate-300 uppercase tracking-widest">Needs Tracker?</span>
-                          </label>
-                          
-                          {customFeat.hasTracker && (
-                            <div className="flex gap-4 animate-in fade-in">
-                              <div className="flex-1">
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Max Slots</label>
-                                <input type="number" value={customFeat.trackerMax} onChange={(e) => setCustomFeat({...customFeat, trackerMax: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                        {!editingFeat && (
+                          <div className="bg-slate-950 p-4 rounded-xl border-2 border-slate-900">
+                            <label className="flex items-center gap-2 cursor-pointer mb-3">
+                              <input type="checkbox" checked={customFeat.hasTracker} onChange={(e) => setCustomFeat({...customFeat, hasTracker: e.target.checked})} className="w-4 h-4 rounded border-slate-600 text-amber-500 bg-slate-800 focus:ring-amber-500" />
+                              <span className="text-sm font-black text-slate-300 uppercase tracking-widest">Needs Tracker?</span>
+                            </label>
+                            
+                            {customFeat.hasTracker && (
+                              <div className="flex gap-4 animate-in fade-in">
+                                <div className="flex-1">
+                                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Max Slots</label>
+                                  <input type="number" value={customFeat.trackerMax} onChange={(e) => setCustomFeat({...customFeat, trackerMax: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
+                                </div>
+                                <div className="flex-1">
+                                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Recharges On</label>
+                                  <select value={customFeat.trackerRecharge} onChange={(e) => setCustomFeat({...customFeat, trackerRecharge: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
+                                    <option value="short">Short Rest</option>
+                                    <option value="long">Long Rest</option>
+                                    <option value="none">Never</option>
+                                  </select>
+                                </div>
                               </div>
-                              <div className="flex-1">
-                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Recharges On</label>
-                                <select value={customFeat.trackerRecharge} onChange={(e) => setCustomFeat({...customFeat, trackerRecharge: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-amber-500">
-                                  <option value="short">Short Rest</option>
-                                  <option value="long">Long Rest</option>
-                                  <option value="none">Never</option>
-                                </select>
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                            )}
+                          </div>
+                        )}
 
                         <div>
                           <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description & Effects</label>
@@ -593,7 +638,8 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                         </div>
                       </div>
                       <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest text-xs py-3.5 rounded-xl border-2 border-indigo-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center gap-2 mt-4">
-                        <Plus className="w-4 h-4" /> Inject Feature
+                        {editingFeat ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />} 
+                        {editingFeat ? 'Save Changes' : 'Inject Feature'}
                       </button>
                     </form>
                   )}
@@ -630,6 +676,13 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                                        >
                                          {hasTracker ? <ZapOff className="w-3.5 h-3.5" /> : <Zap className="w-3.5 h-3.5" />}
                                        </button>
+                                       <button 
+                                         onClick={(e) => { e.stopPropagation(); handleEditFeatClick(feat); }} 
+                                         className="p-1.5 rounded transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] border-2 bg-slate-950 border-slate-800 text-slate-500 hover:text-indigo-400 hover:bg-indigo-950" 
+                                         title="Edit Feature"
+                                       >
+                                         <Edit3 className="w-3.5 h-3.5" />
+                                       </button>
                                        <button onClick={async (e) => { 
                                          e.stopPropagation(); 
                                          const updatedFeatures = char.features.map(f => f.name === feat.name ? { ...f, isHiddenFromCombat: !f.isHiddenFromCombat } : f);
@@ -656,7 +709,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
                                <p className="text-slate-300 font-medium text-sm leading-relaxed whitespace-pre-wrap">{feat.desc}</p>
                              </CollapsibleSection>
 
-                             {/* Render the form OUTSIDE the collapsible body so it's always visible when activated! */}
                              {addingTrackerFor === feat.name && (
                                <div className="p-4 bg-slate-950 border-2 border-amber-900/50 rounded-xl flex flex-wrap gap-3 items-end shadow-inner animate-in fade-in slide-in-from-top-2">
                                  <div className="flex-1 min-w-[80px]">

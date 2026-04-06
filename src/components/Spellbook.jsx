@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Settings, BrainCircuit, Hammer, X, Filter, Trash2 } from 'lucide-react';
+import { Flame, Sparkles, BookOpen, Target, ShieldAlert, Wand2, Search, Plus, Settings, BrainCircuit, Hammer, X, Filter, Trash2, Edit3 } from 'lucide-react';
 import CollapsibleSection from './shared/CollapsibleSection';
 import { fetchAllSpells, fetchSpellDetails } from '../services/srdApi';
 
@@ -10,6 +10,7 @@ const SPELL_FILTERS = ['All', 'Cantrips', 'Leveled', 'Concentration', 'Action', 
 export default function Spellbook({ char, charId, isDM, showDialog }) {
   const [isEditingSlots, setIsEditingSlots] = useState(false); 
   const [isForgingSpell, setIsForgingSpell] = useState(false);
+  const [editingSpell, setEditingSpell] = useState(null);
   
   const [customSpell, setCustomSpell] = useState({ 
     name: '', level: 0, castTime: '1 Action', range: '60 feet', components: 'V, S', duration: 'Instantaneous', desc: '' 
@@ -120,6 +121,20 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     });
   };
 
+  const handleEditClick = (spell) => {
+    setEditingSpell(spell);
+    setCustomSpell({
+      name: spell.name,
+      level: spell.level || 0,
+      castTime: spell.castTime || spell.castingTime || spell.casting_time || '1 Action',
+      range: spell.range || 'Self',
+      components: spell.components || 'V, S',
+      duration: spell.duration || 'Instantaneous',
+      desc: spell.desc || ''
+    });
+    setIsForgingSpell(true);
+  };
+
   const handleForgeCustomSpell = async (e) => {
     e.preventDefault();
     if (!customSpell.name || !customSpell.desc) return;
@@ -133,17 +148,25 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
       duration: customSpell.duration,
       desc: customSpell.desc,
       isHomebrew: true,
-      index: `hb_spell_${Date.now()}`
+      index: editingSpell?.index || `hb_spell_${Date.now()}`
     };
 
     try {
-      await addSpellToGrimoire(formattedSpell);
+      if (editingSpell) {
+        const updatedSpells = spells.map(s => s.name === editingSpell.name ? formattedSpell : s);
+        await updateDoc(doc(db, 'characters', charId), { spells: updatedSpells });
+        showDialog({ isOpen: true, title: 'Success', message: 'Spell updated successfully.', type: 'alert' });
+      } else {
+        await addSpellToGrimoire(formattedSpell);
+        showDialog({ isOpen: true, title: 'Success', message: 'Spell added to Grimoire.', type: 'alert' });
+      }
+      
       setCustomSpell({ name: '', level: 0, castTime: '1 Action', range: '60 feet', components: 'V, S', duration: 'Instantaneous', desc: '' });
       setIsForgingSpell(false);
-      showDialog({ isOpen: true, title: 'Success', message: 'Spell added to Grimoire.', type: 'alert' });
+      setEditingSpell(null);
     } catch (err) {
       console.error("Failed to forge custom spell:", err);
-      showDialog({ isOpen: true, title: 'Error', message: 'Failed to forge spell.', type: 'alert' });
+      showDialog({ isOpen: true, title: 'Error', message: 'Failed to save spell.', type: 'alert' });
     }
   };
 
@@ -176,12 +199,10 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
     return acc;
   }, {});
 
-  // NEW: Sort spells alphabetically within their respective levels
   Object.keys(groupedSpells).forEach(lvl => {
     groupedSpells[lvl].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   });
 
-  // NEW: Create a strictly sorted array of the level keys, forcing "Cantrips" to always be first
   const sortedLevelNames = Object.keys(groupedSpells).sort((a, b) => {
     if (a === 'Cantrips') return -1;
     if (b === 'Cantrips') return 1;
@@ -310,10 +331,14 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
           <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"><BookOpen className="w-5 h-5 text-fuchsia-500" /> Grimoire</h3>
           {isDM && (
             <button 
-              onClick={() => setIsForgingSpell(!isForgingSpell)}
-              className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingSpell ? 'bg-fuchsia-600 border-slate-950 text-white' : 'bg-slate-900 border-slate-950 text-fuchsia-400 hover:text-white hover:bg-slate-800'}`}
+              onClick={() => {
+                setEditingSpell(null);
+                setCustomSpell({ name: '', level: 0, castTime: '1 Action', range: '60 feet', components: 'V, S', duration: 'Instantaneous', desc: '' });
+                setIsForgingSpell(!isForgingSpell);
+              }}
+              className={`text-[10px] md:text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px] ${isForgingSpell && !editingSpell ? 'bg-fuchsia-600 border-slate-950 text-white' : 'bg-slate-900 border-slate-950 text-fuchsia-400 hover:text-white hover:bg-slate-800'}`}
             >
-              <Hammer className="w-3.5 h-3.5" /> {isForgingSpell ? 'Close' : 'Add Spell'}
+              <Hammer className="w-3.5 h-3.5" /> {(isForgingSpell && !editingSpell) ? 'Close' : 'Add Spell'}
             </button>
           )}
         </div>
@@ -336,12 +361,20 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
         {isDM && isForgingSpell && (
           <form onSubmit={handleForgeCustomSpell} className="bg-slate-900 border-2 border-fuchsia-950 p-5 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] mb-6 animate-in fade-in slide-in-from-top-2 space-y-4">
             <div className="flex justify-between items-center border-b-2 border-slate-950 pb-2 mb-3">
-              <h4 className="text-sm font-black text-fuchsia-400 flex items-center gap-2 uppercase tracking-widest"><Hammer className="w-4 h-4" /> Spell Forge</h4>
+              <h4 className="text-sm font-black text-fuchsia-400 flex items-center gap-2 uppercase tracking-widest">
+                {editingSpell ? <Edit3 className="w-4 h-4" /> : <Hammer className="w-4 h-4" />} 
+                {editingSpell ? 'Edit Spell' : 'Spell Forge'}
+              </h4>
+              {editingSpell && (
+                 <button type="button" onClick={() => { setEditingSpell(null); setIsForgingSpell(false); }} className="text-slate-500 hover:text-white">
+                   <X className="w-4 h-4 font-black" />
+                 </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div className="sm:col-span-2 relative">
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> SRD Search</label>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Search className="w-3 h-3"/> SRD Search / Name</label>
                 <input type="text" required value={customSpell.name} onChange={handleSpellNameChange} className="w-full bg-slate-950 border-2 border-slate-800 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-fuchsia-500 shadow-inner" placeholder="e.g. Fireball" />
                 
                 {showSpellDropdown && filteredSrdSpells.length > 0 && (
@@ -388,7 +421,8 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
             </div>
 
             <button type="submit" className="w-full bg-fuchsia-600 hover:bg-fuchsia-500 text-slate-950 font-black uppercase tracking-widest text-xs py-3.5 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] transition-all flex items-center justify-center gap-2 border-2 border-slate-950">
-              <Plus className="w-4 h-4" /> Inject into Grimoire
+              {editingSpell ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />} 
+              {editingSpell ? 'Save Changes' : 'Inject into Grimoire'}
             </button>
           </form>
         )}
@@ -419,12 +453,22 @@ export default function Spellbook({ char, charId, isDM, showDialog }) {
                             <h4 className="font-black text-fuchsia-300 text-xl flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] mb-2 leading-none">
                               {spell.name}
                               {isDM && (
-                                <button 
-                                  onClick={() => removeSpellFromGrimoire(spell)}
-                                  className="text-slate-500 hover:text-red-500 hover:bg-red-950 border-2 border-slate-950 bg-slate-950 p-1.5 rounded-lg transition-all ml-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
+                                <div className="flex items-center gap-1 ml-1">
+                                  <button 
+                                    onClick={() => handleEditClick(spell)}
+                                    className="text-slate-500 hover:text-indigo-400 hover:bg-indigo-950 border-2 border-slate-950 bg-slate-950 p-1.5 rounded-lg transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"
+                                    title="Edit Spell"
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                  </button>
+                                  <button 
+                                    onClick={() => removeSpellFromGrimoire(spell)}
+                                    className="text-slate-500 hover:text-red-500 hover:bg-red-950 border-2 border-slate-950 bg-slate-950 p-1.5 rounded-lg transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[2px]"
+                                    title="Delete Spell"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
                               )}
                             </h4>
                             <div className="flex gap-1.5 flex-wrap">
