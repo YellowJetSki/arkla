@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, writeBatch, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -77,25 +77,11 @@ export default function DMBattleMap() {
     return () => unsub();
   }, []);
 
-  // FIX: Robust Session and Characters Subscription for Map Staging
+  // NEW ARCHITECTURE: Fetch ALL characters from the Vault, not just the live session!
   useEffect(() => {
-    let unsubChars = () => {};
-    
-    const unsubSession = onSnapshot(doc(db, 'campaign', 'main_session'), async (sessionSnap) => {
-      if (sessionSnap.exists()) {
-        const rawIds = sessionSnap.data().unlockedCharacters || [];
-        const validIds = [...new Set(rawIds.filter(id => id && typeof id === 'string'))]; // Deduplicate map players too!
-        
-        unsubChars();
-        if (validIds.length > 0) {
-          unsubChars = onSnapshot(collection(db, 'characters'), (snap) => {
-            const players = snap.docs.filter(d => validIds.includes(d.id)).map(d => ({ id: d.id, ...d.data() }));
-            setActivePlayers(players);
-          });
-        } else {
-          setActivePlayers([]);
-        }
-      }
+    const unsubChars = onSnapshot(collection(db, 'characters'), (snap) => {
+       const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+       setActivePlayers(players);
     });
     
     const unsubEnemies = onSnapshot(collection(db, 'active_enemies'), (snap) => {
@@ -104,30 +90,12 @@ export default function DMBattleMap() {
     });
 
     return () => {
-      unsubSession();
       unsubChars();
       unsubEnemies();
     };
   }, []);
 
-  useEffect(() => {
-    const activePlayerIds = activePlayers.map(p => p.id);
-    const tokensToRemove = Object.values(tokensRef.current).filter(
-      t => t.type === 'player' && !activePlayerIds.includes(t.id)
-    );
-    
-    if (tokensToRemove.length > 0) {
-      const updates = {};
-      tokensToRemove.forEach(t => {
-        updates[`tokens.${t.id}`] = deleteField();
-      });
-      updateDoc(doc(db, 'campaign', 'battlemap'), updates).catch(console.error);
-      
-      if (tokensToRemove.some(t => t.id === selectedTokenId)) {
-        setSelectedTokenId(null);
-      }
-    }
-  }, [activePlayers, selectedTokenId]);
+  // Notice we removed the auto-token-removal for players! Now, tokens stay on the board permanently between sessions unless manually deleted or if the character is deleted from the vault!
 
   const handleUpdateMapSettings = () => {
     setIsSavingMap(true);
@@ -167,7 +135,6 @@ export default function DMBattleMap() {
     try {
       const batch = writeBatch(db);
       
-      // FIX: Ensure active_enemies is completely wiped before dropping in the preset tokens
       const enemyDocs = await getDocs(collection(db, 'active_enemies'));
       enemyDocs.forEach((docSnap) => batch.delete(docSnap.ref));
 
@@ -220,7 +187,20 @@ export default function DMBattleMap() {
   };
 
   const removeToken = async (tokenId) => {
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+    const targetToken = tokens[tokenId];
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+      
+      if (targetToken && targetToken.type === 'enemy') {
+         batch.delete(doc(db, 'active_enemies', tokenId));
+      }
+      await batch.commit();
+    } catch (e) {
+      console.warn("Batch delete failed, falling back to map only.");
+      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+    }
+    
     if (selectedTokenId === tokenId) setSelectedTokenId(null);
   };
 
@@ -256,11 +236,9 @@ export default function DMBattleMap() {
     setImagePrompt({ isOpen: false, tokenId: null, url: '' });
   };
 
-  // FIX: -99999 aggressively deletes ghost tokens from the map even if their db file doesn't exist
   const handleUpdateTokenHpLive = async (tokenId, newHpVal) => {
     if (newHpVal === -99999) {
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
-      if (selectedTokenId === tokenId) setSelectedTokenId(null);
+      removeToken(tokenId);
       return;
     }
     
