@@ -52,13 +52,13 @@ export default function DMDashboard({ onLogout }) {
     localStorage.setItem('dm_scratchpad', val);
   };
 
+  // NEW ARCHITECTURE: Fetch ALL characters permanently, not just logged-in ones!
   useEffect(() => {
-    const sessionRef = doc(db, 'campaign', 'main_session');
-    const unsubscribeSession = onSnapshot(sessionRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const rawChars = docSnap.data().unlockedCharacters || [];
-        setUnlockedCharacters([...new Set(rawChars)]);
-      }
+    const charsRef = collection(db, 'characters');
+    const unsubscribeChars = onSnapshot(charsRef, (snapshot) => {
+      // Document IDs are inherently unique, so deduplication is guaranteed!
+      const charIds = snapshot.docs.map(d => d.id);
+      setUnlockedCharacters(charIds);
     });
 
     const enemiesRef = collection(db, 'active_enemies');
@@ -68,7 +68,7 @@ export default function DMDashboard({ onLogout }) {
     });
 
     return () => {
-      unsubscribeSession();
+      unsubscribeChars();
       unsubscribeEnemies();
     };
   }, []);
@@ -100,22 +100,6 @@ export default function DMDashboard({ onLogout }) {
           setIsBattleMode(false);
           closeDialog();
           showToast('Board & Enemies Wiped');
-        } catch (error) { console.error(error); }
-      }
-    });
-  };
-
-  // NEW: Hard resets the active player array and forces clients to wipe their cache
-  const confirmClearParty = () => {
-    setDialog({
-      isOpen: true, title: 'Refresh Party?',
-      message: 'This clears the active party list and forces all players to refresh their connection. This permanently fixes ghost duplicate bugs!',
-      type: 'confirm',
-      onConfirm: async () => {
-        try {
-          await setDoc(doc(db, 'campaign', 'main_session'), { unlockedCharacters: [] }, { merge: true });
-          closeDialog();
-          showToast('Party List Cleared');
         } catch (error) { console.error(error); }
       }
     });
@@ -327,9 +311,6 @@ export default function DMDashboard({ onLogout }) {
           <button onClick={handleExportCampaign} className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Export Campaign"><DownloadCloud className="w-4 h-4"/></button>
           <div className="h-6 w-px bg-slate-700 hidden sm:block"></div>
           
-          {/* NEW: Refresh Party Button */}
-          <button onClick={confirmClearParty} className="text-sky-500 hover:text-sky-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Refresh Party Connections"><Users className="w-4 h-4"/></button>
-          
           <button onClick={confirmClearConditions} className="text-fuchsia-500 hover:text-fuchsia-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Clear All Conditions"><Sparkles className="w-4 h-4"/></button>
           <button onClick={confirmResetSession} className="text-red-500 hover:text-red-400 hover:bg-slate-800 p-1.5 rounded transition-colors" title="Wipe Board & Enemies"><Trash2 className="w-4 h-4"/></button>
           <button onClick={onLogout} className="text-slate-500 hover:text-white hover:bg-slate-800 p-1.5 rounded transition-colors" title="Logout"><PowerOff className="w-4 h-4"/></button>
@@ -368,9 +349,6 @@ export default function DMDashboard({ onLogout }) {
             <InitiativeTracker 
               unlockedCharacters={unlockedCharacters} 
               activeEnemies={activeEnemies} 
-              isBattleMode={isBattleMode}
-              onLaunchBattle={() => setIsBattleMode(true)}
-              onExitBattle={() => setIsBattleMode(false)}
               expandedOverride={true}
             />
           </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { doc, writeBatch, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, writeBatch, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { UserPlus, ChevronRight, ChevronLeft, X, Edit3 } from 'lucide-react';
+import { UserPlus, ChevronRight, ChevronLeft, X, Edit3, Trash2 } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import { fetchAllEquipment, fetchEquipmentDetails, fetchSpeciesData, fetchClassData, fetchClassProgression } from '../services/srdApi';
 import { calculateSpellcastingStats } from '../services/arklaEngine';
@@ -188,6 +188,27 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
 
   const removeInventoryItem = (index) => setInventory(prev => prev.filter((_, i) => i !== index));
 
+  const handleDeleteCharacter = () => {
+    setDialog({
+      isOpen: true,
+      title: 'Destroy Character?',
+      message: `Are you absolutely sure you want to permanently delete ${formData.name}? This will wipe their sheet from the Vault forever.`,
+      type: 'confirm',
+      onConfirm: async () => {
+        setIsSaving(true);
+        try {
+          await deleteDoc(doc(db, 'characters', charId));
+          closeDialog();
+          onClose();
+        } catch(e) {
+          console.error(e);
+          setDialog({ isOpen: true, title: 'Error', message: 'Failed to delete character.', type: 'alert', onConfirm: closeDialog });
+          setIsSaving(false);
+        }
+      }
+    });
+  };
+
   const handleFinish = async () => {
     if (!formData.name) {
       setDialog({ isOpen: true, title: 'Missing Name', message: 'The character must have a name.', type: 'alert', onConfirm: closeDialog });
@@ -274,8 +295,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         };
         const batch = writeBatch(db);
         batch.set(doc(db, 'characters', finalCharId), newChar);
-        const sessionRef = doc(db, 'campaign', 'main_session');
-        batch.update(sessionRef, { unlockedCharacters: [...(window.unlockedCharactersCache || []), finalCharId] });
         await batch.commit();
       }
       
@@ -324,11 +343,18 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
           </div>
 
           <div className="p-5 bg-slate-900/90 border-t border-slate-800 shrink-0 flex gap-4">
+            
+            {initialData && (
+              <button type="button" onClick={handleDeleteCharacter} className="px-4 py-3 bg-red-950 text-red-500 hover:bg-red-900 hover:text-white transition-colors rounded-xl font-bold border-2 border-red-900 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Permanently Delete Character">
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
+
             {stepIndex > 0 ? (
               <button onClick={() => setStepIndex(s => s - 1)} disabled={isSaving} className="px-5 py-3 bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors rounded-xl font-bold border border-slate-600">
                 <ChevronLeft className="w-5 h-5" />
               </button>
-            ) : <div className="w-[62px]"></div>}
+            ) : <div className={initialData ? "w-[12px]" : "w-[62px]"}></div>}
             
             {stepIndex < steps.length - 1 ? (
                <button onClick={() => setStepIndex(s => s + 1)} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg">
@@ -336,7 +362,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
                </button>
             ) : (
                <button onClick={handleFinish} disabled={isSaving || !formData.name} className={`flex-1 ${initialData ? 'bg-amber-600 hover:bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]'} disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all`}>
-                 {isSaving ? 'Scribing Data...' : (initialData ? 'Save Changes' : 'Construct Character')}
+                 {isSaving ? 'Scribing...' : (initialData ? 'Save' : 'Construct')}
                </button>
             )}
           </div>
