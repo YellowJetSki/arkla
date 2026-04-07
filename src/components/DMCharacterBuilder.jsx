@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { doc, writeBatch, updateDoc, setDoc } from 'firebase/firestore';
+import { doc, writeBatch, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { UserPlus, ChevronRight, ChevronLeft, X, Edit3 } from 'lucide-react';
+import { UserPlus, ChevronRight, ChevronLeft, X, Edit3, Trash2 } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import { fetchAllEquipment, fetchEquipmentDetails, fetchSpeciesData, fetchClassData, fetchClassProgression } from '../services/srdApi';
 import { calculateSpellcastingStats } from '../services/arklaEngine';
@@ -25,7 +25,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
     name: '', species: '', class: '', level: 1, theme: 'indigo',
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
     alignment: 'Neutral', backstory: '', speed: 30, hitDie: 'd10', 
-    imageUrl: '', tokenImg: '', age: '', height: '', weight: '', eyes: '', skin: '', hair: ''
+    imageUrl: '', tokenImg: '', age: '', height: ''
   });
 
   const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '', savingThrows: '' });
@@ -43,7 +43,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
   const [hasCompanion, setHasCompanion] = useState(false);
   const [companionData, setCompanionData] = useState({
     name: '', species: '', isDormant: false, awakeLevel: 1, hp: 10, ac: 10, speed: 30,
-    stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }, attacks: '', desc: ''
+    stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }, attacks: '', traits: ''
   });
 
   const [inventory, setInventory] = useState([]);
@@ -61,8 +61,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         alignment: initialData.alignment || 'Neutral', backstory: initialData.backstory || '', 
         speed: initialData.speed || 30, hitDie: initialData.hitDice?.type || 'd10', 
         imageUrl: initialData.imageUrl || '', tokenImg: initialData.img || '', 
-        age: initialData.age || '', height: initialData.height || '', weight: initialData.weight || '', 
-        eyes: initialData.eyes || '', skin: initialData.skin || '', hair: initialData.hair || ''
+        age: initialData.age || '', height: initialData.height || ''
       });
 
       if (initialData.proficiencies) setCustomProfs(initialData.proficiencies);
@@ -75,7 +74,11 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
       if (initialData.spellSlots && Object.keys(initialData.spellSlots).length > 0) setForceShowSpells(true);
       if (initialData.companion) {
         setHasCompanion(true);
-        setCompanionData(initialData.companion);
+        setCompanionData({
+          ...initialData.companion,
+          attacks: initialData.companion.attacks || '',
+          traits: initialData.companion.traits || ''
+        });
       }
     }
   }, [initialData]);
@@ -136,7 +139,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
     updateProf('weapons', srdClassOffer.weapons);
     updateProf('savingThrows', srdClassOffer.savingThrows);
     
-    // Automatically translate Arcana to Books when importing class choices
     if (srdClassOffer.skills) updateProf('skills', srdClassOffer.skills.replace(/Arcana/g, 'Books'));
     
     if (srdClassOffer.tools) updateProf('tools', customProfs.tools ? `${customProfs.tools}, ${srdClassOffer.tools}` : srdClassOffer.tools);
@@ -185,6 +187,27 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
   };
 
   const removeInventoryItem = (index) => setInventory(prev => prev.filter((_, i) => i !== index));
+
+  const handleDeleteCharacter = () => {
+    setDialog({
+      isOpen: true,
+      title: 'Destroy Character?',
+      message: `Are you absolutely sure you want to permanently delete ${formData.name}? This will wipe their sheet from the Vault forever.`,
+      type: 'confirm',
+      onConfirm: async () => {
+        setIsSaving(true);
+        try {
+          await deleteDoc(doc(db, 'characters', charId));
+          closeDialog();
+          onClose();
+        } catch(e) {
+          console.error(e);
+          setDialog({ isOpen: true, title: 'Error', message: 'Failed to delete character.', type: 'alert', onConfirm: closeDialog });
+          setIsSaving(false);
+        }
+      }
+    });
+  };
 
   const handleFinish = async () => {
     if (!formData.name) {
@@ -244,7 +267,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         name: formData.name, species: formData.species || 'Human', class: formData.class || 'Fighter',
         classes: classesToPass, level: startLevel, theme: formData.theme,
         alignment: formData.alignment,
-        age: formData.age, height: formData.height, weight: formData.weight, eyes: formData.eyes, skin: formData.skin, hair: formData.hair,
+        age: formData.age, height: formData.height,
         maxHp: totalMaxHp, hitDice: { current: initialData ? initialData.hitDice?.current : startLevel, max: startLevel, type: formData.hitDie },
         ac: 10 + dexMod, speed: formData.speed,
         spellSave: spellStats.spellSave || '--', spellAttack: spellStats.spellAttack || '--',
@@ -268,12 +291,10 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
           exp: 0, hp: totalMaxHp, tempHp: 0, initiative: '--',
           combatInitiative: null, inspiration: false, isConcentrating: false, conditions: [], hasCompletedTutorial: false, journal: '',
           currency: { assarions: 0, quadrans: 0, leptons: 0 }, deathSaves: { successes: 0, failures: 0 }, resources: [],
-          dmNotes: '', attacks: [], traits: { personality: '', ideal: '', bond: '', flaws: '' }, notes: ''
+          dmNotes: '', attacks: [], notes: ''
         };
         const batch = writeBatch(db);
         batch.set(doc(db, 'characters', finalCharId), newChar);
-        const sessionRef = doc(db, 'campaign', 'main_session');
-        batch.update(sessionRef, { unlockedCharacters: [...(window.unlockedCharactersCache || []), finalCharId] });
         await batch.commit();
       }
       
@@ -322,11 +343,18 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
           </div>
 
           <div className="p-5 bg-slate-900/90 border-t border-slate-800 shrink-0 flex gap-4">
+            
+            {initialData && (
+              <button type="button" onClick={handleDeleteCharacter} className="px-4 py-3 bg-red-950 text-red-500 hover:bg-red-900 hover:text-white transition-colors rounded-xl font-bold border-2 border-red-900 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Permanently Delete Character">
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
+
             {stepIndex > 0 ? (
               <button onClick={() => setStepIndex(s => s - 1)} disabled={isSaving} className="px-5 py-3 bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors rounded-xl font-bold border border-slate-600">
                 <ChevronLeft className="w-5 h-5" />
               </button>
-            ) : <div className="w-[62px]"></div>}
+            ) : <div className={initialData ? "w-[12px]" : "w-[62px]"}></div>}
             
             {stepIndex < steps.length - 1 ? (
                <button onClick={() => setStepIndex(s => s + 1)} className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg">
@@ -334,7 +362,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
                </button>
             ) : (
                <button onClick={handleFinish} disabled={isSaving || !formData.name} className={`flex-1 ${initialData ? 'bg-amber-600 hover:bg-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.4)]' : 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]'} disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest py-3 rounded-xl flex items-center justify-center gap-2 transition-all`}>
-                 {isSaving ? 'Scribing Data...' : (initialData ? 'Save Changes' : 'Construct Character')}
+                 {isSaving ? 'Scribing...' : (initialData ? 'Save' : 'Construct')}
                </button>
             )}
           </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Swords, Trash2, ArrowDown, Play, Users, X, RotateCcw, Plus, AlertTriangle, Dices } from 'lucide-react';
+import { Swords, Trash2, ArrowDown, Play, RotateCcw, Plus, AlertTriangle, Dices } from 'lucide-react';
 import { getModifier } from '../services/arklaEngine';
 
 export default function InitiativeTracker({ unlockedCharacters, activeEnemies, expandedOverride = false }) {
@@ -14,6 +14,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
   const [newCustomName, setNewCustomName] = useState('');
   
   const [activePlayerSnap, setActivePlayerSnap] = useState(null);
+  const [deployedTokenIds, setDeployedTokenIds] = useState([]);
 
   const missingIdsTracker = useRef(new Set());
   const initiativeRef = useRef(initiative);
@@ -37,6 +38,16 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
   }, []);
 
   useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'campaign', 'battlemap'), (docSnap) => {
+      if (docSnap.exists()) {
+        const tokens = docSnap.data().tokens || {};
+        setDeployedTokenIds(Object.keys(tokens));
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
     const activeActor = initiative[activeTurn];
     if (activeActor && activeActor.type === 'player') {
       const unsub = onSnapshot(doc(db, 'characters', activeActor.id), (snap) => {
@@ -53,15 +64,14 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
       if (!isLoaded) return; 
 
       try {
-        // FIX: Force deduplication to stop React re-render clone bug
         const uniqueCurrentOrder = Array.from(new Map(initiativeRef.current.map(item => [item.id, item])).values());
         const currentIds = uniqueCurrentOrder.map(i => i.id);
         
         const safePlayers = (unlockedCharacters || [])
-          .filter(id => id && typeof id === 'string' && !missingIdsTracker.current.has(id));
+          .filter(id => id && typeof id === 'string' && !missingIdsTracker.current.has(id) && deployedTokenIds.includes(id));
         
         const safeEnemies = (activeEnemies || [])
-          .filter(e => e && e.id && typeof e.id === 'string' && !missingIdsTracker.current.has(e.id))
+          .filter(e => e && e.id && typeof e.id === 'string' && !missingIdsTracker.current.has(e.id) && deployedTokenIds.includes(e.id))
           .map(e => e.id);
         
         const targetIds = [...safePlayers, ...safeEnemies];
@@ -85,7 +95,6 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
               playerDocs.forEach((d, index) => {
                 if (d.exists()) {
                   const p = { id: d.id, ...d.data() };
-                  // Ensure we don't accidentally double-push
                   if (!newOrder.some(a => a.id === p.id)) {
                      newOrder.push({ id: p.id, name: p.name || 'Unknown', type: 'player', value: 0 });
                   }
@@ -114,7 +123,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
     if (isLoaded) {
       autoSync();
     }
-  }, [unlockedCharacters, activeEnemies, isLoaded]); 
+  }, [unlockedCharacters, activeEnemies, isLoaded, deployedTokenIds]); 
 
   const saveInitiative = async (newOrder, newTurn, newRound) => {
     await setDoc(doc(db, 'campaign', 'initiative'), { order: newOrder, activeTurn: newTurn, round: newRound }, { merge: true });
@@ -127,24 +136,10 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
 
   const updateValue = (index, val) => {
     const newOrder = [...initiativeRef.current];
-    // Find the original global index (since the visible list might be filtered by -1)
-    const visibleActorId = visibleInitiative[index].id;
-    const globalIndex = newOrder.findIndex(a => a.id === visibleActorId);
-    
-    if (globalIndex === -1) return;
-
     const activeId = activeTurn >= 0 ? newOrder[activeTurn]?.id : null;
     
-    newOrder[globalIndex].value = Number(val) || 0;
-    
-    // Sort logic places -1 at the very bottom so it doesn't interrupt flow if un-hidden later
-    newOrder.sort((a, b) => {
-       const valA = Number(a.value) || 0;
-       const valB = Number(b.value) || 0;
-       if (valA === -1 && valB !== -1) return 1;
-       if (valB === -1 && valA !== -1) return -1;
-       return valB - valA;
-    });
+    newOrder[index].value = Number(val) || 0;
+    newOrder.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
     
     const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
     saveInitiative(newOrder, newTurn, round);
@@ -173,13 +168,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
     });
 
     if (changed) {
-      newOrder.sort((a, b) => {
-         const valA = Number(a.value) || 0;
-         const valB = Number(b.value) || 0;
-         if (valA === -1 && valB !== -1) return 1;
-         if (valB === -1 && valA !== -1) return -1;
-         return valB - valA;
-      });
+      newOrder.sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0));
       const newTurn = activeId ? newOrder.findIndex(a => a.id === activeId) : activeTurn;
       saveInitiative(newOrder, newTurn, round);
     }
@@ -193,7 +182,6 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
     let newRound = round;
     let foundAlive = false;
 
-    // Loop through the array to find the next valid target
     for (let i = 1; i <= currentOrder.length; i++) {
       let checkIndex = (activeTurn + i) % currentOrder.length;
       
@@ -202,21 +190,16 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
       }
 
       const actor = currentOrder[checkIndex];
-      let isDeadOrHidden = false;
+      let isDead = false;
       
-      // FIX: -1 completely skips them in turn order
-      if (Number(actor.value) === -1) {
-         isDeadOrHidden = true;
-      }
-      
-      if (actor.type === 'enemy' && !isDeadOrHidden) {
+      if (actor.type === 'enemy') {
         const eData = activeEnemies.find(e => e.id === actor.id);
         if (eData && (eData.currentHp ?? eData.hp ?? 1) <= 0) {
-          isDeadOrHidden = true;
+          isDead = true;
         }
       }
 
-      if (!isDeadOrHidden) {
+      if (!isDead) {
         nextIndex = checkIndex;
         foundAlive = true;
         break;
@@ -272,13 +255,9 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
 
   const showConditionWarning = activeConditions.length > 0;
 
-  // VISUAL FILTER: Only render actors who do NOT have an initiative value of exactly -1
-  const visibleInitiative = initiative.filter(actor => Number(actor.value) !== -1);
-
   return (
     <div className={`flex flex-col bg-slate-900 border-[3px] border-slate-950 rounded-2xl shadow-[8px_8px_0px_rgba(0,0,0,1)] transition-all duration-300 ease-in-out w-full h-full overflow-hidden`}>
       
-      {/* COMPACT HEADER */}
       <div className="p-3 flex items-center justify-between shrink-0 border-b-[3px] border-slate-950 bg-indigo-600">
         <div className="flex items-center gap-3 overflow-hidden">
           <h2 className="text-base font-black text-slate-950 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,0.3)]">
@@ -301,11 +280,9 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
         </div>
       </div>
 
-      {/* EXPANDED CONTENT */}
       <div className="flex-1 flex flex-col overflow-hidden opacity-100">
         <div className="p-3 md:p-4 flex flex-col h-full bg-slate-950">
           
-          {/* TOOLBAR */}
           <div className="flex flex-wrap gap-2 justify-end mb-2 shrink-0">
             <button onClick={autoRollEnemies} className="bg-indigo-600 hover:bg-indigo-500 text-slate-950 border-2 border-slate-950 px-3 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
               <Dices className="w-3 h-3 font-black" /> Roll NPCs
@@ -318,7 +295,6 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
             </button>
           </div>
 
-          {/* CUSTOM FORM */}
           {showCustomForm && (
             <form onSubmit={addCustomActor} className="mb-3 flex gap-2 animate-in fade-in slide-in-from-top-2 shrink-0">
               <input 
@@ -335,33 +311,27 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
             </form>
           )}
 
-          {/* ACTOR LIST */}
           <div className="space-y-1.5 flex-1 overflow-y-auto custom-scrollbar pr-1 mb-2">
-            {visibleInitiative.length === 0 ? (
+            {initiative.length === 0 ? (
               <div className="flex flex-col gap-2 p-6 text-center border-2 border-slate-900 border-dashed rounded-xl bg-slate-900/50">
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Waiting for active characters or enemies...</p>
-                {initiative.some(a => Number(a.value) === -1) && (
-                   <p className="text-[10px] text-fuchsia-500 font-black uppercase tracking-widest bg-slate-950 px-2 py-1 rounded inline-block self-center">(Actors hidden with -1 Initiative)</p>
-                )}
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Waiting for deployed actors...</p>
               </div>
             ) : (
-              visibleInitiative.map((actor, idx) => {
+              initiative.map((actor, idx) => {
                 const enemyData = actor.type === 'enemy' ? activeEnemies.find(e => e.id === actor.id) : null;
                 const isDead = enemyData && (enemyData.currentHp ?? enemyData.hp ?? 1) <= 0;
                 const hpPercent = enemyData ? Math.max(0, Math.min(100, ((enemyData.currentHp ?? enemyData.hp ?? 0) / (enemyData.maxHp ?? enemyData.hp ?? 1)) * 100)) : null;
                 const hpColor = hpPercent > 50 ? 'bg-emerald-500' : hpPercent > 20 ? 'bg-amber-500' : 'bg-red-500';
-                
-                const globalIndex = initiative.findIndex(a => a.id === actor.id);
 
                 return (
                   <div key={actor.id + idx} className={`flex items-center gap-3 px-3 py-2 rounded-xl border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)]
-                    ${activeTurn === globalIndex ? 'bg-slate-800 border-indigo-500' : 'bg-slate-900 border-slate-950'}
+                    ${activeTurn === idx ? 'bg-slate-800 border-indigo-500' : 'bg-slate-900 border-slate-950'}
                     ${isDead ? 'opacity-40 grayscale' : ''}
                   `}>
                     <div className="flex-1 flex flex-col min-w-0">
                       <div className="flex items-center gap-2">
-                        {activeTurn === globalIndex && <Play className="w-3 h-3 text-indigo-500 fill-current shrink-0 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]" />}
-                        <span className={`font-black uppercase tracking-widest truncate drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${actor.type === 'enemy' ? 'text-red-400' : 'text-emerald-400'} ${activeTurn === globalIndex ? 'text-base' : 'text-sm'}`}>{actor.name}</span>
+                        {activeTurn === idx && <Play className="w-3 h-3 text-indigo-500 fill-current shrink-0 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]" />}
+                        <span className={`font-black uppercase tracking-widest truncate drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] ${actor.type === 'enemy' ? 'text-red-400' : 'text-emerald-400'} ${activeTurn === idx ? 'text-base' : 'text-sm'}`}>{actor.name}</span>
                       </div>
                       
                       {enemyData && (
@@ -372,6 +342,7 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      {/* Trash can only needed here for Custom Lair actions since they don't have map tokens */}
                       {actor.type === 'custom' && (
                         <button onClick={() => removeCustomActor(actor.id)} className="p-1 bg-slate-950 border border-slate-900 rounded text-slate-500 hover:text-red-500 hover:border-red-900 transition-colors shadow-sm active:translate-y-px active:shadow-none">
                           <Trash2 className="w-3 h-3" />
@@ -391,9 +362,8 @@ export default function InitiativeTracker({ unlockedCharacters, activeEnemies, e
             )}
           </div>
 
-          {/* FOOTER */}
           <div className="flex flex-col sm:flex-row items-center gap-2 shrink-0 border-t-2 border-slate-900 pt-3">
-            {showConditionWarning && activeActorData && Number(activeActorData.value) !== -1 && (
+            {showConditionWarning && activeActorData && (
               <div className="flex-1 bg-amber-500 border-2 border-amber-950 rounded-lg p-2.5 flex items-center justify-center gap-1.5 animate-in fade-in zoom-in-95 shadow-[2px_2px_0px_rgba(0,0,0,1)] w-full">
                  <AlertTriangle className="w-4 h-4 text-amber-950 shrink-0" />
                  <span className="text-[10px] font-black text-amber-950 uppercase tracking-widest truncate drop-shadow-[1px_1px_0px_rgba(255,255,255,0.3)]">

@@ -2,7 +2,7 @@ import {
   User, ZoomIn, ZoomOut, Target, 
   EyeOff, Heart, EarOff, Flame, Ghost, Link, 
   Ban, Cloud, Lock, Mountain, Skull, ArrowDown, 
-  Stars, Moon, AlertCircle, BrainCircuit, Maximize, Ruler, CircleDashed, ArrowUpCircle, Image as ImageIcon, Trash2, X, Activity, Eye, Hand
+  Stars, Moon, AlertCircle, BrainCircuit, Circle, Triangle, PenTool, Eraser, Swords
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import MapDrawings from './MapDrawings';
@@ -57,6 +57,7 @@ export default function MapGrid({
   tokens, 
   activePlayers = [],
   activeEnemies = [],
+  activeActor = null,
   onTileClick,
   onTokenClick, 
   selectedTokenId, 
@@ -64,6 +65,7 @@ export default function MapGrid({
   showMovementRangeFor = null,
   onToggleRuler,
   isDisplayMode = false,
+  isPlayerMap = false,
   isDrawingMode = false, 
   drawingColor = '#ef4444',
   drawingShape = 'freehand',
@@ -107,8 +109,11 @@ export default function MapGrid({
     container.scrollTo({ left: targetX - (container.clientWidth / 2), top: targetY - (container.clientHeight / 2), behavior: 'smooth' });
   };
 
+  const activeTurnId = activeActor?.id && tokens[activeActor.id] ? activeActor.id : null;
+  const cameraTargetId = isPlayerMap ? selectedTokenId : activeTurnId;
+
   useEffect(() => {
-    if (isDisplayMode) {
+    if (isDisplayMode || isPlayerMap) {
       const calculateOptimalZoom = () => {
         const mapPixelWidth = cols * 30; 
         const mapPixelHeight = rows * 30; 
@@ -116,8 +121,11 @@ export default function MapGrid({
         const zoomX = (window.innerWidth - padding) / mapPixelWidth;
         const zoomY = (window.innerHeight - padding) / mapPixelHeight;
         const baseZoom = Math.min(zoomX, zoomY);
-        if (mapData?.activeTokenId) {
-          setZoom(Math.max(baseZoom * 1.8, 1.5)); 
+        
+        if (isPlayerMap) {
+          setZoom(Math.max(baseZoom * 2.5, 2.0)); 
+        } else if (cameraTargetId) {
+          setZoom(Math.max(baseZoom * 2.2, 1.5)); 
         } else {
           setZoom(baseZoom); 
         }
@@ -126,15 +134,17 @@ export default function MapGrid({
       window.addEventListener('resize', calculateOptimalZoom);
       return () => window.removeEventListener('resize', calculateOptimalZoom);
     }
-  }, [isDisplayMode, cols, rows, mapData?.activeTokenId]);
+  }, [isDisplayMode, isPlayerMap, cols, rows, cameraTargetId]);
 
   useEffect(() => {
-    if (mapData?.activeTokenId && tokens[mapData.activeTokenId]) {
-      setTimeout(() => centerOnToken(mapData.activeTokenId), 500);
+    if (cameraTargetId && (isDisplayMode || isPlayerMap)) {
+      const timer = setTimeout(() => centerOnToken(cameraTargetId), 300);
+      return () => clearTimeout(timer);
     } else if (isDisplayMode) {
-      setTimeout(() => centerOnMap(), 500);
+      const timer = setTimeout(() => centerOnMap(), 300);
+      return () => clearTimeout(timer);
     }
-  }, [mapData?.activeTokenId, isDisplayMode]);
+  }, [cameraTargetId, isDisplayMode, isPlayerMap, zoom]);
 
   const handleMapMouseDown = (e) => {
     if (isDisplayMode || isDrawingMode) return;
@@ -215,7 +225,6 @@ export default function MapGrid({
     }
   };
 
-  const activeToken = mapData?.activeTokenId ? tokens[mapData.activeTokenId] : null;
   const gridColor = mapData?.gridColor || 'rgba(255,255,255,0.35)';
 
   const cellGroups = {};
@@ -235,42 +244,36 @@ export default function MapGrid({
      }
   }
 
-  // Find active token parsed name for display
-  let activeTokenName = 'Unknown';
-  if (activeToken) {
-    const isEnemy = activeToken.type === 'enemy';
-    const entityData = isEnemy ? activeEnemies.find(e => e.id === activeToken.id) : activePlayers.find(p => p.id === activeToken.id);
-    const rawName = entityData ? entityData.name : activeToken.name;
-    const match = rawName ? rawName.match(/["']([^"']+)["']/) : null;
-    activeTokenName = match ? match[1] : (rawName ? rawName.split(' ')[0] : 'Unknown');
-  }
-
   return (
-    <div className={`relative w-full flex flex-col overflow-hidden h-full ${isDisplayMode ? 'rounded-none border-0 bg-black' : 'rounded-2xl border-[3px] border-slate-950 bg-slate-900 shadow-[6px_6px_0px_rgba(0,0,0,1)]'}`}>
+    <div className={`relative w-full flex flex-col overflow-hidden h-full ${isDisplayMode ? 'rounded-none border-0 bg-black' : 'rounded-none md:rounded-2xl border-none md:border-[3px] border-slate-950 bg-slate-900 shadow-[6px_6px_0px_rgba(0,0,0,1)]'}`}>
       
       {!isDisplayMode && (
         <div className="absolute top-4 right-4 z-[90] flex flex-col gap-2 bg-slate-900 border-2 border-slate-950 p-2 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)]">
           <button onClick={() => setZoom(prev => Math.min(prev + 0.25, 3))} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700" title="Zoom In"><ZoomIn className="w-5 h-5"/></button>
           <button onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700" title="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
           <div className="w-full h-0.5 bg-slate-950 my-0.5"></div>
-          <button onClick={() => centerOnToken(selectedTokenId || mapData?.activeTokenId)} className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-indigo-900/50" title="Center on Active Turn/Me"><Target className="w-5 h-5"/></button>
+          <button onClick={() => centerOnToken(cameraTargetId || mapData?.activeTokenId)} className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-indigo-900/50" title="Center on Active Turn/Me"><Target className="w-5 h-5"/></button>
         </div>
       )}
 
-      {isDisplayMode && activeToken && (
+      {(isDisplayMode || isPlayerMap) && activeActor && (
         <div className="fixed top-8 left-8 z-[200] flex items-center gap-4 bg-slate-950/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-3 shadow-2xl animate-in slide-in-from-left-8 fade-in duration-500">
-          <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-slate-800">
-            <TokenImage token={activeToken} parsedName={activeTokenName} isEnemy={activeToken.type === 'enemy'} />
-          </div>
+          {tokens[activeActor.id] ? (
+             <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-slate-800 shrink-0">
+               <TokenImage token={tokens[activeActor.id]} parsedName={activeActor.name} isEnemy={activeActor.type === 'enemy'} />
+             </div>
+          ) : (
+             <div className="w-14 h-14 rounded-full border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-slate-900 flex items-center justify-center shrink-0">
+               {activeActor.type === 'enemy' ? <Skull className="w-6 h-6 text-red-500" /> : <Swords className="w-6 h-6 text-indigo-400" />}
+             </div>
+          )}
           <div className="flex flex-col pr-4">
             <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-0.5">Current Turn</span>
-            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">{activeTokenName}</h1>
+            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+              {activeActor.name}
+            </h1>
           </div>
         </div>
-      )}
-
-      {isDisplayMode && (
-        <div className="absolute inset-0 z-[100] pointer-events-none bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(0,0,0,0.8)_85%,_rgba(0,0,0,1)_100%)]"></div>
       )}
 
       <div 
@@ -329,12 +332,12 @@ export default function MapGrid({
                 <div 
                   key={`click-${tile.x},${tile.y}`}
                   onMouseDown={(e) => { 
-                    if(isDisplayMode) { e.preventDefault(); return; } 
+                    if(isDisplayMode || isPlayerMap) { e.preventDefault(); return; } 
                     if(isDrawingMode) e.stopPropagation(); 
                   }}
                   onClick={(e) => { 
                     if(isPanning || hasPanned.current) return; 
-                    if(!isDisplayMode && onTileClick) onTileClick(tile.x, tile.y); 
+                    if(!isDisplayMode && !isPlayerMap && onTileClick) onTileClick(tile.x, tile.y); 
                   }}
                   className={`w-full h-full transition-colors ${tileClass}`}
                 />
@@ -353,13 +356,12 @@ export default function MapGrid({
               })
               .map(token => {
               const isSelected = selectedTokenId === token.id;
-              const isActiveTurn = mapData?.activeTokenId === token.id; 
+              const isActiveTurn = activeActor?.id === token.id; 
               const isEnemy = token.type === 'enemy';
               const tSize = token.size || 1; 
               
               const entityData = isEnemy ? activeEnemies.find(e => e.id === token.id) : activePlayers.find(p => p.id === token.id);
               
-              // Safely extract the nickname or first name
               const rawName = entityData ? entityData.name : token.name;
               const match = rawName ? rawName.match(/["']([^"']+)["']/) : null;
               const displayName = match ? match[1] : (rawName ? rawName.split(' ')[0] : 'Unknown');
@@ -384,12 +386,12 @@ export default function MapGrid({
                 <div
                   key={token.id}
                   onMouseDown={(e) => {
-                    if (!isDisplayMode && onTokenClick && (isDM || token.id === selectedTokenId)) {
+                    if (!isDisplayMode && !isPlayerMap && onTokenClick && (isDM || token.id === selectedTokenId)) {
                       e.stopPropagation();
                       if (!isDrawingMode) onTokenClick(token.id);
                     }
                   }}
-                  className={`absolute transition-all duration-700 ease-in-out flex items-center justify-center ${isDisplayMode || isDrawingMode ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer hover:scale-105'} ${token.isHidden ? 'opacity-40 grayscale' : ''}`}
+                  className={`absolute transition-all duration-700 ease-in-out flex items-center justify-center ${isDisplayMode || isDrawingMode || isPlayerMap ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer hover:scale-105'} ${token.isHidden ? 'opacity-40 grayscale' : ''}`}
                   style={{ width: currentCellSize * tSize, height: currentCellSize * tSize, transform: `translate(${safeX * currentCellSize + offsetXY}px, ${safeY * currentCellSize - offsetXY}px)` }}
                 >
                   
@@ -474,46 +476,34 @@ export default function MapGrid({
           </div>
         </div>
 
-        {/* CONTEXT MENU OUTSIDE DRAGGABLE DIV */}
-        <div className="absolute inset-0 pointer-events-none z-[60]">
-          {selectedTokenId && tokens[selectedTokenId] && !isDisplayMode && isDM && (
-             <div 
-               className="absolute pointer-events-none transition-transform duration-700 ease-in-out"
-               style={{ 
-                 width: currentCellSize * (tokens[selectedTokenId].size || 1),
-                 height: currentCellSize * (tokens[selectedTokenId].size || 1),
-                 transform: `translate(${tokens[selectedTokenId].x * currentCellSize}px, ${tokens[selectedTokenId].y * currentCellSize}px)` 
-               }}
-             >
-                <TokenContextMenu 
-                  token={tokens[selectedTokenId]}
-                  tokenX={tokens[selectedTokenId].x}
-                  mapCols={cols}
-                  displayName={(() => {
-                    const isE = tokens[selectedTokenId].type === 'enemy';
-                    const eData = isE ? activeEnemies.find(e => e.id === selectedTokenId) : activePlayers.find(p => p.id === selectedTokenId);
-                    const rName = eData ? eData.name : tokens[selectedTokenId].name;
-                    const m = rName ? rName.match(/["']([^"']+)["']/) : null;
-                    return m ? m[1] : (rName ? rName.split(' ')[0] : 'Unknown');
-                  })()}
-                  onUpdateHpLive={onUpdateHpLive}
-                  onDeselect={onDeselect}
-                  onToggleSize={onToggleSize}
-                  onToggleAura={onToggleAura}
-                  onToggleElevation={onToggleElevation}
-                  onToggleConcentration={onToggleConcentration}
-                  onToggleRuler={onToggleRuler}
-                  onToggleHidden={onToggleHidden}
-                  onUpdateImage={onUpdateImage}
-                  onRemoveToken={onRemoveToken}
-                  onToggleCondition={onToggleCondition}
-                  showMovementRangeFor={showMovementRangeFor}
-                />
-             </div>
-          )}
-        </div>
-
       </div>
+
+      {/* FLOATING CONTEXT MENU HUD */}
+      {selectedTokenId && tokens[selectedTokenId] && !isDisplayMode && !isPlayerMap && isDM && (
+        <TokenContextMenu 
+          token={tokens[selectedTokenId]}
+          displayName={(() => {
+            const isE = tokens[selectedTokenId].type === 'enemy';
+            const eData = isE ? activeEnemies.find(e => e.id === selectedTokenId) : activePlayers.find(p => p.id === selectedTokenId);
+            const rName = eData ? eData.name : tokens[selectedTokenId].name;
+            const m = rName ? rName.match(/["']([^"']+)["']/) : null;
+            return m ? m[1] : (rName ? rName.split(' ')[0] : 'Unknown');
+          })()}
+          onUpdateHpLive={onUpdateHpLive}
+          onDeselect={onDeselect}
+          onToggleSize={onToggleSize}
+          onToggleAura={onToggleAura}
+          onToggleElevation={onToggleElevation}
+          onToggleConcentration={onToggleConcentration}
+          onToggleRuler={onToggleRuler}
+          onToggleHidden={onToggleHidden}
+          onUpdateImage={onUpdateImage}
+          onRemoveToken={onRemoveToken}
+          onToggleCondition={onToggleCondition}
+          showMovementRangeFor={showMovementRangeFor}
+        />
+      )}
+
     </div>
   );
 }

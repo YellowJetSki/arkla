@@ -9,6 +9,7 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [], fogOfWar: false });
   const [tokens, setTokens] = useState({});
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert' });
+  const [initiative, setInitiative] = useState(null);
   
   const [activePlayers, setActivePlayers] = useState([]);
   const [activeEnemies, setActiveEnemies] = useState([]);
@@ -34,6 +35,14 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
         });
         setTokens(data.tokens || {});
       }
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const initRef = doc(db, 'campaign', 'initiative');
+    const unsub = onSnapshot(initRef, (docSnap) => {
+      if (docSnap.exists()) setInitiative(docSnap.data());
     });
     return () => unsub();
   }, []);
@@ -165,39 +174,37 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
 
   if (!isOpen) return null;
 
+  const isMapAvailable = mapData.isPublished && mapData.imageUrl;
+  const activeActor = initiative?.order?.[initiative.activeTurn] || null;
+
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col animate-in slide-in-from-bottom duration-300">
-      <div className="bg-slate-900 border-b border-slate-700 p-4 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 rounded-lg">
-            <MapIcon className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h2 className="text-white font-black text-sm uppercase tracking-widest">Tactical View</h2>
-            <p className="text-[10px] text-slate-400 font-bold uppercase">Tap your token to see range.</p>
-          </div>
-        </div>
-        <button onClick={onClose} className="bg-slate-800 text-slate-400 p-2 rounded-xl border border-slate-700 hover:text-white transition-colors">
-          <X className="w-6 h-6" />
+    <div className={`fixed inset-x-0 bottom-0 z-[45] bg-slate-950 transition-all duration-500 ease-in-out flex flex-col shadow-[0_-10px_30px_rgba(0,0,0,0.8)] border-t-[3px] border-slate-900 ${isOpen ? 'h-[80dvh] md:h-screen md:w-[calc(100%-350px)] lg:w-[calc(100%-400px)] md:right-0 md:left-auto md:border-t-0 md:border-l-[3px]' : 'h-0 opacity-0 pointer-events-none'}`}>
+      
+      <div className="h-10 md:h-12 bg-slate-900 border-b-[3px] border-slate-950 flex items-center justify-between px-4 shrink-0">
+        <h3 className="font-black text-emerald-400 uppercase tracking-widest text-xs flex items-center gap-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
+          <MapIcon className="w-4 h-4"/> Tactical View
+        </h3>
+        <button onClick={onClose} className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors">
+          <X className="w-5 h-5 font-black" />
         </button>
       </div>
 
       {dialog.isOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-sm w-full p-5 shadow-2xl">
-            <h3 className={`text-lg font-bold mb-2 flex items-center gap-2 ${dialog.type === 'confirm' ? 'text-amber-400' : 'text-red-400'}`}>
+          <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl max-w-sm w-full p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
+            <h3 className={`text-lg font-black mb-2 flex items-center gap-2 uppercase tracking-widest ${dialog.type === 'confirm' ? 'text-amber-400' : 'text-red-400'}`}>
               {dialog.type === 'confirm' ? <Zap className="w-5 h-5"/> : <AlertTriangle className="w-5 h-5"/>}
               {dialog.title}
             </h3>
-            <p className="text-sm text-slate-300 mb-6 leading-relaxed">{dialog.message}</p>
+            <p className="text-sm text-slate-300 mb-6 font-bold leading-relaxed">{dialog.message}</p>
             <div className="flex gap-3 justify-end">
-               <button onClick={() => { setDialog({ isOpen: false }); setPendingMove(null); }} className="px-4 py-2 text-slate-400 bg-slate-800 rounded-lg font-bold text-sm">
+               <button onClick={() => { setDialog({ isOpen: false }); setPendingMove(null); }} className="px-5 py-2.5 text-slate-400 bg-slate-800 hover:text-white rounded-xl font-black text-[10px] uppercase tracking-widest border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all">
                  {dialog.type === 'confirm' ? 'Cancel' : 'Understood'}
                </button>
                {dialog.type === 'confirm' && (
                  <button 
                    onClick={() => { executePendingMove(); setDialog({ isOpen: false }); }} 
-                   className="px-4 py-2 bg-amber-600 text-white rounded-lg font-bold text-sm shadow-md"
+                   className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-black text-[10px] uppercase tracking-widest border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all"
                  >
                    Confirm Dash
                  </button>
@@ -207,36 +214,40 @@ export default function BattleMapLayer({ char, charId, isOpen, onClose }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-slate-950 custom-scrollbar">
-        {!mapData.isPublished ? (
-          <div className="text-center">
-            <MapIcon className="w-16 h-16 text-slate-800 mx-auto mb-4" />
-            <p className="text-slate-500 font-bold uppercase tracking-widest">Waiting for DM to reveal map...</p>
-          </div>
-        ) : (
-          <MapGrid 
-            mapData={mapData} 
-            tokens={tokens} 
-            activePlayers={activePlayers}
-            activeEnemies={activeEnemies}
-            onTileClick={handleTileClick} 
-            onTokenClick={handleTokenClick}
-            selectedTokenId={charId}
-            isDM={false} 
-            showMovementRangeFor={showRange ? { ...tokens[charId], speed: dynamicSpeed } : null}
-          />
-        )}
+      <div className="flex-1 w-full bg-black relative min-h-0 overflow-hidden">
+         {!isMapAvailable ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-500 p-6 text-center">
+              <MapIcon className="w-12 h-12 mb-4 opacity-30 drop-shadow-sm" />
+              <p className="font-black uppercase tracking-widest text-sm">Waiting for DM to reveal map...</p>
+            </div>
+         ) : (
+            <MapGrid 
+              mapData={mapData} 
+              tokens={tokens} 
+              activeActor={activeActor}
+              activePlayers={activePlayers}
+              activeEnemies={activeEnemies}
+              onTileClick={handleTileClick} 
+              onTokenClick={handleTokenClick}
+              selectedTokenId={charId}
+              isDM={false} 
+              isPlayerMap={true}
+              showMovementRangeFor={showRange ? { ...tokens[charId], speed: dynamicSpeed } : null}
+            />
+         )}
       </div>
 
+      <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-b from-slate-950/20 to-transparent pointer-events-none md:hidden"></div>
+      
       {myToken && (
-        <div className="bg-slate-900 border-t border-slate-700 p-4 shrink-0 flex justify-center gap-6">
+        <div className="bg-slate-900 border-t-[3px] border-slate-950 p-3 shrink-0 flex justify-center gap-6 z-50 relative shadow-[0_-4px_10px_rgba(0,0,0,0.5)]">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-            <span className={`text-[10px] font-black uppercase tracking-widest ${dynamicSpeed === 0 ? 'text-red-500' : 'text-slate-400'}`}>Move: {dynamicSpeed}ft</span>
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]"></div>
+            <span className={`text-[10px] font-black uppercase tracking-widest ${dynamicSpeed === 0 ? 'text-red-500' : 'text-slate-300'}`}>Move: {dynamicSpeed}ft</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-amber-500"></div>
-            <span className={`text-[10px] font-black uppercase tracking-widest ${dynamicSpeed === 0 ? 'text-red-500' : 'text-slate-400'}`}>Dash: {dynamicSpeed * 2}ft</span>
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_5px_rgba(245,158,11,0.8)]"></div>
+            <span className={`text-[10px] font-black uppercase tracking-widest ${dynamicSpeed === 0 ? 'text-red-500' : 'text-slate-300'}`}>Dash: {dynamicSpeed * 2}ft</span>
           </div>
         </div>
       )}

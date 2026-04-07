@@ -32,7 +32,7 @@ export default function BattleMapDisplay({ onLogout }) {
     return () => unsub();
   }, []);
 
-  // NEW: Directly subscribe to the Initiative order to control the Turn Banner
+  // Directly subscribe to the Initiative order to control the Turn Banner & Camera Focus
   useEffect(() => {
     const initRef = doc(db, 'campaign', 'initiative');
     const unsub = onSnapshot(initRef, (docSnap) => {
@@ -90,11 +90,12 @@ export default function BattleMapDisplay({ onLogout }) {
           isDisplayMode={true}
         />
         
+        {/* Soft, long gradient vignette that doesn't encroach on the map */}
         <div 
           className="absolute inset-0 pointer-events-none z-[10000]"
           style={{
-            boxShadow: 'inset 0 0 250px 100px rgba(0,0,0,1)',
-            background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,1) 100%)'
+            boxShadow: 'inset 0 0 150px 50px rgba(0,0,0,0.8)',
+            background: 'radial-gradient(ellipse at center, transparent 70%, rgba(0,0,0,0.5) 90%, rgba(0,0,0,1) 100%)'
           }}
         />
       </div>
