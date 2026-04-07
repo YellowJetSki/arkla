@@ -25,7 +25,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
     name: '', species: '', class: '', level: 1, theme: 'indigo',
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
     alignment: 'Neutral', backstory: '', speed: 30, hitDie: 'd10', 
-    imageUrl: '', tokenImg: '', age: '', height: '', weight: '', eyes: '', skin: '', hair: ''
+    imageUrl: '', tokenImg: '', age: '', height: ''
   });
 
   const [customProfs, setCustomProfs] = useState({ languages: 'Common', skills: '', tools: '', weapons: '', armor: '', savingThrows: '' });
@@ -43,7 +43,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
   const [hasCompanion, setHasCompanion] = useState(false);
   const [companionData, setCompanionData] = useState({
     name: '', species: '', isDormant: false, awakeLevel: 1, hp: 10, ac: 10, speed: 30,
-    stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }, attacks: '', desc: ''
+    stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 }, attacks: '', traits: ''
   });
 
   const [inventory, setInventory] = useState([]);
@@ -61,8 +61,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         alignment: initialData.alignment || 'Neutral', backstory: initialData.backstory || '', 
         speed: initialData.speed || 30, hitDie: initialData.hitDice?.type || 'd10', 
         imageUrl: initialData.imageUrl || '', tokenImg: initialData.img || '', 
-        age: initialData.age || '', height: initialData.height || '', weight: initialData.weight || '', 
-        eyes: initialData.eyes || '', skin: initialData.skin || '', hair: initialData.hair || ''
+        age: initialData.age || '', height: initialData.height || ''
       });
 
       if (initialData.proficiencies) setCustomProfs(initialData.proficiencies);
@@ -75,7 +74,11 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
       if (initialData.spellSlots && Object.keys(initialData.spellSlots).length > 0) setForceShowSpells(true);
       if (initialData.companion) {
         setHasCompanion(true);
-        setCompanionData(initialData.companion);
+        setCompanionData({
+          ...initialData.companion,
+          attacks: initialData.companion.attacks || '',
+          traits: initialData.companion.traits || ''
+        });
       }
     }
   }, [initialData]);
@@ -136,7 +139,6 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
     updateProf('weapons', srdClassOffer.weapons);
     updateProf('savingThrows', srdClassOffer.savingThrows);
     
-    // Automatically translate Arcana to Books when importing class choices
     if (srdClassOffer.skills) updateProf('skills', srdClassOffer.skills.replace(/Arcana/g, 'Books'));
     
     if (srdClassOffer.tools) updateProf('tools', customProfs.tools ? `${customProfs.tools}, ${srdClassOffer.tools}` : srdClassOffer.tools);
@@ -244,7 +246,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
         name: formData.name, species: formData.species || 'Human', class: formData.class || 'Fighter',
         classes: classesToPass, level: startLevel, theme: formData.theme,
         alignment: formData.alignment,
-        age: formData.age, height: formData.height, weight: formData.weight, eyes: formData.eyes, skin: formData.skin, hair: formData.hair,
+        age: formData.age, height: formData.height,
         maxHp: totalMaxHp, hitDice: { current: initialData ? initialData.hitDice?.current : startLevel, max: startLevel, type: formData.hitDie },
         ac: 10 + dexMod, speed: formData.speed,
         spellSave: spellStats.spellSave || '--', spellAttack: spellStats.spellAttack || '--',
@@ -268,7 +270,7 @@ export default function DMCharacterBuilder({ onClose, initialData = null, charId
           exp: 0, hp: totalMaxHp, tempHp: 0, initiative: '--',
           combatInitiative: null, inspiration: false, isConcentrating: false, conditions: [], hasCompletedTutorial: false, journal: '',
           currency: { assarions: 0, quadrans: 0, leptons: 0 }, deathSaves: { successes: 0, failures: 0 }, resources: [],
-          dmNotes: '', attacks: [], traits: { personality: '', ideal: '', bond: '', flaws: '' }, notes: ''
+          dmNotes: '', attacks: [], notes: ''
         };
         const batch = writeBatch(db);
         batch.set(doc(db, 'characters', finalCharId), newChar);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, writeBatch, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, getDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -77,14 +77,13 @@ export default function DMBattleMap() {
     return () => unsub();
   }, []);
 
-  // FIX: Robust Session and Characters Subscription for Map Staging
   useEffect(() => {
     let unsubChars = () => {};
     
     const unsubSession = onSnapshot(doc(db, 'campaign', 'main_session'), async (sessionSnap) => {
       if (sessionSnap.exists()) {
         const rawIds = sessionSnap.data().unlockedCharacters || [];
-        const validIds = [...new Set(rawIds.filter(id => id && typeof id === 'string'))]; // Deduplicate map players too!
+        const validIds = [...new Set(rawIds.filter(id => id && typeof id === 'string'))];
         
         unsubChars();
         if (validIds.length > 0) {
@@ -167,7 +166,6 @@ export default function DMBattleMap() {
     try {
       const batch = writeBatch(db);
       
-      // FIX: Ensure active_enemies is completely wiped before dropping in the preset tokens
       const enemyDocs = await getDocs(collection(db, 'active_enemies'));
       enemyDocs.forEach((docSnap) => batch.delete(docSnap.ref));
 
@@ -219,8 +217,22 @@ export default function DMBattleMap() {
     if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'campaign', 'battlemap'), updates);
   };
 
+  // FULL DELETION FIX: Deleting from context menu now permanently wipes enemies from Active Threats DB
   const removeToken = async (tokenId) => {
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+    const targetToken = tokens[tokenId];
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+      
+      if (targetToken && targetToken.type === 'enemy') {
+         batch.delete(doc(db, 'active_enemies', tokenId));
+      }
+      await batch.commit();
+    } catch (e) {
+      console.warn("Batch delete failed, falling back to map only.");
+      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+    }
+    
     if (selectedTokenId === tokenId) setSelectedTokenId(null);
   };
 
@@ -256,15 +268,25 @@ export default function DMBattleMap() {
     setImagePrompt({ isOpen: false, tokenId: null, url: '' });
   };
 
-  // FIX: -99999 aggressively deletes ghost tokens from the map even if their db file doesn't exist
+  // FULL DELETION FIX: -99999 trick also sweeps the Active Threats database
   const handleUpdateTokenHpLive = async (tokenId, newHpVal) => {
+    const targetToken = tokens[tokenId];
+    
     if (newHpVal === -99999) {
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+      try {
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+        if (targetToken && targetToken.type === 'enemy') {
+          batch.delete(doc(db, 'active_enemies', tokenId));
+        }
+        await batch.commit();
+      } catch (e) {
+        await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
+      }
       if (selectedTokenId === tokenId) setSelectedTokenId(null);
       return;
     }
     
-    const targetToken = tokens[tokenId];
     if (!targetToken) return;
     
     const parsedHp = Math.max(0, Math.min(targetToken.maxHp || 1000, parseInt(newHpVal, 10)));

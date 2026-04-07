@@ -23,23 +23,18 @@ export default function StepLore({ formData, updateField }) {
         />
       </div>
       
-      {/* BIO TAB SYNC: Physical Appearance */}
       <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 shadow-inner">
         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Physical Appearance (Optional)</label>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {[
-            { label: 'Age', field: 'age', placeholder: '24' },
-            { label: 'Height', field: 'height', placeholder: '5\'10"' },
-            { label: 'Weight', field: 'weight', placeholder: '160 lbs' },
-            { label: 'Eyes', field: 'eyes', placeholder: 'Emerald' },
-            { label: 'Skin', field: 'skin', placeholder: 'Fair' },
-            { label: 'Hair', field: 'hair', placeholder: 'Black' }
+            { label: 'Age', field: 'age', placeholder: 'e.g. 24' },
+            { label: 'Height', field: 'height', placeholder: 'e.g. 5\'10"' }
           ].map((item) => (
             <div key={item.field} className="bg-slate-950 border border-slate-700 rounded-lg p-2 focus-within:border-indigo-500 transition-colors">
               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">{item.label}</span>
               <input 
                 type="text" 
-                value={formData[item.field]} 
+                value={formData[item.field] || ''} 
                 onChange={(e) => updateField(item.field, e.target.value)} 
                 placeholder={item.placeholder}
                 className="w-full bg-transparent text-white text-xs font-bold focus:outline-none placeholder-slate-700" 
@@ -66,8 +61,8 @@ export default function StepLore({ formData, updateField }) {
         <textarea 
           value={formData.backstory} 
           onChange={e => updateField('backstory', e.target.value)} 
-          className="w-full h-24 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 shadow-inner resize-y custom-scrollbar" 
-          placeholder="Born in the town of..." 
+          className="w-full h-40 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-slate-300 text-sm focus:outline-none focus:border-indigo-500 shadow-inner resize-y custom-scrollbar" 
+          placeholder="Where did you come from? What drives you?" 
         />
       </div>
     </div>

@@ -83,7 +83,6 @@ const CardWrapper = ({ isDM, onClose, children }) => {
           >
              <X className="w-5 h-5" />
           </button>
-          {/* FIX: Handled scrolling natively inside the wrapper to fix DM views */}
           <div className="flex-1 overflow-y-auto custom-scrollbar relative">
              {children}
           </div>
@@ -207,7 +206,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     }
   };
 
-  // NEW: Manual Force Sync for DM peace of mind
   const handleForceSave = async () => {
     if (!char) return;
     setIsSavingSheet(true);
@@ -432,7 +430,7 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
     { id: 'combat', icon: Swords, label: 'Combat' },
     ...(hasSpells ? [{ id: 'spells', icon: Flame, label: 'Spells' }] : []),
     { id: 'features', icon: Sparkles, label: 'Features' },
-    ...(char.companion ? [{ id: 'companion', icon: PawPrint, label: 'Companion' }] : []),
+    ...(char.companion && !char.companion.isDormant ? [{ id: 'companion', icon: PawPrint, label: 'Companion' }] : []),
     { id: 'inventory', icon: Backpack, label: 'Inventory' }, 
     { id: 'partyLoot', icon: Gem, label: 'Party Loot' }, 
     { id: 'bio', icon: BookOpen, label: 'Bio' }, 
@@ -446,7 +444,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
          <div className={`fixed inset-0 bg-gradient-to-b ${activeTheme.ambient} to-slate-950 pointer-events-none -z-10 transition-colors duration-1000`}></div>
       )}
 
-      {/* Main Container - FIX: Removed broken DM split classes */}
       <div className={`transition-all duration-700 ${isExhausted ? 'grayscale-[0.5] contrast-75' : ''} pb-28 md:pb-12 relative min-h-full flex flex-col md:flex-row w-full`}>
         
         <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} inputPlaceholder={dialog.inputPlaceholder} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
@@ -473,7 +470,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
         <ImageModal isOpen={isImageOpen} url={char.imageUrl || char.img || ''} alt={char.name || 'Character'} onClose={() => setIsImageOpen(false)} />
         <ImageModal isOpen={!!activeLoot} url={activeLoot?.url} alt={activeLoot?.name} onClose={() => setActiveLoot(null)} />
 
-        {/* LEFT ANCHOR PANEL (Desktop) / TOP HEADER (Mobile) */}
         <div className="w-full md:w-[350px] lg:w-[400px] shrink-0 p-3 md:p-6 md:sticky md:top-0 md:h-[95dvh] md:overflow-y-auto transition-all duration-700 custom-scrollbar z-20 bg-slate-900/40 md:bg-transparent border-b-[3px] md:border-b-0 md:border-r-[3px] border-slate-950">
           
           {isDM ? (
@@ -548,7 +544,6 @@ export default function CharacterCard({ currentUser, onLogout, isDM = false, onC
           </div>
         </div>
 
-        {/* RIGHT DYNAMIC PANEL (Desktop) / MAIN CONTENT (Mobile) */}
         <div className={`flex-1 flex flex-col min-w-0 pt-0 md:pt-6 transition-all duration-700 ${(isLongRestOpen || isShortRestOpen || isLevelUpOpen || newLootPopup || isGuideOpen || !!activeLoot || dialog.isOpen || (!isDM && !char.hasCompletedTutorial)) ? 'opacity-50 pointer-events-none blur-sm' : 'opacity-100'} overflow-x-hidden`}>
           
           <div className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-md border-b-[3px] md:border-none md:bg-transparent border-slate-900 shadow-sm md:shadow-none pb-2 md:pb-0 md:-mx-8 md:px-8 md:mb-6 pt-2">
