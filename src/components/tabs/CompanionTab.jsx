@@ -98,10 +98,10 @@ function CompanionContent({ companion, activeTheme }) {
 
         <div className="bg-slate-800 border-[3px] border-slate-950 rounded-2xl p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)]">
            <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 mb-4 border-b-2 border-slate-950 pb-2 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
-             <BookOpen className={`w-5 h-5 ${activeTheme.text}`} /> Description & Traits
+             <BookOpen className={`w-5 h-5 ${activeTheme.text}`} /> Traits & Features
            </h3>
            <p className="text-sm text-slate-300 font-medium whitespace-pre-wrap leading-relaxed bg-slate-900 p-4 rounded-xl border-2 border-slate-950 shadow-inner">
-             {companion.desc || 'No description provided.'}
+             {companion.traits || companion.desc || 'No specific traits listed.'}
            </p>
         </div>
       </div>

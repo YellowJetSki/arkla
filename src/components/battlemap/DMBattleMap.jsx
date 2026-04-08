@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
@@ -77,11 +77,24 @@ export default function DMBattleMap() {
     return () => unsub();
   }, []);
 
-  // NEW ARCHITECTURE: Fetch ALL characters from the Vault, not just the live session!
   useEffect(() => {
-    const unsubChars = onSnapshot(collection(db, 'characters'), (snap) => {
-       const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-       setActivePlayers(players);
+    let unsubChars = () => {};
+    
+    const unsubSession = onSnapshot(doc(db, 'campaign', 'main_session'), async (sessionSnap) => {
+      if (sessionSnap.exists()) {
+        const rawIds = sessionSnap.data().unlockedCharacters || [];
+        const validIds = [...new Set(rawIds.filter(id => id && typeof id === 'string'))];
+        
+        unsubChars();
+        if (validIds.length > 0) {
+          unsubChars = onSnapshot(collection(db, 'characters'), (snap) => {
+            const players = snap.docs.filter(d => validIds.includes(d.id)).map(d => ({ id: d.id, ...d.data() }));
+            setActivePlayers(players);
+          });
+        } else {
+          setActivePlayers([]);
+        }
+      }
     });
     
     const unsubEnemies = onSnapshot(collection(db, 'active_enemies'), (snap) => {
@@ -90,12 +103,30 @@ export default function DMBattleMap() {
     });
 
     return () => {
+      unsubSession();
       unsubChars();
       unsubEnemies();
     };
   }, []);
 
-  // Notice we removed the auto-token-removal for players! Now, tokens stay on the board permanently between sessions unless manually deleted or if the character is deleted from the vault!
+  useEffect(() => {
+    const activePlayerIds = activePlayers.map(p => p.id);
+    const tokensToRemove = Object.values(tokensRef.current).filter(
+      t => t.type === 'player' && !activePlayerIds.includes(t.id)
+    );
+    
+    if (tokensToRemove.length > 0) {
+      const updates = {};
+      tokensToRemove.forEach(t => {
+        updates[`tokens.${t.id}`] = deleteField();
+      });
+      updateDoc(doc(db, 'campaign', 'battlemap'), updates).catch(console.error);
+      
+      if (tokensToRemove.some(t => t.id === selectedTokenId)) {
+        setSelectedTokenId(null);
+      }
+    }
+  }, [activePlayers, selectedTokenId]);
 
   const handleUpdateMapSettings = () => {
     setIsSavingMap(true);
@@ -331,7 +362,10 @@ export default function DMBattleMap() {
     });
   };
 
+  // DO NOT SAVE THE QUICK MEASURE RULER TO THE CLOUD
   const handleDrawEnd = async (lineData) => {
+    if (drawingShape === 'ruler' || lineData.type === 'ruler') return; 
+    
     const newLine = { ...lineData, id: Date.now(), shape: drawingShape };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [...mapData.drawings, newLine] });
   };
@@ -413,7 +447,14 @@ export default function DMBattleMap() {
                 <button onClick={() => setDrawingShape('circle')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'circle' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><Circle className="w-3 h-3" /></button>
                 <button onClick={() => setDrawingShape('cone')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'cone' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><Triangle className="w-3 h-3" /></button>
                 <button onClick={() => setDrawingShape('reveal')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'reveal' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`} title="Reveal Fog"><Eye className="w-3 h-3" /></button>
+                
                 <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
+                
+                {/* THE NEW RULER BUTTON */}
+                <button onClick={() => setDrawingShape('ruler')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'ruler' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`} title="Quick Measure Distance"><Ruler className="w-3 h-3" /></button>
+                
+                <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
+
                 {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
                   <button key={c} onClick={() => setDrawingColor(c)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${drawingColor === c ? 'scale-110 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'border-transparent opacity-50 hover:opacity-100'}`} style={{ backgroundColor: c }} />
                 ))}
