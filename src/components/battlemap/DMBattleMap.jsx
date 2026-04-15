@@ -1,16 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
 import ImageSelector from '../shared/ImageSelector';
-
-const LOCAL_MAPS = [
-  { label: 'Tutorial Forest', value: '/tutorial_forest_enc.png' },
-  { label: 'Screwbeard Cave', value: '/screwbeard_cave_enc.png' }
-];
 
 const getShortName = (fullName) => {
   if (!fullName) return 'Unknown';
@@ -362,10 +357,7 @@ export default function DMBattleMap() {
     });
   };
 
-  // DO NOT SAVE THE QUICK MEASURE RULER TO THE CLOUD
   const handleDrawEnd = async (lineData) => {
-    if (drawingShape === 'ruler' || lineData.type === 'ruler') return; 
-    
     const newLine = { ...lineData, id: Date.now(), shape: drawingShape };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [...mapData.drawings, newLine] });
   };
@@ -449,10 +441,7 @@ export default function DMBattleMap() {
                 <button onClick={() => setDrawingShape('reveal')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'reveal' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`} title="Reveal Fog"><Eye className="w-3 h-3" /></button>
                 
                 <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
-                
-                {/* THE NEW RULER BUTTON */}
                 <button onClick={() => setDrawingShape('ruler')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'ruler' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`} title="Quick Measure Distance"><Ruler className="w-3 h-3" /></button>
-                
                 <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
 
                 {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
@@ -474,14 +463,7 @@ export default function DMBattleMap() {
 
       {isEditingMap && (
         <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 space-y-5 relative z-10 shrink-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Preset Local Map</label>
-              <select className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-indigo-500 shadow-inner" onChange={(e) => setTempImageUrl(e.target.value)} value={LOCAL_MAPS.some(m => m.value === tempImageUrl) ? tempImageUrl : ''}>
-                <option value="" disabled>Select a map...</option>
-                {LOCAL_MAPS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div>
                <ImageSelector 
                  label="Custom Map Image"
