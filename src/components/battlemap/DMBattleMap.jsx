@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { doc, onSnapshot, setDoc, updateDoc, collection, writeBatch, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -72,7 +72,6 @@ export default function DMBattleMap() {
     return () => unsub();
   }, []);
 
-  // TRUE PERSISTENT ARCHITECTURE: Fetch ALL characters directly from the Vault
   useEffect(() => {
     const unsubChars = onSnapshot(collection(db, 'characters'), (snap) => {
        const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -90,7 +89,6 @@ export default function DMBattleMap() {
     };
   }, []);
 
-  // Cleanup ghost tokens if a character is permanently deleted from the Vault
   useEffect(() => {
     const activePlayerIds = activePlayers.map(p => p.id);
     const tokensToRemove = Object.values(tokensRef.current).filter(
@@ -142,6 +140,30 @@ export default function DMBattleMap() {
   
   const toggleFogOfWar = async () => {
     await setDoc(doc(db, 'campaign', 'battlemap'), { fogOfWar: !mapData.fogOfWar }, { merge: true });
+  };
+
+  const handleRestorePreset = async (presetData) => {
+    try {
+      const batch = writeBatch(db);
+      
+      const enemyDocs = await getDocs(collection(db, 'active_enemies'));
+      enemyDocs.forEach((docSnap) => batch.delete(docSnap.ref));
+
+      const mapRef = doc(db, 'campaign', 'battlemap');
+      batch.set(mapRef, { ...presetData.mapData, tokens: presetData.tokens, isPublished: false });
+
+      const presetEnemies = Object.values(presetData.tokens || {}).filter(t => t.type === 'enemy');
+      for (const enemy of presetEnemies) {
+         batch.set(doc(db, 'active_enemies', enemy.id), {
+            ...(enemy.entityData || {}), 
+            name: enemy.name, hp: enemy.hp || 10, maxHp: enemy.maxHp || enemy.hp || 10,
+            currentHp: enemy.hp || 10, speed: enemy.speed || 30, img: enemy.img || '',
+            conditions: enemy.conditions || [], size: enemy.size || 1, isConcentrating: enemy.isConcentrating || false
+         });
+      }
+      await batch.commit();
+      setSelectedTokenId(null);
+    } catch (error) { console.error("Restore error:", error); }
   };
 
   const getCreatureSize = (name) => {
