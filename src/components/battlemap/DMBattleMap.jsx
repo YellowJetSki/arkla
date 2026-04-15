@@ -72,6 +72,7 @@ export default function DMBattleMap() {
     return () => unsub();
   }, []);
 
+  // TRUE PERSISTENT ARCHITECTURE: Fetch ALL characters directly from the Vault
   useEffect(() => {
     const unsubChars = onSnapshot(collection(db, 'characters'), (snap) => {
        const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -89,6 +90,7 @@ export default function DMBattleMap() {
     };
   }, []);
 
+  // Cleanup ghost tokens if a character is permanently deleted from the Vault
   useEffect(() => {
     const activePlayerIds = activePlayers.map(p => p.id);
     const tokensToRemove = Object.values(tokensRef.current).filter(
