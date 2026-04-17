@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Shield, Heart, Skull, Trash2, Swords, Calculator, CheckSquare, Square, Plus, Minus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Shield, Heart, Skull, Trash2, Swords, Calculator, CheckSquare, Square, Edit3, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { CONDITIONS_LIST } from '../data/campaignData';
 import DialogModal from './shared/DialogModal';
 
-export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
+export default function DMEnemyCard({ enemy, isSelected, onToggleSelect, onEdit }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [displayHp, setDisplayHp] = useState("");
   const [isEditingHp, setIsEditingHp] = useState(false);
@@ -43,22 +43,18 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
     setMathInput(''); 
   };
 
-  const killEnemy = async () => {
-    const batch = writeBatch(db);
-    batch.delete(doc(db, 'active_enemies', enemy.id));
-    await batch.commit();
-  };
-
   const handleDelete = () => {
     setDialog({
       isOpen: true,
-      title: 'Clear Threat Card',
-      message: `Remove ${enemy.name} from the active threats panel? (Their corpse will remain on the battlefield).`,
+      title: 'Clear Threat',
+      message: `Completely remove ${enemy.name} from the active threats panel and the battlemap?`,
       type: 'confirm',
       onConfirm: async () => {
         try {
-          await updateHp(-9999); 
-          setTimeout(() => { killEnemy(); }, 500);
+          const batch = writeBatch(db);
+          batch.delete(doc(db, 'active_enemies', enemy.id));
+          batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${enemy.id}`]: deleteField() });
+          await batch.commit();
         } catch (err) {
           console.error("Enemy Deletion Sync Failed:", err);
         }
@@ -96,7 +92,6 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
   const hpPercent = Math.max(0, Math.min(100, (currentHp / enemy.hp) * 100));
   const hpColor = hpPercent > 50 ? 'bg-emerald-500/80' : hpPercent > 20 ? 'bg-amber-500/80' : 'bg-red-500/80';
 
-  // Data Normalization Helper: Makes sure strings are safely wrapped into arrays to prevent .map crashes
   const normalizeArray = (val, defaultName) => {
     if (!val) return [];
     if (Array.isArray(val)) return val;
@@ -112,36 +107,35 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
     <>
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
       
-      <div className={`bg-slate-900 border-[3px] ${isSelected ? 'border-indigo-500 shadow-[6px_6px_0px_rgba(99,102,241,1)]' : isDead ? 'border-red-950 shadow-[6px_6px_0px_rgba(127,29,29,1)]' : 'border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)]'} rounded-2xl relative flex flex-col h-full transition-all overflow-hidden group`}>
+      <div className={`bg-slate-900 border-[3px] ${isSelected ? 'border-indigo-500 shadow-[6px_6px_0px_rgba(99,102,241,1)]' : isDead ? 'border-red-950 shadow-[6px_6px_0px_rgba(127,29,29,1)]' : 'border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)]'} rounded-2xl flex flex-col h-full transition-all overflow-hidden relative group`}>
         
-        <button 
-          onClick={onToggleSelect}
-          className={`absolute top-3 left-3 z-20 p-2 bg-slate-900 rounded-lg transition-transform border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${isSelected ? 'bg-indigo-500 text-slate-950' : 'hover:bg-slate-800'}`}
-          title={isSelected ? "Deselect Target" : "Select for Mass Damage/Healing"}
-        >
-          {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-slate-400" />}
-        </button>
-
-        <div className={`w-full h-32 relative flex items-center justify-center shrink-0 border-b-[3px] border-slate-950 overflow-hidden ${isDead ? 'bg-red-950' : 'bg-red-600'}`}>
+        <div className={`flex items-start justify-between p-3 border-b-[3px] border-slate-950 shrink-0 relative overflow-hidden transition-colors ${isDead ? 'bg-red-950' : 'bg-red-600'}`}>
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20 mix-blend-overlay pointer-events-none"></div>
-          <Skull className={`w-20 h-20 ${isDead ? 'text-red-900/50' : 'text-red-950/20'} drop-shadow-[2px_2px_0px_rgba(0,0,0,0.5)]`} />
           
-          <div className="absolute bottom-3 left-4 right-14 text-left">
-            <h3 className={`font-black text-xl leading-tight truncate uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] ${isDead ? 'text-red-400 line-through' : 'text-slate-950'}`}>
-              {enemy.name}
-            </h3>
-            <p className="text-[10px] font-bold text-slate-100 uppercase tracking-widest truncate w-full mt-0.5 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
-              {enemy.flavor || "Dangerous Foe"}
-            </p>
+          <div className="flex items-center gap-3 overflow-hidden relative z-10">
+            <button onClick={onToggleSelect} className="text-slate-950 hover:text-white transition-colors">
+              {isSelected ? <CheckSquare className="w-5 h-5 text-indigo-300 bg-slate-950 rounded shadow-inner" /> : <Square className="w-5 h-5 opacity-60" />}
+            </button>
+            <div className="w-10 h-10 rounded-lg border-2 border-slate-950 overflow-hidden bg-slate-900 shrink-0 shadow-[2px_2px_0px_rgba(0,0,0,0.5)] relative flex items-center justify-center">
+              {enemy.img && enemy.img !== '/icon.png' ? (
+                <img src={enemy.img} className={`w-full h-full object-cover ${isDead ? 'opacity-30 grayscale' : ''}`} />
+              ) : (
+                <Skull className={`w-full h-full p-2 ${isDead ? 'text-red-900' : 'text-red-500'}`} />
+              )}
+              {isDead && <Skull className="absolute inset-0 m-auto w-6 h-6 text-red-500 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]" />}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <h3 className={`font-black text-base uppercase tracking-widest truncate drop-shadow-[1px_1px_0px_rgba(0,0,0,0.5)] ${isDead ? 'text-red-500 line-through' : 'text-slate-950'}`}>
+                {enemy.name}
+              </h3>
+              <span className="text-[9px] font-bold text-slate-100 uppercase tracking-widest truncate drop-shadow-sm">{enemy.flavor || "Threat"}</span>
+            </div>
           </div>
-
-          <button 
-            onClick={handleDelete} 
-            className="absolute top-3 right-3 p-2 bg-slate-950 text-slate-400 hover:text-red-500 hover:bg-slate-900 border-2 border-slate-950 rounded-lg transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none z-20" 
-            title="Clear Threat (Leave Corpse)"
-          >
-            <Trash2 className="w-4 h-4 font-black" />
-          </button>
+          
+          <div className="flex items-center gap-1 shrink-0 bg-slate-950/20 p-1 rounded-lg border border-slate-950/20 relative z-10 shadow-inner">
+            <button onClick={onEdit} title="Edit Enemy" className="p-1.5 text-slate-950 hover:bg-slate-950 hover:text-amber-400 rounded transition-colors"><Edit3 className="w-4 h-4 font-black"/></button>
+            <button onClick={handleDelete} title="Remove Threat" className="p-1.5 text-slate-950 hover:bg-slate-950 hover:text-red-500 rounded transition-colors"><Trash2 className="w-4 h-4 font-black"/></button>
+          </div>
         </div>
 
         <div className="p-4 flex flex-col flex-1 space-y-4">
@@ -206,6 +200,45 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
             </div>
           </div>
 
+          <div className="bg-slate-900 p-3 rounded-xl border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)] relative z-10">
+            <div className="flex items-center justify-between border-b-2 border-slate-950 pb-2 mb-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-fuchsia-500 flex items-center gap-1.5 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><Skull className="w-4 h-4"/> Conditions</span>
+              <button onClick={() => setShowConditionPicker(!showConditionPicker)} className="text-[10px] font-black uppercase tracking-widest bg-slate-950 text-white px-2 py-1 rounded-md border border-slate-800 hover:bg-slate-800 transition-colors flex items-center gap-1 shadow-inner">
+                <Plus className="w-3 h-3"/> Add
+              </button>
+            </div>
+
+            {showConditionPicker && (
+              <div className="absolute right-3 top-12 mt-1 w-56 bg-slate-900 border-[3px] border-slate-950 rounded-xl p-2 shadow-[8px_8px_0px_rgba(0,0,0,1)] z-50 grid grid-cols-2 gap-1 animate-in fade-in zoom-in-95">
+                {CONDITIONS_LIST.filter(c => !activeConditions.includes(c)).map(c => (
+                  <button 
+                    key={c} 
+                    onClick={() => handleAddCondition(c)} 
+                    className="text-[9px] font-black uppercase tracking-widest bg-slate-950 border border-slate-800 hover:bg-fuchsia-600 hover:text-slate-950 text-slate-300 rounded py-1.5 px-2 text-left transition-colors truncate shadow-inner"
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2 min-h-[28px]">
+              {activeConditions.length === 0 ? (
+                <span className="text-[10px] font-bold text-slate-500 italic mt-1 uppercase tracking-widest">No active conditions</span>
+              ) : (
+                activeConditions.map(cond => (
+                  <button 
+                    key={cond} 
+                    onClick={() => handleRemoveCondition(cond)} 
+                    className="bg-fuchsia-500 hover:bg-fuchsia-400 text-slate-950 text-[9px] uppercase font-black px-2 py-1 rounded-md flex items-center gap-1 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none group transition-all"
+                  >
+                    {cond} <span className="group-hover:text-red-600 font-black text-xs leading-none">×</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
           <div className="flex gap-3 shrink-0">
             <div className="flex-1 bg-slate-950 border-2 border-slate-900 rounded-xl px-4 py-2 flex items-center justify-between gap-3 shadow-inner">
               <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1.5"><Shield className="w-4 h-4"/> AC</span>
@@ -215,68 +248,6 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect }) {
               {isExpanded ? <ChevronUp className="w-4 h-4"/> : <ChevronDown className="w-4 h-4"/>} Details
             </button>
           </div>
-
-          <div className="bg-slate-900 p-4 rounded-xl border-2 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 mb-4 relative border-b-2 border-slate-950 pb-3">
-              <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-fuchsia-500 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><Skull className="w-4 h-4" /> Conditions</span>
-              
-              <div>
-                <button 
-                  onClick={() => setShowConditionPicker(!showConditionPicker)} 
-                  className="w-full xl:w-auto bg-slate-950 text-[10px] font-black uppercase tracking-widest text-white border-2 border-slate-800 rounded-lg py-1.5 px-4 hover:bg-slate-800 transition-all flex items-center gap-1.5 justify-center shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"
-                >
-                  <Plus className="w-3 h-3" /> Add
-                </button>
-                
-                {showConditionPicker && (
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-slate-900 border-[3px] border-slate-950 rounded-xl p-2 shadow-[8px_8px_0px_rgba(0,0,0,1)] z-50 grid grid-cols-2 gap-1 animate-in fade-in zoom-in-95">
-                    {CONDITIONS_LIST.filter(c => !activeConditions.includes(c)).map(c => (
-                      <button 
-                        key={c} 
-                        onClick={() => handleAddCondition(c)} 
-                        className="text-[10px] font-black uppercase tracking-widest bg-slate-950 border border-slate-800 hover:bg-fuchsia-600 hover:text-slate-950 text-slate-300 rounded py-2 px-2 text-left transition-colors truncate"
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap gap-2 min-h-[32px]">
-              {activeConditions.length === 0 ? (
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 italic mt-1">No active conditions</span>
-              ) : (
-                activeConditions.map(cond => (
-                  <button 
-                    key={cond} 
-                    onClick={() => handleRemoveCondition(cond)} 
-                    className="bg-fuchsia-500 hover:bg-fuchsia-400 border-2 border-slate-950 text-slate-950 text-[9px] uppercase font-black px-2 py-1 rounded-lg transition-all group flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"
-                  >
-                    {cond} <span className="text-slate-950 font-black text-xs leading-none group-hover:text-red-600">×</span>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-
-          {(safeActions.length > 0 || safeFeatures.length > 0) && (
-            <div className="bg-slate-900 p-4 rounded-xl border-2 border-slate-950 space-y-4 mt-auto shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-              {safeFeatures.map((f, i) => (
-                <div key={`f-${i}`} className="text-xs border-b-2 border-slate-950 pb-3 last:border-0 last:pb-0">
-                  <span className="font-black text-amber-500 uppercase tracking-widest block mb-1 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">{f.name}</span>
-                  <span className="text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{f.desc}</span>
-                </div>
-              ))}
-              {safeActions.map((a, i) => (
-                <div key={`a-${i}`} className="text-xs border-b-2 border-slate-950 pb-3 last:border-0 last:pb-0">
-                  <span className="font-black text-red-500 uppercase tracking-widest block mb-1 drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">{a.name}</span>
-                  <span className="text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{a.desc}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {isExpanded && (

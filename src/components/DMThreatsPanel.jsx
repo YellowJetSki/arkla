@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, Hammer, CheckSquare, Square, Flame, Search, MapPin } from 'lucide-react';
+import { Skull, Hammer, CheckSquare, Square, Flame, Search } from 'lucide-react';
 import DMEnemyCard from './DMEnemyCard';
 
 export default function DMThreatsPanel({
   activeEnemies,
   selectedEnemies,
   setIsForgingEnemy,
+  setEditingEnemy,
   selectAllEnemies,
   massMathAmount,
   setMassMathAmount,
@@ -19,31 +20,6 @@ export default function DMThreatsPanel({
   const filteredEnemies = activeEnemies.filter(enemy => 
     enemy.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const deployToBoard = async (enemy) => {
-    try {
-      const mapRef = doc(db, 'campaign', 'battlemap');
-      const mapSnap = await getDoc(mapRef);
-      if (mapSnap.exists()) {
-        const tokens = mapSnap.data().tokens || {};
-        if (!tokens[enemy.id]) {
-          tokens[enemy.id] = {
-            type: 'enemy',
-            x: 0, 
-            y: 0,
-            size: enemy.size || 1,
-            hp: enemy.currentHp ?? enemy.hp ?? 10,
-            maxHp: enemy.maxHp ?? enemy.hp ?? 10,
-            img: enemy.img || enemy.imageUrl || '/icon.png',
-            conditions: enemy.conditions || []
-          };
-          await updateDoc(mapRef, { tokens });
-        }
-      }
-    } catch (err) {
-      console.error("Failed to hot-drop enemy to board", err);
-    }
-  };
 
   return (
     <aside className="w-full h-full bg-slate-900 flex flex-col shrink-0">
@@ -93,20 +69,13 @@ export default function DMThreatsPanel({
            </div>
          ) : (
            filteredEnemies.map(enemy => (
-             <div key={enemy.id} className="relative group">
-               <DMEnemyCard 
-                 enemy={enemy} 
-                 isSelected={selectedEnemies.includes(enemy.id)}
-                 onToggleSelect={() => toggleEnemySelection(enemy.id)}
-               />
-               <button 
-                 onClick={() => deployToBoard(enemy)}
-                 className="absolute top-2 right-12 bg-sky-500 hover:bg-sky-400 text-slate-950 p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none z-10 opacity-0 group-hover:opacity-100 transition-opacity"
-                 title="Hot-Drop to Map"
-               >
-                 <MapPin className="w-4 h-4 font-black" />
-               </button>
-             </div>
+             <DMEnemyCard 
+               key={enemy.id}
+               enemy={enemy} 
+               isSelected={selectedEnemies.includes(enemy.id)}
+               onToggleSelect={() => toggleEnemySelection(enemy.id)}
+               onEdit={() => setEditingEnemy(enemy)}
+             />
            ))
          )}
       </div>

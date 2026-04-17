@@ -7,14 +7,14 @@ import ImageSelector from './shared/ImageSelector';
 import { applySanctuaryFilter } from '../services/arklaEngine';
 import { fetchAllSpells, fetchSpellDetails } from '../services/srdApi';
 
-export default function EnemyForge({ onClose }) {
+export default function EnemyForge({ onClose, enemyToEdit }) {
   const [activeTab, setActiveTab] = useState('custom'); 
   const [isSaving, setIsSaving] = useState(false);
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
   const [enemy, setEnemy] = useState({
-    bestiaryId: null, // Tracks if this is an existing Homebrew template
+    bestiaryId: null, 
     name: '', size: 'Medium', type: 'Humanoid', alignment: 'Unaligned', challenge_rating: 1,
     ac: 10, hp: 10, speed: '30 ft.',
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
@@ -29,7 +29,6 @@ export default function EnemyForge({ onClose }) {
   const [customBestiary, setCustomBestiary] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Spell Injector State
   const [srdSpells, setSrdSpells] = useState([]);
   const [spellSearch, setSpellSearch] = useState('');
   const [filteredSpells, setFilteredSpells] = useState([]);
@@ -39,7 +38,22 @@ export default function EnemyForge({ onClose }) {
     fetchAllSpells().then(setSrdSpells);
   }, []);
 
-  // Fetch the DM's permanent custom Bestiary
+  // LOAD ENEMY TO EDIT
+  useEffect(() => {
+    if (enemyToEdit) {
+      setEnemy({
+        ...enemyToEdit,
+        hp: enemyToEdit.maxHp || enemyToEdit.hp, // Form handles Max HP
+        imageUrl: enemyToEdit.img || '',
+        tokenUrl: enemyToEdit.img || '',
+        actions: enemyToEdit.actions?.[0]?.desc || '',
+        reactions: enemyToEdit.reactions?.[0]?.desc || '',
+        traits: enemyToEdit.features?.[0]?.desc || enemyToEdit.special_abilities?.[0]?.desc || ''
+      });
+      setActiveTab('custom');
+    }
+  }, [enemyToEdit]);
+
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'bestiary'), (snap) => {
       const templates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
@@ -48,17 +62,14 @@ export default function EnemyForge({ onClose }) {
     return () => unsub();
   }, []);
 
-  // Mixed Search Engine: Queries local Bestiary AND 5e API
   useEffect(() => {
     const delayFn = setTimeout(async () => {
       if (searchQuery.trim().length > 1) {
         setIsSearching(true);
         const q = searchQuery.trim().toLowerCase();
         
-        // 1. Search local Homebrew Bestiary
         const localMatches = customBestiary.filter(e => e.name.toLowerCase().includes(q));
 
-        // 2. Search 5e API
         try {
           const res = await fetch(`https://www.dnd5eapi.co/api/monsters/?name=${encodeURIComponent(q)}`);
           const data = await res.json();
@@ -138,63 +149,100 @@ export default function EnemyForge({ onClose }) {
       if (enemy.size === 'Huge') tokenSize = 3;
       if (enemy.size === 'Gargantuan') tokenSize = 4;
 
-      const newEnemyId = `enemy_${Date.now()}`;
-      const bId = enemy.bestiaryId || `bestiary_${Date.now()}`;
-
-      const newEnemy = {
-        ...enemy,
-        id: newEnemyId,
-        flavor: `${enemy.size} ${enemy.type}, ${enemy.alignment}`,
-        ac: Number(enemy.ac),
-        hp: Number(enemy.hp),
-        currentHp: Number(enemy.hp),
-        maxHp: Number(enemy.hp),
-        challenge_rating: Number(enemy.challenge_rating),
-        size: tokenSize,
-        conditions: [],
-        actions: enemy.actions ? [{ name: 'Actions', desc: enemy.actions }] : [],
-        reactions: enemy.reactions ? [{ name: 'Reactions', desc: enemy.reactions }] : [],
-        special_abilities: enemy.traits ? [{ name: 'Traits', desc: enemy.traits }] : [],
-        features: enemy.traits ? [{ name: 'Traits', desc: enemy.traits }] : [], 
-        img: enemy.tokenUrl || enemy.imageUrl || '/icon.png',
-        isHomebrew: true
-      };
-
       const batch = writeBatch(db);
+      
+      // LOGIC 1: UPDATING AN EXISTING ACTIVE ENEMY
+      if (enemyToEdit) {
+         const newMaxHp = Number(enemy.hp);
+         const currentHpBounded = Math.min(enemyToEdit.currentHp, newMaxHp);
 
-      // 1. Save to Permanent Bestiary Vault
-      const templateData = { ...enemy, bestiaryId: bId, isCustomTemplate: true };
-      batch.set(doc(db, 'bestiary', bId), templateData);
+         const updatedData = {
+            ...enemy,
+            ac: Number(enemy.ac),
+            hp: newMaxHp,
+            maxHp: newMaxHp,
+            currentHp: currentHpBounded,
+            size: tokenSize,
+            img: enemy.tokenUrl || enemy.imageUrl || '/icon.png',
+            actions: enemy.actions ? [{ name: 'Actions', desc: enemy.actions }] : [],
+            reactions: enemy.reactions ? [{ name: 'Reactions', desc: enemy.reactions }] : [],
+            special_abilities: enemy.traits ? [{ name: 'Traits', desc: enemy.traits }] : [],
+            features: enemy.traits ? [{ name: 'Traits', desc: enemy.traits }] : [],
+         };
 
-      // 2. Deploy directly to active_enemies 
-      const enemyRef = doc(db, 'active_enemies', newEnemyId);
-      batch.set(enemyRef, newEnemy);
+         batch.update(doc(db, 'active_enemies', enemyToEdit.id), updatedData);
 
-      // 3. Instantly deploy token to the Battlemap
-      const mapRef = doc(db, 'campaign', 'battlemap');
-      const mapSnap = await getDoc(mapRef);
-      if (mapSnap.exists()) {
-        const mapTokens = mapSnap.data().tokens || {};
-        mapTokens[newEnemyId] = {
-          id: newEnemyId,
-          type: 'enemy',
-          x: 0,
-          y: 0,
-          size: tokenSize,
-          hp: Number(enemy.hp),
-          maxHp: Number(enemy.hp),
-          img: newEnemy.img,
-          conditions: [],
-          name: enemy.name.split(' ')[0] || 'Unknown'
-        };
-        batch.update(mapRef, { tokens: mapTokens });
+         const mapRef = doc(db, 'campaign', 'battlemap');
+         const mapSnap = await getDoc(mapRef);
+         if (mapSnap.exists()) {
+            const mapTokens = mapSnap.data().tokens || {};
+            if (mapTokens[enemyToEdit.id]) {
+               mapTokens[enemyToEdit.id] = {
+                  ...mapTokens[enemyToEdit.id],
+                  hp: currentHpBounded,
+                  maxHp: newMaxHp,
+                  ac: Number(enemy.ac),
+                  size: tokenSize,
+                  img: updatedData.img,
+                  name: enemy.name.split(' ')[0] || 'Unknown'
+               };
+               batch.update(mapRef, { tokens: mapTokens });
+            }
+         }
+      } 
+      // LOGIC 2: CREATING A NEW ENEMY
+      else {
+         const newEnemyId = `enemy_${Date.now()}`;
+         const bId = enemy.bestiaryId || `bestiary_${Date.now()}`;
+
+         const newEnemy = {
+            ...enemy,
+            id: newEnemyId,
+            flavor: `${enemy.size} ${enemy.type}, ${enemy.alignment}`,
+            ac: Number(enemy.ac),
+            hp: Number(enemy.hp),
+            currentHp: Number(enemy.hp),
+            maxHp: Number(enemy.hp),
+            challenge_rating: Number(enemy.challenge_rating),
+            size: tokenSize,
+            conditions: [],
+            actions: enemy.actions ? [{ name: 'Actions', desc: enemy.actions }] : [],
+            reactions: enemy.reactions ? [{ name: 'Reactions', desc: enemy.reactions }] : [],
+            special_abilities: enemy.traits ? [{ name: 'Traits', desc: enemy.traits }] : [],
+            features: enemy.traits ? [{ name: 'Traits', desc: enemy.traits }] : [], 
+            img: enemy.tokenUrl || enemy.imageUrl || '/icon.png',
+            isHomebrew: true
+         };
+
+         const templateData = { ...enemy, bestiaryId: bId, isCustomTemplate: true };
+         batch.set(doc(db, 'bestiary', bId), templateData);
+         batch.set(doc(db, 'active_enemies', newEnemyId), newEnemy);
+
+         const mapRef = doc(db, 'campaign', 'battlemap');
+         const mapSnap = await getDoc(mapRef);
+         if (mapSnap.exists()) {
+            const mapTokens = mapSnap.data().tokens || {};
+            mapTokens[newEnemyId] = {
+               id: newEnemyId,
+               type: 'enemy',
+               x: 0,
+               y: 0,
+               size: tokenSize,
+               hp: Number(enemy.hp),
+               maxHp: Number(enemy.hp),
+               img: newEnemy.img,
+               conditions: [],
+               name: enemy.name.split(' ')[0] || 'Unknown'
+            };
+            batch.update(mapRef, { tokens: mapTokens });
+         }
       }
 
       await batch.commit();
       onClose();
     } catch (error) {
       console.error("Error forging enemy:", error);
-      setDialog({ isOpen: true, title: 'Forge Error', message: 'Failed to summon enemy.', type: 'alert' });
+      setDialog({ isOpen: true, title: 'Forge Error', message: 'Failed to summon/update enemy.', type: 'alert' });
     } finally {
       setIsSaving(false);
     }
@@ -203,7 +251,6 @@ export default function EnemyForge({ onClose }) {
   const loadEnemyIntoForge = async (monster) => {
     setIsSaving(true);
     try {
-      // If it's a Homebrew Bestiary Template, just load the raw state perfectly
       if (monster.isCustomTemplate) {
         setEnemy({ ...monster });
         setActiveTab('custom');
@@ -211,7 +258,6 @@ export default function EnemyForge({ onClose }) {
         return;
       }
 
-      // Otherwise, it's from the D&D 5e API. Fetch and map it!
       const res = await fetch(`https://www.dnd5eapi.co${monster.url}`);
       const data = await res.json();
 
@@ -224,7 +270,7 @@ export default function EnemyForge({ onClose }) {
       const formattedReactions = (data.reactions || []).map(r => `${r.name}. ${r.desc}`).join('\n\n');
 
       setEnemy({
-        bestiaryId: null, // Nullifies ID so if you save this, it becomes a NEW Homebrew template!
+        bestiaryId: null, 
         name: applySanctuaryFilter(data.name),
         size: data.size || 'Medium',
         type: data.type || 'Humanoid',
@@ -276,10 +322,12 @@ export default function EnemyForge({ onClose }) {
                <h2 className="text-xl font-black text-slate-950 flex items-center gap-2 uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,0.3)]">
                  <Skull className="w-6 h-6" /> Monster Forge
                </h2>
-               <div className="flex bg-red-700 rounded-xl p-1 border-2 border-slate-950 shadow-inner">
-                 <button onClick={() => setActiveTab('custom')} className={`px-4 py-1.5 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-colors ${activeTab === 'custom' ? 'bg-slate-950 text-red-500 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'text-slate-950 hover:bg-red-500'}`}>Forge</button>
-                 <button onClick={() => setActiveTab('api')} className={`px-4 py-1.5 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-colors ${activeTab === 'api' ? 'bg-slate-950 text-red-500 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'text-slate-950 hover:bg-red-500'}`}>Bestiary</button>
-               </div>
+               {!enemyToEdit && (
+                 <div className="flex bg-red-700 rounded-xl p-1 border-2 border-slate-950 shadow-inner">
+                   <button onClick={() => setActiveTab('custom')} className={`px-4 py-1.5 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-colors ${activeTab === 'custom' ? 'bg-slate-950 text-red-500 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'text-slate-950 hover:bg-red-500'}`}>Forge</button>
+                   <button onClick={() => setActiveTab('api')} className={`px-4 py-1.5 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-colors ${activeTab === 'api' ? 'bg-slate-950 text-red-500 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'text-slate-950 hover:bg-red-500'}`}>Bestiary</button>
+                 </div>
+               )}
             </div>
             <button onClick={onClose} className="text-slate-950 bg-red-500 hover:bg-red-400 transition-colors p-2 rounded-xl border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><X className="w-5 h-5 font-black" /></button>
           </div>
@@ -294,7 +342,7 @@ export default function EnemyForge({ onClose }) {
                     <div className="sm:col-span-2 lg:col-span-4">
                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-2">
                         Monster Name 
-                        {enemy.bestiaryId && <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[8px]">EDITING TEMPLATE</span>}
+                        {enemyToEdit ? <span className="bg-amber-500 text-slate-950 px-2 py-0.5 rounded text-[8px]">EDITING ACTIVE ENEMY</span> : enemy.bestiaryId && <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[8px]">EDITING TEMPLATE</span>}
                       </label>
                       <input type="text" value={enemy.name} onChange={e => setEnemy({...enemy, name: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-xl px-4 py-3 text-white text-lg font-black focus:outline-none focus:border-red-500 shadow-inner" placeholder="e.g. The Brevar Chieftain" />
                     </div>
@@ -321,7 +369,7 @@ export default function EnemyForge({ onClose }) {
 
                 <div className="grid grid-cols-3 gap-4 bg-slate-900 p-5 rounded-2xl border-[3px] border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)]">
                   <div>
-                    <label className="flex items-center justify-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><Heart className="w-4 h-4 text-red-500 drop-shadow-sm" /> HP</label>
+                    <label className="flex items-center justify-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><Heart className="w-4 h-4 text-red-500 drop-shadow-sm" /> Max HP</label>
                     <input type="number" value={enemy.hp} onChange={e => setEnemy({...enemy, hp: e.target.value})} className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white text-center font-black text-2xl focus:outline-none focus:border-red-500 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none" />
                   </div>
                   <div>
@@ -424,7 +472,7 @@ export default function EnemyForge({ onClose }) {
                 </div>
                 
                 <button type="submit" disabled={isSaving} className="w-full bg-red-600 hover:bg-red-500 text-slate-950 font-black uppercase tracking-widest text-sm py-5 rounded-xl transition-all border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)] active:translate-y-[6px] active:shadow-none mt-4">
-                  {isSaving ? 'Summoning...' : 'Save to Bestiary & Deploy'}
+                  {isSaving ? 'Processing...' : enemyToEdit ? 'Update Active Enemy' : 'Save to Bestiary & Deploy'}
                 </button>
               </form>
             ) : (

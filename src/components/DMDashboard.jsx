@@ -30,6 +30,7 @@ export default function DMDashboard({ onLogout }) {
 
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [isForgingEnemy, setIsForgingEnemy] = useState(false);
+  const [editingEnemy, setEditingEnemy] = useState(null); // NEW: Tracks who we are editing
   const [isBuildingCharacter, setIsBuildingCharacter] = useState(false);
   const [scratchpad, setScratchpad] = useState(() => localStorage.getItem('dm_scratchpad') || '');
 
@@ -52,11 +53,9 @@ export default function DMDashboard({ onLogout }) {
     localStorage.setItem('dm_scratchpad', val);
   };
 
-  // NEW ARCHITECTURE: Fetch ALL characters permanently, not just logged-in ones!
   useEffect(() => {
     const charsRef = collection(db, 'characters');
     const unsubscribeChars = onSnapshot(charsRef, (snapshot) => {
-      // Document IDs are inherently unique, so deduplication is guaranteed!
       const charIds = snapshot.docs.map(d => d.id);
       setUnlockedCharacters(charIds);
     });
@@ -267,7 +266,7 @@ export default function DMDashboard({ onLogout }) {
         </div>
       )}
 
-      {isForgingEnemy && <EnemyForge onClose={() => setIsForgingEnemy(false)} />}
+      {isForgingEnemy && <EnemyForge onClose={() => { setIsForgingEnemy(false); setEditingEnemy(null); }} enemyToEdit={editingEnemy} />}
       {isBuildingCharacter && <DMCharacterBuilder onClose={() => setIsBuildingCharacter(false)} />}
       
       {activeManager === 'items' && <DMItemManager activePlayers={unlockedCharacters} onClose={() => setActiveManager(null)} />}
@@ -317,10 +316,7 @@ export default function DMDashboard({ onLogout }) {
         </div>
       </header>
 
-      {/* 3-COLUMN LAYOUT: Party | Initiative/Commands | Threats */}
       <main className="flex-1 flex flex-col lg:grid lg:grid-cols-3 min-h-0 z-10 bg-slate-950 pb-[76px] lg:pb-0">
-        
-        {/* COLUMN 1: The Party */}
         <div className={`${mobileTab === 'party' ? 'flex' : 'hidden'} lg:flex border-r-2 border-slate-900 bg-slate-950 overflow-hidden flex-col h-full`}>
           <DMPartyPanel 
             unlockedCharacters={unlockedCharacters} 
@@ -328,9 +324,7 @@ export default function DMDashboard({ onLogout }) {
           />
         </div>
 
-        {/* COLUMN 2: Command Center & Initiative */}
         <div className={`${mobileTab === 'initiative' ? 'flex' : 'hidden'} lg:flex bg-slate-950 flex-col p-3 md:p-4 overflow-hidden lg:border-r-2 border-slate-900 h-full w-full`}>
-          
           <div className="bg-slate-900 border-[3px] border-slate-950 rounded-xl p-3 shadow-[4px_4px_0px_rgba(0,0,0,1)] flex flex-row items-center justify-between relative overflow-hidden mb-3 shrink-0">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_left,_var(--tw-gradient-stops))] from-emerald-900/20 via-transparent to-transparent pointer-events-none"></div>
             <div className="flex items-center gap-3 relative z-10 pl-2">
@@ -354,13 +348,13 @@ export default function DMDashboard({ onLogout }) {
           </div>
         </div>
 
-        {/* COLUMN 3: Threats */}
         <div className={`${mobileTab === 'threats' ? 'flex' : 'hidden'} lg:flex bg-slate-950 overflow-hidden flex-col h-full`}>
           <DMThreatsPanel 
             activeEnemies={activeEnemies}
             selectedEnemies={selectedEnemies}
             setActiveManager={setActiveManager}
-            setIsForgingEnemy={setIsForgingEnemy}
+            setIsForgingEnemy={(val) => { setIsForgingEnemy(val); setEditingEnemy(null); }}
+            setEditingEnemy={(enemy) => { setEditingEnemy(enemy); setIsForgingEnemy(true); }}
             selectAllEnemies={selectAllEnemies}
             massMathAmount={massMathAmount}
             setMassMathAmount={setMassMathAmount}
@@ -368,31 +362,17 @@ export default function DMDashboard({ onLogout }) {
             toggleEnemySelection={toggleEnemySelection}
           />
         </div>
-
       </main>
 
-      {/* MOBILE NAV BAR */}
       <div className="lg:hidden fixed bottom-0 left-0 w-full z-40 bg-slate-950 border-t-[3px] border-slate-900 shadow-[0_-4px_20px_rgba(0,0,0,0.8)] pb-safe">
         <div className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] p-2 gap-2 bg-slate-900/90 backdrop-blur-md snap-x">
-          
-          <button 
-            onClick={() => setMobileTab('party')} 
-            className={`snap-center shrink-0 min-w-[80px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 ${mobileTab === 'party' ? 'bg-indigo-600 text-white border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-900 hover:text-white'}`}
-          >
+          <button onClick={() => setMobileTab('party')} className={`snap-center shrink-0 min-w-[80px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 ${mobileTab === 'party' ? 'bg-indigo-600 text-white border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-900 hover:text-white'}`}>
             <Users className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Party</span>
           </button>
-          
-          <button 
-            onClick={() => setMobileTab('initiative')} 
-            className={`snap-center shrink-0 min-w-[80px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 ${mobileTab === 'initiative' ? 'bg-amber-500 text-slate-950 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-900 hover:text-white'}`}
-          >
+          <button onClick={() => setMobileTab('initiative')} className={`snap-center shrink-0 min-w-[80px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 ${mobileTab === 'initiative' ? 'bg-amber-500 text-slate-950 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-900 hover:text-white'}`}>
             <Swords className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Command</span>
           </button>
-          
-          <button 
-            onClick={() => setMobileTab('threats')} 
-            className={`snap-center shrink-0 min-w-[80px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 ${mobileTab === 'threats' ? 'bg-red-600 text-white border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-900 hover:text-white'}`}
-          >
+          <button onClick={() => setMobileTab('threats')} className={`snap-center shrink-0 min-w-[80px] flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all border-2 ${mobileTab === 'threats' ? 'bg-red-600 text-white border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-900 hover:text-white'}`}>
             <Skull className="w-4 h-4"/> <span className="text-[9px] font-black uppercase tracking-widest">Threats</span>
           </button>
           
