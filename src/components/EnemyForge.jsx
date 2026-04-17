@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { doc, setDoc, getDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, getDoc, writeBatch, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, X, Shield, Heart, Wind, Swords, Search, Loader2, Plus, Wand2 } from 'lucide-react';
+import { Skull, X, Shield, Heart, Wind, Swords, Search, Loader2, Plus, Wand2, Trash2 } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import ImageSelector from './shared/ImageSelector';
 import { applySanctuaryFilter } from '../services/arklaEngine';
@@ -14,6 +14,7 @@ export default function EnemyForge({ onClose }) {
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
   const [enemy, setEnemy] = useState({
+    bestiaryId: null, // Tracks if this is an existing Homebrew template
     name: '', size: 'Medium', type: 'Humanoid', alignment: 'Unaligned', challenge_rating: 1,
     ac: 10, hp: 10, speed: '30 ft.',
     stats: { STR: 10, DEX: 10, CON: 10, INT: 10, WIS: 10, CHA: 10 },
@@ -25,6 +26,7 @@ export default function EnemyForge({ onClose }) {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [srdEnemies, setSrdEnemies] = useState([]);
+  const [customBestiary, setCustomBestiary] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
   // Spell Injector State
@@ -37,17 +39,35 @@ export default function EnemyForge({ onClose }) {
     fetchAllSpells().then(setSrdSpells);
   }, []);
 
-  // API Search Debouncer
+  // Fetch the DM's permanent custom Bestiary
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'bestiary'), (snap) => {
+      const templates = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+      setCustomBestiary(templates);
+    });
+    return () => unsub();
+  }, []);
+
+  // Mixed Search Engine: Queries local Bestiary AND 5e API
   useEffect(() => {
     const delayFn = setTimeout(async () => {
       if (searchQuery.trim().length > 1) {
         setIsSearching(true);
+        const q = searchQuery.trim().toLowerCase();
+        
+        // 1. Search local Homebrew Bestiary
+        const localMatches = customBestiary.filter(e => e.name.toLowerCase().includes(q));
+
+        // 2. Search 5e API
         try {
-          const res = await fetch(`https://www.dnd5eapi.co/api/monsters/?name=${encodeURIComponent(searchQuery.trim())}`);
+          const res = await fetch(`https://www.dnd5eapi.co/api/monsters/?name=${encodeURIComponent(q)}`);
           const data = await res.json();
-          setSrdEnemies(data.results || []);
+          const apiMatches = (data.results || []).map(r => ({ ...r, isCustomTemplate: false }));
+          
+          setSrdEnemies([...localMatches, ...apiMatches]);
         } catch (err) {
           console.error(err);
+          setSrdEnemies(localMatches);
         }
         setIsSearching(false);
       } else {
@@ -55,7 +75,7 @@ export default function EnemyForge({ onClose }) {
       }
     }, 500); 
     return () => clearTimeout(delayFn);
-  }, [searchQuery]);
+  }, [searchQuery, customBestiary]);
 
   const handleSpellSearchChange = (e) => {
     const val = e.target.value;
@@ -85,6 +105,25 @@ export default function EnemyForge({ onClose }) {
     setEnemy(prev => ({ ...prev, stats: { ...prev.stats, [stat]: Number(val) } }));
   };
 
+  const handleDeleteTemplate = async (templateId) => {
+    setDialog({
+      isOpen: true,
+      title: 'Delete Template?',
+      message: 'Are you sure you want to permanently remove this monster from your Bestiary?',
+      type: 'confirm',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'bestiary', templateId));
+          setSrdEnemies(prev => prev.filter(e => e.bestiaryId !== templateId));
+          closeDialog();
+        } catch (e) {
+          console.error(e);
+          setDialog({ isOpen: true, title: 'Error', message: 'Failed to delete template.', type: 'alert', onConfirm: closeDialog });
+        }
+      }
+    });
+  };
+
   const handleSaveCustom = async (e) => {
     e.preventDefault();
     if (!enemy.name) {
@@ -100,6 +139,7 @@ export default function EnemyForge({ onClose }) {
       if (enemy.size === 'Gargantuan') tokenSize = 4;
 
       const newEnemyId = `enemy_${Date.now()}`;
+      const bId = enemy.bestiaryId || `bestiary_${Date.now()}`;
 
       const newEnemy = {
         ...enemy,
@@ -122,11 +162,15 @@ export default function EnemyForge({ onClose }) {
 
       const batch = writeBatch(db);
 
-      // 1. Save directly to active_enemies so it populates the Threats panel
+      // 1. Save to Permanent Bestiary Vault
+      const templateData = { ...enemy, bestiaryId: bId, isCustomTemplate: true };
+      batch.set(doc(db, 'bestiary', bId), templateData);
+
+      // 2. Deploy directly to active_enemies 
       const enemyRef = doc(db, 'active_enemies', newEnemyId);
       batch.set(enemyRef, newEnemy);
 
-      // 2. Instantly deploy token to the Battlemap
+      // 3. Instantly deploy token to the Battlemap
       const mapRef = doc(db, 'campaign', 'battlemap');
       const mapSnap = await getDoc(mapRef);
       if (mapSnap.exists()) {
@@ -156,10 +200,19 @@ export default function EnemyForge({ onClose }) {
     }
   };
 
-  const loadApiEnemyIntoForge = async (url) => {
+  const loadEnemyIntoForge = async (monster) => {
     setIsSaving(true);
     try {
-      const res = await fetch(`https://www.dnd5eapi.co${url}`);
+      // If it's a Homebrew Bestiary Template, just load the raw state perfectly
+      if (monster.isCustomTemplate) {
+        setEnemy({ ...monster });
+        setActiveTab('custom');
+        setIsSaving(false);
+        return;
+      }
+
+      // Otherwise, it's from the D&D 5e API. Fetch and map it!
+      const res = await fetch(`https://www.dnd5eapi.co${monster.url}`);
       const data = await res.json();
 
       const profs = data.proficiencies || [];
@@ -171,6 +224,7 @@ export default function EnemyForge({ onClose }) {
       const formattedReactions = (data.reactions || []).map(r => `${r.name}. ${r.desc}`).join('\n\n');
 
       setEnemy({
+        bestiaryId: null, // Nullifies ID so if you save this, it becomes a NEW Homebrew template!
         name: applySanctuaryFilter(data.name),
         size: data.size || 'Medium',
         type: data.type || 'Humanoid',
@@ -205,14 +259,14 @@ export default function EnemyForge({ onClose }) {
       setActiveTab('custom');
     } catch (err) {
       console.error(err);
-      setDialog({ isOpen: true, title: 'Import Error', message: 'Failed to load monster data into the forge.', type: 'alert' });
+      setDialog({ isOpen: true, title: 'Import Error', message: 'Failed to load monster data into the forge.', type: 'alert', onConfirm: closeDialog });
     }
     setIsSaving(false);
   };
 
   return (
     <>
-      <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onCancel={closeDialog} />
+      <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
 
       <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md h-[100dvh] overflow-hidden animate-in fade-in duration-300">
         <div className="bg-slate-900 border-[3px] border-slate-950 rounded-3xl w-full max-w-5xl shadow-[12px_12px_0px_rgba(0,0,0,1)] flex flex-col max-h-[90dvh] relative overflow-hidden animate-in zoom-in-95 duration-500">
@@ -223,8 +277,8 @@ export default function EnemyForge({ onClose }) {
                  <Skull className="w-6 h-6" /> Monster Forge
                </h2>
                <div className="flex bg-red-700 rounded-xl p-1 border-2 border-slate-950 shadow-inner">
-                 <button onClick={() => setActiveTab('custom')} className={`px-4 py-1.5 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-colors ${activeTab === 'custom' ? 'bg-slate-950 text-red-500 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'text-slate-950 hover:bg-red-500'}`}>Custom Board</button>
-                 <button onClick={() => setActiveTab('api')} className={`px-4 py-1.5 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-colors ${activeTab === 'api' ? 'bg-slate-950 text-red-500 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'text-slate-950 hover:bg-red-500'}`}>API Search</button>
+                 <button onClick={() => setActiveTab('custom')} className={`px-4 py-1.5 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-colors ${activeTab === 'custom' ? 'bg-slate-950 text-red-500 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'text-slate-950 hover:bg-red-500'}`}>Forge</button>
+                 <button onClick={() => setActiveTab('api')} className={`px-4 py-1.5 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-colors ${activeTab === 'api' ? 'bg-slate-950 text-red-500 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'text-slate-950 hover:bg-red-500'}`}>Bestiary</button>
                </div>
             </div>
             <button onClick={onClose} className="text-slate-950 bg-red-500 hover:bg-red-400 transition-colors p-2 rounded-xl border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><X className="w-5 h-5 font-black" /></button>
@@ -238,7 +292,10 @@ export default function EnemyForge({ onClose }) {
                 <div className="bg-slate-950 p-5 rounded-2xl border-[3px] border-slate-900 shadow-inner">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div className="sm:col-span-2 lg:col-span-4">
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Monster Name</label>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                        Monster Name 
+                        {enemy.bestiaryId && <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[8px]">EDITING TEMPLATE</span>}
+                      </label>
                       <input type="text" value={enemy.name} onChange={e => setEnemy({...enemy, name: e.target.value})} className="w-full bg-slate-900 border-2 border-slate-800 rounded-xl px-4 py-3 text-white text-lg font-black focus:outline-none focus:border-red-500 shadow-inner" placeholder="e.g. The Brevar Chieftain" />
                     </div>
                     <div>
@@ -367,7 +424,7 @@ export default function EnemyForge({ onClose }) {
                 </div>
                 
                 <button type="submit" disabled={isSaving} className="w-full bg-red-600 hover:bg-red-500 text-slate-950 font-black uppercase tracking-widest text-sm py-5 rounded-xl transition-all border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)] active:translate-y-[6px] active:shadow-none mt-4">
-                  {isSaving ? 'Summoning...' : 'Deploy to Board & Threats'}
+                  {isSaving ? 'Summoning...' : 'Save to Bestiary & Deploy'}
                 </button>
               </form>
             ) : (
@@ -388,11 +445,21 @@ export default function EnemyForge({ onClose }) {
                 ) : (
                   <div className="space-y-4 max-w-3xl mx-auto">
                     {srdEnemies.map(s => (
-                      <div key={s.index} className="bg-slate-900 p-5 rounded-2xl border-[3px] border-slate-950 flex flex-col sm:flex-row gap-4 justify-between sm:items-center group shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:border-red-500 transition-colors">
-                        <span className="font-black text-white flex items-center gap-3 text-lg uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]"><Skull className="w-6 h-6 text-red-500"/> {s.name}</span>
-                        <button onClick={() => loadApiEnemyIntoForge(s.url)} disabled={isSaving} className="bg-red-600 hover:bg-red-500 text-slate-950 px-5 py-3 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest border-2 border-slate-950 transition-all flex items-center justify-center gap-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none w-full sm:w-auto">
-                          <Plus className="w-4 h-4 font-black"/> Load as Template
-                        </button>
+                      <div key={s.index || s.id} className="bg-slate-900 p-5 rounded-2xl border-[3px] border-slate-950 flex flex-col sm:flex-row gap-4 justify-between sm:items-center group shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:border-red-500 transition-colors">
+                        <span className="font-black text-white flex items-center gap-3 text-lg uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
+                          <Skull className="w-6 h-6 text-red-500"/> {s.name}
+                          {s.isCustomTemplate && <span className="bg-indigo-600 px-2 py-1 rounded text-[10px] text-white font-black tracking-widest shadow-inner">HOMEBREW</span>}
+                        </span>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <button onClick={() => loadEnemyIntoForge(s)} disabled={isSaving} className="flex-1 sm:flex-none bg-red-600 hover:bg-red-500 text-slate-950 px-5 py-3 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest border-2 border-slate-950 transition-all flex items-center justify-center gap-2 shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none">
+                            <Plus className="w-4 h-4 font-black"/> Load Template
+                          </button>
+                          {s.isCustomTemplate && (
+                            <button onClick={() => handleDeleteTemplate(s.bestiaryId)} className="bg-slate-950 hover:bg-red-900 text-slate-500 hover:text-red-400 p-3 rounded-xl border-2 border-slate-950 transition-all shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-y-[4px] active:shadow-none" title="Delete Template">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                     {searchQuery && srdEnemies.length === 0 && <p className="text-center text-slate-500 font-bold uppercase tracking-widest p-8 border-[3px] border-dashed border-slate-900 rounded-2xl">No monsters found.</p>}
