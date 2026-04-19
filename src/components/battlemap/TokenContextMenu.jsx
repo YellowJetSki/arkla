@@ -1,156 +1,171 @@
-import { Maximize, CircleDashed, ArrowUpCircle, BrainCircuit, Ruler, EyeOff, Image as ImageIcon, Trash2, Skull, X } from 'lucide-react';
-import { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Heart, Maximize, CircleDashed, ArrowUpCircle, BrainCircuit, Ruler, 
+  EyeOff, Eye, Image as ImageIcon, Trash2, AlertCircle, EarOff, Flame, 
+  Ghost, Link, Ban, Cloud, Lock, Mountain, Skull, ArrowDown, Stars, Moon, X, GripHorizontal 
+} from 'lucide-react';
 
-// Common D&D 5e Conditions
-const CONDITIONS_LIST = [
-  'Blinded', 'Charmed', 'Deafened', 'Exhaustion', 'Frightened',
-  'Grappled', 'Incapacitated', 'Invisible', 'Paralyzed', 'Petrified',
-  'Poisoned', 'Prone', 'Restrained', 'Stunned', 'Unconscious'
-];
+const CONDITION_ICONS = {
+  'Blinded': { icon: EyeOff, color: 'bg-slate-700 text-slate-300 border-slate-500' },
+  'Charmed': { icon: Heart, color: 'bg-pink-600 text-white border-pink-400' },
+  'Deafened': { icon: EarOff, color: 'bg-slate-700 text-slate-300 border-slate-500' },
+  'Exhaustion': { icon: Flame, color: 'bg-orange-600 text-white border-orange-400' },
+  'Frightened': { icon: Ghost, color: 'bg-purple-600 text-white border-purple-400' },
+  'Grappled': { icon: Link, color: 'bg-amber-600 text-white border-amber-400' },
+  'Incapacitated': { icon: Ban, color: 'bg-red-600 text-white border-red-400' },
+  'Invisible': { icon: Cloud, color: 'bg-sky-400/50 text-white border-sky-300' },
+  'Paralyzed': { icon: Lock, color: 'bg-yellow-500 text-yellow-950 border-yellow-300' },
+  'Petrified': { icon: Mountain, color: 'bg-stone-500 text-white border-stone-300' },
+  'Poisoned': { icon: Skull, color: 'bg-lime-500 text-lime-950 border-lime-300' },
+  'Prone': { icon: ArrowDown, color: 'bg-amber-700 text-white border-amber-500' },
+  'Restrained': { icon: Link, color: 'bg-orange-700 text-white border-orange-500' },
+  'Stunned': { icon: Stars, color: 'bg-yellow-400 text-yellow-900 border-yellow-200' },
+  'Unconscious': { icon: Moon, color: 'bg-indigo-800 text-indigo-200 border-indigo-500' }
+};
 
-export default function TokenContextMenu({ 
-  token, 
-  tokenX, 
-  mapCols, 
-  displayName, 
-  onUpdateHpLive, 
-  onDeselect, 
-  onToggleSize, 
-  onToggleAura, 
-  onToggleElevation, 
-  onToggleConcentration, 
-  onToggleRuler, 
-  onToggleHidden, 
-  onUpdateImage, 
-  onRemoveToken, 
-  onToggleCondition,
-  showMovementRangeFor 
+export default function TokenContextMenu({
+  token,
+  displayName,
+  showMovementRangeFor,
+  onUpdateHpLive,
+  onDeselect,
+  onToggleSize,
+  onToggleAura,
+  onToggleElevation,
+  onToggleConcentration,
+  onToggleRuler,
+  onToggleHidden,
+  onUpdateImage,
+  onRemoveToken,
+  onToggleCondition
 }) {
-  const [showConditions, setShowConditions] = useState(false);
   
-  // Decide whether to render the menu to the left or right of the token so it doesn't go off-screen
-  const openLeft = tokenX > (mapCols - 4);
-  const positionClass = openLeft ? 'right-full mr-2' : 'left-full ml-2';
+  // Draggable HUD Logic
+  const [pos, setPos] = useState({ x: Math.max(10, window.innerWidth - 360), y: 80 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+
+  const handlePointerDown = (e) => {
+    setIsDragging(true);
+    dragStart.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+    e.stopPropagation();
+  };
+
+  useEffect(() => {
+    const handlePointerMove = (e) => {
+      if (!isDragging) return;
+      setPos({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
+    };
+    const handlePointerUp = () => setIsDragging(false);
+
+    if (isDragging) {
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+    }
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDragging]);
 
   return (
-    <div className={`absolute top-0 ${positionClass} flex flex-col gap-2 z-[100] w-48 animate-in fade-in zoom-in-95 duration-200 pointer-events-auto`}>
+    <div 
+      className="fixed bg-slate-900 border-[3px] border-slate-950 rounded-2xl shadow-[8px_8px_0px_rgba(0,0,0,1)] z-[999999] w-[320px] flex flex-col pointer-events-auto overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+      style={{ left: pos.x, top: pos.y }}
+      onMouseDown={e => e.stopPropagation()}
+      onClick={e => e.stopPropagation()}
+    >
       
-      {/* HEADER */}
-      <div className="bg-slate-900 border-[3px] border-slate-950 rounded-xl shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden">
-        <div className="bg-indigo-600 px-3 py-2 flex justify-between items-center border-b-2 border-slate-950">
-          <span className="font-black text-[10px] uppercase tracking-widest text-slate-950 truncate drop-shadow-sm">{displayName}</span>
-          <button onClick={(e) => { e.stopPropagation(); onDeselect(); }} className="text-slate-950 hover:text-white transition-colors"><X className="w-4 h-4 font-black" /></button>
+      {/* HUD Header & Drag Handle */}
+      <div 
+        onPointerDown={handlePointerDown}
+        className="bg-slate-950 px-3 py-2 flex items-center justify-between cursor-grab active:cursor-grabbing border-b-2 border-slate-900"
+      >
+        <div className="flex items-center gap-2">
+          <GripHorizontal className="w-4 h-4 text-slate-500" />
+          <span className="text-xs font-black text-white uppercase tracking-widest truncate drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">
+            {displayName}
+          </span>
         </div>
-        
-        <div className="p-2 grid grid-cols-4 gap-1.5 bg-slate-950">
-          <button 
-            onClick={(e) => { e.stopPropagation(); onToggleSize(token.id); }} 
-            className="p-2 bg-slate-900 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-lg transition-colors border border-slate-800 hover:border-slate-950 shadow-inner flex items-center justify-center" 
-            title="Toggle Token Size"
-          >
-            <Maximize className="w-4 h-4" />
-          </button>
-          
-          <button 
-            onClick={(e) => { e.stopPropagation(); onToggleAura(token.id); }} 
-            className={`p-2 rounded-lg transition-colors border shadow-inner flex items-center justify-center ${token.aura > 0 ? 'bg-indigo-600 text-white border-slate-950' : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800'}`} 
-            title="Toggle Aura (Light/Effect)"
-          >
-            <CircleDashed className="w-4 h-4" />
-          </button>
-          
-          <button 
-            onClick={(e) => { e.stopPropagation(); onToggleElevation(token.id); }} 
-            className={`p-2 rounded-lg transition-colors border shadow-inner flex items-center justify-center ${token.elevation > 0 ? 'bg-sky-500 text-slate-950 border-slate-950' : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800'}`} 
-            title="Toggle Flight/Elevation"
-          >
-            <ArrowUpCircle className="w-4 h-4" />
-          </button>
-          
-          <button 
-            onClick={(e) => { e.stopPropagation(); onToggleConcentration(token.id); }} 
-            className={`p-2 rounded-lg transition-colors border shadow-inner flex items-center justify-center ${token.isConcentrating ? 'bg-amber-400 text-slate-950 border-slate-950' : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800'}`} 
-            title="Toggle Concentration"
-          >
-            <BrainCircuit className="w-4 h-4" />
-          </button>
-
-          <button 
-            onClick={(e) => { e.stopPropagation(); onToggleRuler(token.id); }} 
-            className={`p-2 rounded-lg transition-colors border shadow-inner flex items-center justify-center ${showMovementRangeFor?.id === token.id ? 'bg-emerald-500 text-slate-950 border-slate-950' : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800'}`} 
-            title="Show Movement Range"
-          >
-            <Ruler className="w-4 h-4" />
-          </button>
-
-          <button 
-            onClick={(e) => { e.stopPropagation(); onToggleHidden(token.id); }} 
-            className={`p-2 rounded-lg transition-colors border shadow-inner flex items-center justify-center ${token.isHidden ? 'bg-amber-500 text-slate-950 border-slate-950' : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border-slate-800'}`} 
-            title="Hide from Players"
-          >
-            <EyeOff className="w-4 h-4" />
-          </button>
-
-          <button 
-            onClick={(e) => { e.stopPropagation(); onUpdateImage(token.id); }} 
-            className="p-2 bg-slate-900 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-lg transition-colors border border-slate-800 hover:border-slate-950 shadow-inner flex items-center justify-center" 
-            title="Change Token Image"
-          >
-            <ImageIcon className="w-4 h-4" />
-          </button>
-
-          <button 
-            onClick={(e) => { e.stopPropagation(); if(onRemoveToken) onRemoveToken(token.id); }} 
-            className="p-2 bg-slate-900 hover:bg-red-600 text-red-500 hover:text-white rounded-lg transition-colors border border-slate-800 hover:border-slate-950 shadow-inner flex items-center justify-center" 
-            title="Undeploy / Delete Token"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
+        <button 
+          type="button"
+          onClick={onDeselect} 
+          className="text-slate-500 hover:text-white p-1 bg-slate-900 hover:bg-slate-800 rounded transition-colors"
+        >
+          <X className="w-4 h-4 font-black"/>
+        </button>
       </div>
 
-      {/* QUICK HP EDIT */}
-      {token.hp !== undefined && (
-        <div className="bg-slate-900 border-[3px] border-slate-950 rounded-xl shadow-[6px_6px_0px_rgba(0,0,0,1)] p-2">
-          <div className="flex gap-1.5 mb-2">
-            <button onClick={(e) => { e.stopPropagation(); onUpdateHpLive(token.id, token.hp - 1); }} className="flex-1 bg-red-600 hover:bg-red-500 text-white font-black rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">- 1</button>
-            <button onClick={(e) => { e.stopPropagation(); onUpdateHpLive(token.id, token.hp - 5); }} className="flex-1 bg-red-600 hover:bg-red-500 text-white font-black rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">- 5</button>
-          </div>
-          <div className="flex gap-1.5">
-            <button onClick={(e) => { e.stopPropagation(); onUpdateHpLive(token.id, token.hp + 1); }} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">+ 1</button>
-            <button onClick={(e) => { e.stopPropagation(); onUpdateHpLive(token.id, token.hp + 5); }} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">+ 5</button>
+      <div className="p-3 flex flex-col gap-3">
+        {/* HP Bar */}
+        <div className="flex items-center justify-between bg-slate-950 px-3 py-2 rounded-xl border-2 border-slate-900 shadow-inner">
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hit Points</span>
+          <div className="flex items-center gap-2">
+            <Heart className="w-4 h-4 text-red-500 drop-shadow-sm" />
+            <input 
+              type="number" 
+              defaultValue={token.hp}
+              onFocus={(e) => e.target.select()}
+              onBlur={(e) => onUpdateHpLive(token.id, e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+              className="w-14 bg-slate-900 border-2 border-slate-800 rounded px-1 text-white text-lg font-black text-center focus:outline-none focus:border-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
           </div>
         </div>
-      )}
 
-      {/* CONDITIONS TOGGLE */}
-      <div className="bg-slate-900 border-[3px] border-slate-950 rounded-xl shadow-[6px_6px_0px_rgba(0,0,0,1)] overflow-hidden">
-        <button 
-          onClick={(e) => { e.stopPropagation(); setShowConditions(!showConditions); }}
-          className={`w-full px-3 py-2 flex justify-between items-center transition-colors ${showConditions ? 'bg-fuchsia-600 text-slate-950' : 'bg-slate-950 hover:bg-slate-800 text-fuchsia-500'}`}
-        >
-          <span className="font-black text-[10px] uppercase tracking-widest">Conditions</span>
-          <Skull className="w-4 h-4" />
-        </button>
-        
-        {showConditions && (
-          <div className="p-2 grid grid-cols-2 gap-1 bg-slate-900 max-h-48 overflow-y-auto custom-scrollbar">
-            {CONDITIONS_LIST.map(cond => {
-              const isActive = (token.conditions || []).includes(cond);
-              return (
-                <button 
-                  key={cond}
-                  onClick={(e) => { e.stopPropagation(); onToggleCondition(token.id, cond); }}
-                  className={`text-left px-2 py-1.5 rounded text-[9px] font-black uppercase tracking-widest border transition-all ${isActive ? 'bg-fuchsia-500 text-slate-950 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white hover:border-slate-600'}`}
-                >
-                  {cond}
-                </button>
-              );
+        {/* Core Controls */}
+        <div className="grid grid-cols-4 gap-2 bg-slate-950 p-2 rounded-xl border-2 border-slate-900 shadow-inner">
+          <button type="button" onClick={() => onToggleSize(token.id)} className="text-indigo-400 hover:text-indigo-300 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Size">
+            <Maximize className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">{token.size || 1}x</span>
+          </button>
+          <button type="button" onClick={() => onToggleAura(token.id)} className="text-sky-400 hover:text-sky-300 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Aura">
+            <CircleDashed className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">{token.aura ? `${token.aura}ft` : 'Off'}</span>
+          </button>
+          <button type="button" onClick={() => onToggleElevation(token.id)} className="text-emerald-400 hover:text-emerald-300 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Elevation">
+            <ArrowUpCircle className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">{token.elevation ? `+${token.elevation}` : 'Gnd'}</span>
+          </button>
+          <button type="button" onClick={() => onToggleConcentration(token.id)} className={`${token.isConcentrating ? 'text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'text-slate-400'} hover:text-amber-400 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]`} title="Concentration">
+            <BrainCircuit className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">Conc</span>
+          </button>
+          <button type="button" onClick={() => onToggleRuler(token.id)} className={`${showMovementRangeFor?.id === token.id ? 'text-fuchsia-500 drop-shadow-[0_0_5px_rgba(217,70,239,0.5)]' : 'text-slate-400'} hover:text-fuchsia-400 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]`} title="Movement Ruler">
+            <Ruler className="w-4 h-4" /> <span className="text-[9px] font-black uppercase tracking-widest">Move</span>
+          </button>
+          <button type="button" onClick={() => onToggleHidden(token.id)} className={`${token.isHidden ? 'text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]' : 'text-slate-400'} hover:text-white flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]`} title="Toggle Visibility">
+            {token.isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />} <span className="text-[9px] font-black uppercase tracking-widest">Hide</span>
+          </button>
+          <button type="button" onClick={() => onUpdateImage(token.id)} className="text-slate-400 hover:text-emerald-400 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Update Image">
+            <ImageIcon className="w-4 h-4" /><span className="text-[9px] font-black uppercase tracking-widest">Img</span>
+          </button>
+          {/* THE NEW DELETE BUTTON */}
+          <button type="button" onClick={() => onRemoveToken(token.id)} className="text-slate-400 hover:text-red-500 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Remove from Map">
+            <Trash2 className="w-4 h-4" /><span className="text-[9px] font-black uppercase tracking-widest">Del</span>
+          </button>
+        </div>
+
+        {/* Conditions */}
+        <div className="bg-slate-950 p-3 rounded-xl border-2 border-slate-900 shadow-inner">
+          <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-3">Quick Conditions</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {Object.keys(CONDITION_ICONS).map(cond => {
+               const config = CONDITION_ICONS[cond];
+               const Icon = config.icon;
+               const isActive = token.conditions?.includes(cond);
+               return (
+                 <button 
+                   type="button"
+                   key={cond} 
+                   onClick={() => onToggleCondition(token.id, cond)}
+                   className={`p-2 rounded-lg transition-all border-2 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${isActive ? `${config.color} border-slate-950` : 'text-slate-500 border-slate-900 hover:text-white bg-slate-900 hover:bg-slate-800 hover:border-slate-950'}`}
+                   title={cond}
+                 >
+                   <Icon className="w-4 h-4 font-black" />
+                 </button>
+               )
             })}
           </div>
-        )}
-      </div>
+        </div>
 
+      </div>
     </div>
   );
 }
