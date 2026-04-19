@@ -2,7 +2,9 @@
   {
     "category": "Battle Maps",
     "urls": [
+      "/boathouse_enc.png",
       "/chauzy_map.png",
+      "/scorpion_enc.png",
       "/screwbeard_cave_enc.png",
       "/tutorial_forest_enc.png"
     ]
@@ -14,6 +16,9 @@
       "/geepo_bm.png",
       "/kehrfuffle_bm.png",
       "/leeta_bm.png",
+      "/pavel_bm.png",
+      "/scant_bm.png",
+      "/scorpio_bm.png",
       "/screwbeard_bm.png",
       "/strider_bm.png",
       "/toern_bm.png",
