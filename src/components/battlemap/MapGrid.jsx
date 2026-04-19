@@ -2,7 +2,7 @@ import {
   User, ZoomIn, ZoomOut, Target, 
   EyeOff, Heart, EarOff, Flame, Ghost, Link, 
   Ban, Cloud, Lock, Mountain, Skull, ArrowDown, 
-  Stars, Moon, AlertCircle, BrainCircuit, Circle, Triangle, PenTool, Eraser, Swords
+  Stars, Moon, AlertCircle, BrainCircuit, Maximize, Ruler, CircleDashed, ArrowUpCircle, Image as ImageIcon, Trash2, X, Activity, Eye, Hand
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import MapDrawings from './MapDrawings';
@@ -26,7 +26,7 @@ const CONDITION_ICONS = {
   'Unconscious': { icon: Moon, color: 'bg-indigo-800 text-indigo-200 border-indigo-500' }
 };
 
-const TokenImage = ({ token, isEnemy, parsedName }) => {
+const TokenImage = ({ token, parsedName }) => {
   const [fallbackStep, setFallbackStep] = useState(0);
 
   useEffect(() => {
@@ -41,7 +41,7 @@ const TokenImage = ({ token, isEnemy, parsedName }) => {
   if (fallbackStep === 2) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-full border-[3px] border-slate-950 shadow-inner relative">
-        <User className={`w-4 h-4 md:w-5 md:h-5 ${isEnemy ? 'text-red-500' : 'text-indigo-400'} ${token.size > 1 ? 'scale-150' : ''}`} />
+        <User className={`w-4 h-4 md:w-5 md:h-5 ${token.type === 'enemy' ? 'text-red-500' : token.type === 'npc' ? 'text-slate-400' : 'text-indigo-400'} ${token.size > 1 ? 'scale-150' : ''}`} />
       </div>
     );
   }
@@ -260,7 +260,7 @@ export default function MapGrid({
         <div className="fixed top-8 left-8 z-[200] flex items-center gap-4 bg-slate-950/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-3 shadow-2xl animate-in slide-in-from-left-8 fade-in duration-500">
           {tokens[activeActor.id] ? (
              <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-slate-800 shrink-0">
-               <TokenImage token={tokens[activeActor.id]} parsedName={activeActor.name} isEnemy={activeActor.type === 'enemy'} />
+               <TokenImage token={tokens[activeActor.id]} parsedName={activeActor.name} />
              </div>
           ) : (
              <div className="w-14 h-14 rounded-full border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-slate-900 flex items-center justify-center shrink-0">
@@ -357,10 +357,14 @@ export default function MapGrid({
               .map(token => {
               const isSelected = selectedTokenId === token.id;
               const isActiveTurn = activeActor?.id === token.id; 
+              
               const isEnemy = token.type === 'enemy';
+              const isPlayer = token.type === 'player';
+              const isNPC = token.type === 'npc';
+              
               const tSize = token.size || 1; 
               
-              const entityData = isEnemy ? activeEnemies.find(e => e.id === token.id) : activePlayers.find(p => p.id === token.id);
+              const entityData = isEnemy ? activeEnemies.find(e => e.id === token.id) : isPlayer ? activePlayers.find(p => p.id === token.id) : null;
               
               const rawName = entityData ? entityData.name : token.name;
               const match = rawName ? rawName.match(/["']([^"']+)["']/) : null;
@@ -395,22 +399,27 @@ export default function MapGrid({
                   style={{ width: currentCellSize * tSize, height: currentCellSize * tSize, transform: `translate(${safeX * currentCellSize + offsetXY}px, ${safeY * currentCellSize - offsetXY}px)` }}
                 >
                   
+                  {/* FIX: Static wrapper for the aura to perfectly respect the translate positioning without being broken by the spin animation */}
                   {token.aura > 0 && !isDead && (
                     <div 
-                      className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-[4px] border-dashed pointer-events-none z-0 transition-all duration-500
+                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0"
+                      style={{ width: currentCellSize * (tSize + (token.aura / 5) * 2), height: currentCellSize * (tSize + (token.aura / 5) * 2) }}
+                    >
+                      <div className={`w-full h-full rounded-full border-[4px] border-dashed transition-all duration-500
                         ${isEnemy ? 'border-red-500/80 bg-red-500/20' : 'border-indigo-400/80 bg-indigo-400/20'} 
                         ${isDisplayMode ? 'animate-[spin_20s_linear_infinite]' : 'animate-[spin_30s_linear_infinite]'}`}
-                      style={{ width: currentCellSize * (tSize + (token.aura / 5) * 2), height: currentCellSize * (tSize + (token.aura / 5) * 2) }}
-                    />
+                      />
+                    </div>
                   )}
 
                   <div className={`relative w-[80%] h-[80%] rounded-full shadow-[4px_4px_0px_rgba(0,0,0,0.5)] transition-all z-10
                     ${isSelected && !isDisplayMode ? 'ring-[4px] ring-white scale-105 z-40' : ''} 
                     ${isActiveTurn ? (isDisplayMode ? 'ring-[6px] ring-amber-400 shadow-[0_0_30px_rgba(251,191,36,0.8)] scale-105 z-50' : 'ring-[4px] md:ring-[6px] ring-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.6)] animate-pulse z-50') : ''} 
                     ${isDead ? 'grayscale-[0.9] opacity-60' : ''}
-                    ${isBloodied && !isActiveTurn ? 'ring-[4px] ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.8)]' : ''}
+                    ${isBloodied && !isActiveTurn && !isNPC ? 'ring-[4px] ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.8)]' : ''}
                     ${isEnemy && !isBloodied && !isActiveTurn && !isDead ? 'ring-[3px] ring-slate-950 bg-red-950 shadow-[0_0_15px_rgba(220,38,38,0.5)]' : ''}
-                    ${!isEnemy && !isBloodied && !isActiveTurn && !isDead ? 'ring-[3px] ring-slate-950 bg-indigo-950 shadow-[0_0_15px_rgba(99,102,241,0.5)]' : ''}
+                    ${isPlayer && !isBloodied && !isActiveTurn && !isDead ? 'ring-[3px] ring-slate-950 bg-indigo-950 shadow-[0_0_15px_rgba(99,102,241,0.5)]' : ''}
+                    ${isNPC && !isBloodied && !isActiveTurn && !isDead ? 'ring-[3px] ring-slate-950 bg-slate-800 shadow-[0_0_15px_rgba(148,163,184,0.5)]' : ''}
                   `}>
                     
                     {token.elevation > 0 && !isDead && (
@@ -425,7 +434,7 @@ export default function MapGrid({
                       </div>
                     )}
 
-                    <TokenImage token={token} parsedName={displayName} isEnemy={isEnemy} />
+                    <TokenImage token={token} parsedName={displayName} />
 
                     {isDead && (
                       <div className="absolute inset-0 flex items-center justify-center bg-red-950/80 rounded-full z-40 pointer-events-none">
@@ -455,7 +464,7 @@ export default function MapGrid({
                     )}
                   </div>
 
-                  {isDM && !isDisplayMode && tHp !== undefined && !isDead && (
+                  {isDM && !isDisplayMode && tHp !== undefined && !isDead && !isNPC && (
                     <div className="absolute -bottom-2 left-[5%] w-[90%] h-2 bg-slate-950 rounded-full overflow-hidden border-2 border-slate-950 z-50 shadow-[2px_2px_0px_rgba(0,0,0,1)] pointer-events-none">
                        {(tTempHp > 0) && (
                          <div className="absolute top-0 left-0 h-full bg-indigo-500 z-20 shadow-[0_0_5px_rgba(99,102,241,0.8)]" style={{ width: `${Math.min(100, (tTempHp / (tMaxHp || 1)) * 100)}%` }} />
@@ -476,34 +485,49 @@ export default function MapGrid({
           </div>
         </div>
 
+        {/* CONTEXT MENU OUTSIDE DRAGGABLE DIV */}
+        <div className="absolute inset-0 pointer-events-none z-[60]">
+          {selectedTokenId && tokens[selectedTokenId] && !isDisplayMode && !isPlayerMap && isDM && (
+             <div 
+               className="absolute transition-transform duration-700 ease-in-out pointer-events-none"
+               style={{ 
+                 width: currentCellSize * (tokens[selectedTokenId].size || 1),
+                 height: currentCellSize * (tokens[selectedTokenId].size || 1),
+                 transform: `translate(${tokens[selectedTokenId].x * currentCellSize}px, ${tokens[selectedTokenId].y * currentCellSize}px)` 
+               }}
+             >
+                <div className="pointer-events-auto absolute inset-0"> 
+                  <TokenContextMenu 
+                    token={tokens[selectedTokenId]}
+                    tokenX={tokens[selectedTokenId].x}
+                    mapCols={cols}
+                    displayName={(() => {
+                      const isE = tokens[selectedTokenId].type === 'enemy';
+                      const isP = tokens[selectedTokenId].type === 'player';
+                      const eData = isE ? activeEnemies.find(e => e.id === selectedTokenId) : isP ? activePlayers.find(p => p.id === selectedTokenId) : null;
+                      const rName = eData ? eData.name : tokens[selectedTokenId].name;
+                      const m = rName ? rName.match(/["']([^"']+)["']/) : null;
+                      return m ? m[1] : (rName ? rName.split(' ')[0] : 'Unknown');
+                    })()}
+                    onUpdateHpLive={onUpdateHpLive}
+                    onDeselect={onDeselect}
+                    onToggleSize={onToggleSize}
+                    onToggleAura={onToggleAura}
+                    onToggleElevation={onToggleElevation}
+                    onToggleConcentration={onToggleConcentration}
+                    onToggleRuler={onToggleRuler}
+                    onToggleHidden={onToggleHidden}
+                    onUpdateImage={onUpdateImage}
+                    onRemoveToken={onRemoveToken}
+                    onToggleCondition={onToggleCondition}
+                    showMovementRangeFor={showMovementRangeFor}
+                  />
+                </div>
+             </div>
+          )}
+        </div>
+
       </div>
-
-      {/* FLOATING CONTEXT MENU HUD */}
-      {selectedTokenId && tokens[selectedTokenId] && !isDisplayMode && !isPlayerMap && isDM && (
-        <TokenContextMenu 
-          token={tokens[selectedTokenId]}
-          displayName={(() => {
-            const isE = tokens[selectedTokenId].type === 'enemy';
-            const eData = isE ? activeEnemies.find(e => e.id === selectedTokenId) : activePlayers.find(p => p.id === selectedTokenId);
-            const rName = eData ? eData.name : tokens[selectedTokenId].name;
-            const m = rName ? rName.match(/["']([^"']+)["']/) : null;
-            return m ? m[1] : (rName ? rName.split(' ')[0] : 'Unknown');
-          })()}
-          onUpdateHpLive={onUpdateHpLive}
-          onDeselect={onDeselect}
-          onToggleSize={onToggleSize}
-          onToggleAura={onToggleAura}
-          onToggleElevation={onToggleElevation}
-          onToggleConcentration={onToggleConcentration}
-          onToggleRuler={onToggleRuler}
-          onToggleHidden={onToggleHidden}
-          onUpdateImage={onUpdateImage}
-          onRemoveToken={onRemoveToken}
-          onToggleCondition={onToggleCondition}
-          showMovementRangeFor={showMovementRangeFor}
-        />
-      )}
-
     </div>
   );
 }

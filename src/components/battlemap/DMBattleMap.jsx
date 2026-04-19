@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler, User } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
@@ -72,7 +72,6 @@ export default function DMBattleMap() {
     return () => unsub();
   }, []);
 
-  // TRUE PERSISTENT ARCHITECTURE: Fetch ALL characters directly from the Vault
   useEffect(() => {
     const unsubChars = onSnapshot(collection(db, 'characters'), (snap) => {
        const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -90,7 +89,6 @@ export default function DMBattleMap() {
     };
   }, []);
 
-  // Cleanup ghost tokens if a character is permanently deleted from the Vault
   useEffect(() => {
     const activePlayerIds = activePlayers.map(p => p.id);
     const tokensToRemove = Object.values(tokensRef.current).filter(
@@ -199,6 +197,29 @@ export default function DMBattleMap() {
     if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'campaign', 'battlemap'), updates);
   };
 
+  const spawnNPC = async () => {
+    const npcId = `npc_${Date.now()}`;
+    const newToken = { 
+      id: npcId, 
+      name: 'NPC', 
+      type: 'npc', 
+      img: '', 
+      speed: 30, 
+      conditions: [], 
+      x: 0, 
+      y: 0, 
+      size: 1, 
+      isHidden: false, 
+      hp: 10, 
+      maxHp: 10,
+      tempHp: 0, 
+      aura: 0, 
+      elevation: 0, 
+      isConcentrating: false 
+    };
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${npcId}`]: newToken });
+  };
+
   const removeToken = async (tokenId) => {
     const targetToken = tokens[tokenId];
     try {
@@ -268,7 +289,7 @@ export default function DMBattleMap() {
       const collectionName = targetToken.type === 'player' ? 'characters' : 'active_enemies';
       if (targetToken.type === 'enemy') {
         batch.update(doc(db, collectionName, tokenId), { currentHp: parsedHp });
-      } else {
+      } else if (targetToken.type === 'player') {
         batch.update(doc(db, collectionName, tokenId), { hp: parsedHp });
       }
       await batch.commit();
@@ -417,6 +438,13 @@ export default function DMBattleMap() {
             className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 ${mapData.fogOfWar ? 'bg-slate-400 border-slate-950 text-slate-950' : 'bg-slate-950 border-slate-900 text-slate-500 hover:text-white'}`}
           >
             <Eye className="w-4 h-4" /> Fog
+          </button>
+          
+          <button 
+            onClick={spawnNPC} 
+            className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 bg-slate-800 border-slate-950 text-white hover:bg-slate-700`}
+          >
+            <User className="w-4 h-4" /> + NPC
           </button>
 
           <div className="flex items-center bg-slate-950 p-1 rounded-xl border-2 border-slate-900 shadow-inner shrink-0 mr-1 overflow-x-auto custom-scrollbar">
