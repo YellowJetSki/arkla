@@ -399,7 +399,6 @@ export default function MapGrid({
                   style={{ width: currentCellSize * tSize, height: currentCellSize * tSize, transform: `translate(${safeX * currentCellSize + offsetXY}px, ${safeY * currentCellSize - offsetXY}px)` }}
                 >
                   
-                  {/* FIX: Static wrapper for the aura to perfectly respect the translate positioning without being broken by the spin animation */}
                   {token.aura > 0 && !isDead && (
                     <div 
                       className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0"
@@ -485,47 +484,32 @@ export default function MapGrid({
           </div>
         </div>
 
-        {/* CONTEXT MENU OUTSIDE DRAGGABLE DIV */}
-        <div className="absolute inset-0 pointer-events-none z-[60]">
-          {selectedTokenId && tokens[selectedTokenId] && !isDisplayMode && !isPlayerMap && isDM && (
-             <div 
-               className="absolute transition-transform duration-700 ease-in-out pointer-events-none"
-               style={{ 
-                 width: currentCellSize * (tokens[selectedTokenId].size || 1),
-                 height: currentCellSize * (tokens[selectedTokenId].size || 1),
-                 transform: `translate(${tokens[selectedTokenId].x * currentCellSize}px, ${tokens[selectedTokenId].y * currentCellSize}px)` 
-               }}
-             >
-                <div className="pointer-events-auto absolute inset-0"> 
-                  <TokenContextMenu 
-                    token={tokens[selectedTokenId]}
-                    tokenX={tokens[selectedTokenId].x}
-                    mapCols={cols}
-                    displayName={(() => {
-                      const isE = tokens[selectedTokenId].type === 'enemy';
-                      const isP = tokens[selectedTokenId].type === 'player';
-                      const eData = isE ? activeEnemies.find(e => e.id === selectedTokenId) : isP ? activePlayers.find(p => p.id === selectedTokenId) : null;
-                      const rName = eData ? eData.name : tokens[selectedTokenId].name;
-                      const m = rName ? rName.match(/["']([^"']+)["']/) : null;
-                      return m ? m[1] : (rName ? rName.split(' ')[0] : 'Unknown');
-                    })()}
-                    onUpdateHpLive={onUpdateHpLive}
-                    onDeselect={onDeselect}
-                    onToggleSize={onToggleSize}
-                    onToggleAura={onToggleAura}
-                    onToggleElevation={onToggleElevation}
-                    onToggleConcentration={onToggleConcentration}
-                    onToggleRuler={onToggleRuler}
-                    onToggleHidden={onToggleHidden}
-                    onUpdateImage={onUpdateImage}
-                    onRemoveToken={onRemoveToken}
-                    onToggleCondition={onToggleCondition}
-                    showMovementRangeFor={showMovementRangeFor}
-                  />
-                </div>
-             </div>
-          )}
-        </div>
+        {/* FREELY FLOATING CONTEXT MENU */}
+        {selectedTokenId && tokens[selectedTokenId] && !isDisplayMode && !isPlayerMap && isDM && (
+          <TokenContextMenu 
+            token={tokens[selectedTokenId]}
+            displayName={(() => {
+              const isE = tokens[selectedTokenId].type === 'enemy';
+              const isP = tokens[selectedTokenId].type === 'player';
+              const eData = isE ? activeEnemies.find(e => e.id === selectedTokenId) : isP ? activePlayers.find(p => p.id === selectedTokenId) : null;
+              const rName = eData ? eData.name : tokens[selectedTokenId].name;
+              const m = rName ? rName.match(/["']([^"']+)["']/) : null;
+              return m ? m[1] : (rName ? rName.split(' ')[0] : 'Unknown');
+            })()}
+            onUpdateHpLive={onUpdateHpLive}
+            onDeselect={onDeselect}
+            onToggleSize={onToggleSize}
+            onToggleAura={onToggleAura}
+            onToggleElevation={onToggleElevation}
+            onToggleConcentration={onToggleConcentration}
+            onToggleRuler={onToggleRuler}
+            onToggleHidden={onToggleHidden}
+            onUpdateImage={onUpdateImage}
+            onRemoveToken={onRemoveToken}
+            onToggleCondition={onToggleCondition}
+            showMovementRangeFor={showMovementRangeFor}
+          />
+        )}
 
       </div>
     </div>
