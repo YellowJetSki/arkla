@@ -42,6 +42,18 @@ export default function DMBattleMap() {
   
   const [imagePrompt, setImagePrompt] = useState({ isOpen: false, tokenId: null, url: '' });
 
+  // Helper to grab the FULL document for the selected token
+  const getSelectedEntity = () => {
+    if (!selectedTokenId) return null;
+    const token = tokens[selectedTokenId];
+    if (!token) return null;
+    if (token.type === 'player') return activePlayers.find(p => p.id === selectedTokenId);
+    if (token.type === 'enemy') return activeEnemies.find(e => e.id === selectedTokenId);
+    return null;
+  };
+  
+  const selectedEntity = getSelectedEntity();
+
   useEffect(() => {
     tokensRef.current = tokens;
   }, [tokens]);
@@ -177,7 +189,7 @@ export default function DMBattleMap() {
     if (tokens[actor.id]) return; 
     const newToken = { 
       id: actor.id, name: getShortName(actor.name), type: type, img: actor.img || '', 
-      speed: actor.speed || 30, conditions: actor.conditions || [], x: 0, y: 0, 
+      speed: actor.speed || 30, ac: actor.ac || 10, conditions: actor.conditions || [], x: 0, y: 0, 
       size: getCreatureSize(actor.name), isHidden: false, 
       hp: actor.currentHp ?? actor.hp ?? 0, maxHp: actor.maxHp ?? actor.hp ?? 1,
       tempHp: actor.tempHp || 0, aura: 0, elevation: 0, isConcentrating: actor.isConcentrating || false
@@ -189,10 +201,10 @@ export default function DMBattleMap() {
     const updates = {};
     let pX = 0, eX = 0;
     activePlayers.filter(p => !tokens[p.id]).forEach(p => {
-      updates[`tokens.${p.id}`] = { id: p.id, name: getShortName(p.name), type: 'player', img: p.img || '', speed: p.speed || 30, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
+      updates[`tokens.${p.id}`] = { id: p.id, name: getShortName(p.name), type: 'player', img: p.img || '', speed: p.speed || 30, ac: p.ac || 10, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
     });
     activeEnemies.filter(e => !tokens[e.id]).forEach(e => {
-      updates[`tokens.${e.id}`] = { id: e.id, name: getShortName(e.name), type: 'enemy', img: e.img || '', speed: e.speed || 30, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
+      updates[`tokens.${e.id}`] = { id: e.id, name: getShortName(e.name), type: 'enemy', img: e.img || '', speed: e.speed || 30, ac: e.ac || 10, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
     });
     if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'campaign', 'battlemap'), updates);
   };
@@ -205,6 +217,7 @@ export default function DMBattleMap() {
       type: 'npc', 
       img: '', 
       speed: 30, 
+      ac: 10,
       conditions: [], 
       x: 0, 
       y: 0, 
@@ -545,6 +558,85 @@ export default function DMBattleMap() {
           />
         )}
       </div>
+
+      {/* --- DM STAT BLOCK DRAWER --- */}
+      {selectedEntity && (
+        <div className="absolute top-4 right-4 bottom-4 w-80 bg-slate-900 border-[3px] border-slate-950 rounded-2xl shadow-[8px_8px_0px_rgba(0,0,0,1)] z-[100] flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-200">
+          
+          {/* Drawer Header */}
+          <div className="bg-indigo-600 p-3 border-b-2 border-slate-950 flex justify-between items-start relative overflow-hidden">
+            <div className="relative z-10">
+              <h3 className="font-black text-slate-950 uppercase tracking-widest text-lg">{selectedEntity.name}</h3>
+              <p className="text-[10px] font-bold text-slate-900 bg-white/20 inline-block px-2 py-0.5 rounded mt-1">
+                {selectedEntity.type === 'player' ? `Level ${selectedEntity.level || '?'} Player` : `CR ${selectedEntity.cr || '?'} Enemy`}
+              </p>
+            </div>
+            <button onClick={() => setSelectedTokenId(null)} className="text-slate-950 bg-indigo-500 hover:bg-indigo-400 border-2 border-slate-950 p-1 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none z-10">
+              <X className="w-4 h-4 font-black" />
+            </button>
+            {/* Background Image flair */}
+            {selectedEntity.img && <img src={selectedEntity.img} className="absolute -right-4 -top-4 w-24 h-24 object-cover opacity-20 mix-blend-luminosity rounded-full" />}
+          </div>
+
+          {/* Core Stats Row */}
+          <div className="flex bg-slate-950 border-b-2 border-slate-900">
+            <div className="flex-1 p-2 text-center border-r-2 border-slate-900">
+              <span className="block text-[10px] text-slate-500 font-black">AC</span>
+              <span className="text-blue-400 font-black text-lg">{selectedEntity.ac || tokens[selectedTokenId].ac || 10}</span>
+            </div>
+            <div className="flex-1 p-2 text-center border-r-2 border-slate-900">
+              <span className="block text-[10px] text-slate-500 font-black">HP</span>
+              <span className="text-red-400 font-black text-lg">{tokens[selectedTokenId].hp}/{tokens[selectedTokenId].maxHp}</span>
+            </div>
+            <div className="flex-1 p-2 text-center">
+              <span className="block text-[10px] text-slate-500 font-black">SPEED</span>
+              <span className="text-emerald-400 font-black text-lg">{selectedEntity.speed || tokens[selectedTokenId].speed || 30}</span>
+            </div>
+          </div>
+
+          {/* Scrollable Data Area */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+            
+            {/* Attributes (STR, DEX, etc) */}
+            {selectedEntity.attributes && (
+              <div className="grid grid-cols-3 gap-2">
+                {Object.entries(selectedEntity.attributes).map(([stat, val]) => (
+                  <div key={stat} className="bg-slate-950 border border-slate-800 rounded p-1 text-center">
+                    <span className="text-[9px] uppercase font-bold text-slate-500">{stat}</span>
+                    <p className="text-sm font-black text-white">{val} <span className="text-slate-500 text-xs font-normal">({Math.floor((val - 10) / 2) >= 0 ? '+' : ''}{Math.floor((val - 10) / 2)})</span></p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Actions Section */}
+            <div>
+              <h4 className="text-xs font-black text-indigo-400 uppercase border-b border-slate-800 pb-1 mb-2">Actions</h4>
+              {selectedEntity.actions && selectedEntity.actions.length > 0 ? (
+                <div className="space-y-2">
+                  {selectedEntity.actions.map((action, i) => (
+                    <div key={i} className="bg-slate-800/50 p-2 rounded-lg border border-slate-700 text-sm">
+                      <p className="font-bold text-white mb-1">{action.name} <span className="text-indigo-300 text-xs ml-1">{action.type}</span></p>
+                      <p className="text-slate-300 text-xs">{action.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic">No specific actions listed.</p>
+              )}
+            </div>
+
+            {/* Spells/Features Section */}
+            {(selectedEntity.spells || selectedEntity.features) && (
+              <div>
+                <h4 className="text-xs font-black text-indigo-400 uppercase border-b border-slate-800 pb-1 mb-2">Features & Spells</h4>
+                <p className="text-xs text-slate-400">Data linked from character/enemy sheet.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

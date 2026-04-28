@@ -134,9 +134,16 @@ export default function TokenLayer({
                  </div>
                )}
                
-               {/* Name Tag (Hover) */}
-               <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap opacity-0 group-hover/token:opacity-100 transition-opacity pointer-events-none border border-slate-700 z-50">
-                 {token.name} {token.isHidden && '(Hidden)'} {isDead && '(Dead)'}
+               {/* Upgraded Quick-Glance Hover Tooltip */}
+               <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900/95 text-white px-3 py-1.5 rounded-lg opacity-0 group-hover/token:opacity-100 transition-opacity pointer-events-none border border-slate-700 z-50 flex flex-col items-center shadow-xl min-w-max">
+                 <span className="text-xs font-black uppercase tracking-widest text-indigo-300 mb-1 border-b border-slate-700 w-full text-center pb-0.5">
+                   {token.name} {token.isHidden && '(Hidden)'} {isDead && '(Dead)'}
+                 </span>
+                 <div className="flex gap-3 text-[10px] font-bold">
+                   <span className="flex items-center gap-1 text-red-400"><span className="text-white">HP</span> {token.hp}/{token.maxHp}</span>
+                   <span className="flex items-center gap-1 text-blue-400"><span className="text-white">AC</span> {token.ac || 10}</span>
+                   <span className="flex items-center gap-1 text-emerald-400"><span className="text-white">SPD</span> {token.speed || 30}ft</span>
+                 </div>
                </div>
 
                {/* Status Indicators */}
