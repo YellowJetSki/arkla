@@ -45,6 +45,9 @@ export default function TokenContextMenu({
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
+  // Quick Math Logic
+  const [hpMod, setHpMod] = useState('');
+
   const handlePointerDown = (e) => {
     setIsDragging(true);
     dragStart.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
@@ -67,6 +70,22 @@ export default function TokenContextMenu({
       window.removeEventListener('pointerup', handlePointerUp);
     };
   }, [isDragging]);
+
+  const handleDamage = () => {
+    const amt = parseInt(hpMod, 10);
+    if (!isNaN(amt) && amt > 0) {
+      onUpdateHpLive(token.id, Math.max(0, token.hp - amt));
+      setHpMod('');
+    }
+  };
+
+  const handleHeal = () => {
+    const amt = parseInt(hpMod, 10);
+    if (!isNaN(amt) && amt > 0) {
+      onUpdateHpLive(token.id, Math.min(token.maxHp || 1000, token.hp + amt));
+      setHpMod('');
+    }
+  };
 
   return (
     <div 
@@ -97,19 +116,35 @@ export default function TokenContextMenu({
       </div>
 
       <div className="p-3 flex flex-col gap-3">
-        {/* HP Bar */}
-        <div className="flex items-center justify-between bg-slate-950 px-3 py-2 rounded-xl border-2 border-slate-900 shadow-inner">
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hit Points</span>
-          <div className="flex items-center gap-2">
-            <Heart className="w-4 h-4 text-red-500 drop-shadow-sm" />
-            <input 
-              type="number" 
-              defaultValue={token.hp}
-              onFocus={(e) => e.target.select()}
-              onBlur={(e) => onUpdateHpLive(token.id, e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-              className="w-14 bg-slate-900 border-2 border-slate-800 rounded px-1 text-white text-lg font-black text-center focus:outline-none focus:border-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
+        
+        {/* UPGRADED: Quick Damage/Heal Calculator */}
+        <div className="bg-slate-950 p-2.5 rounded-xl border-2 border-slate-900 shadow-inner flex flex-col gap-2">
+          <div className="flex justify-between items-center px-1">
+             <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1">
+               <Heart className="w-3 h-3 text-slate-500" /> Hit Points
+             </span>
+             <span className={`text-xs font-black ${token.hp <= 0 ? 'text-red-500' : 'text-white'}`}>
+               {token.hp} / {token.maxHp || '?'}
+             </span>
+          </div>
+          <div className="flex gap-2">
+             <input 
+               type="number" 
+               placeholder="Amt..."
+               value={hpMod}
+               onFocus={(e) => e.target.select()}
+               onChange={(e) => setHpMod(e.target.value)}
+               onKeyDown={(e) => {
+                 if (e.key === 'Enter') handleDamage();
+               }}
+               className="w-full bg-slate-900 border-2 border-slate-800 rounded px-2 text-white text-sm font-black focus:outline-none focus:border-indigo-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+             />
+             <button onClick={handleDamage} className="bg-red-500 hover:bg-red-400 text-slate-950 text-[10px] uppercase tracking-widest font-black px-4 py-1.5 rounded border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all">
+               DMG
+             </button>
+             <button onClick={handleHeal} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] uppercase tracking-widest font-black px-4 py-1.5 rounded border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all">
+               HEAL
+             </button>
           </div>
         </div>
 
@@ -136,7 +171,6 @@ export default function TokenContextMenu({
           <button type="button" onClick={() => onUpdateImage(token.id)} className="text-slate-400 hover:text-emerald-400 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Update Image">
             <ImageIcon className="w-4 h-4" /><span className="text-[9px] font-black uppercase tracking-widest">Img</span>
           </button>
-          {/* THE NEW DELETE BUTTON */}
           <button type="button" onClick={() => onRemoveToken(token.id)} className="text-slate-400 hover:text-red-500 flex flex-col items-center gap-1 p-2 bg-slate-900 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none hover:bg-slate-800 rounded-lg transition-all min-w-[40px]" title="Remove from Map">
             <Trash2 className="w-4 h-4" /><span className="text-[9px] font-black uppercase tracking-widest">Del</span>
           </button>
