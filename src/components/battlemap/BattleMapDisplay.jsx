@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { LogOut } from 'lucide-react';
 import MapGrid from './MapGrid';
@@ -12,13 +12,15 @@ export default function BattleMapDisplay({ onLogout }) {
   const [activeHandout, setActiveHandout] = useState(null);
   const [initiative, setInitiative] = useState(null);
 
+  // FIXED: Added state for live characters/enemies to ensure visual states (like Bloodied rings) sync perfectly!
+  const [activePlayers, setActivePlayers] = useState([]);
+  const [activeEnemies, setActiveEnemies] = useState([]);
+
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
     const unsub = onSnapshot(mapRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        
-        // Safety bounds for cols/rows to prevent crash
         const safeCols = Math.min(100, Math.max(1, isNaN(Number(data.cols)) ? 20 : Number(data.cols)));
         const safeRows = Math.min(100, Math.max(1, isNaN(Number(data.rows)) ? 15 : Number(data.rows)));
 
@@ -39,13 +41,21 @@ export default function BattleMapDisplay({ onLogout }) {
     return () => unsub();
   }, []);
 
-  // Directly subscribe to the Initiative order to control the Turn Banner & Camera Focus
+  // Sync Live Character/Enemy Data
+  useEffect(() => {
+    const unsubChars = onSnapshot(collection(db, 'characters'), (snap) => {
+       setActivePlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubEnemies = onSnapshot(collection(db, 'active_enemies'), (snap) => {
+       setActiveEnemies(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsubChars(); unsubEnemies(); };
+  }, []);
+
   useEffect(() => {
     const initRef = doc(db, 'campaign', 'initiative');
     const unsub = onSnapshot(initRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setInitiative(docSnap.data());
-      }
+      if (docSnap.exists()) setInitiative(docSnap.data());
     });
     return () => unsub();
   }, []);
@@ -56,14 +66,9 @@ export default function BattleMapDisplay({ onLogout }) {
       if (docSnap.exists()) {
         const data = docSnap.data();
         const targetId = data.displayHandoutId !== undefined ? data.displayHandoutId : data.latestShareId;
-        
         if (targetId && data.items) {
           const baseItem = data.items.find(i => targetId.startsWith(i.id));
-          if (baseItem && baseItem.url) {
-            setActiveHandout(baseItem);
-          } else {
-            setActiveHandout(null);
-          }
+          setActiveHandout(baseItem && baseItem.url ? baseItem : null);
         } else {
           setActiveHandout(null);
         }
@@ -89,6 +94,8 @@ export default function BattleMapDisplay({ onLogout }) {
         <MapGrid 
           mapData={mapData} 
           tokens={tokens} 
+          activePlayers={activePlayers}    {/* ADDED */}
+          activeEnemies={activeEnemies}    {/* ADDED */}
           activeActor={activeActor} 
           onTileClick={() => {}} 
           onTokenClick={() => {}}
