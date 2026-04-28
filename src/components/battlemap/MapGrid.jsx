@@ -79,14 +79,15 @@ const EnvironmentOverlay = ({ environment }) => {
       0% { transform: translate(0, 0); }
       100% { transform: translate(25%, 25%); } 
     }
-    @keyframes sun-drift {
-      0% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
-      50% { opacity: 0.9; }
-      100% { transform: translateY(-5%) rotate(3deg); opacity: 0.6; }
+    @keyframes god-rays {
+       0% { transform: translateX(-10%) rotate(25deg); opacity: 0.3; }
+       50% { opacity: 0.6; }
+       100% { transform: translateX(10%) rotate(25deg); opacity: 0.3; }
     }
-    @keyframes moon-pulse {
-      0% { opacity: 0.6; }
-      100% { opacity: 1; }
+    @keyframes moon-drift {
+       0% { transform: translateX(-5%) rotate(-15deg); opacity: 0.3; }
+       50% { opacity: 0.6; }
+       100% { transform: translateX(5%) rotate(-15deg); opacity: 0.3; }
     }
 
     .env-light_rain {
@@ -114,10 +115,7 @@ const EnvironmentOverlay = ({ environment }) => {
 
     /* BEAUTIFUL DRIFTING FOG */
     .env-fog::before {
-       content: "";
-       position: absolute;
-       top: -50%; left: -50%;
-       width: 200%; height: 200%;
+       content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
        background-image:
          radial-gradient(circle at 20% 30%, rgba(255,255,255,0.15) 0%, transparent 20%),
          radial-gradient(circle at 80% 60%, rgba(255,255,255,0.1) 0%, transparent 25%),
@@ -131,26 +129,22 @@ const EnvironmentOverlay = ({ environment }) => {
 
     /* ETHEREAL SHIFTING GOD-RAYS */
     .env-sunlight::before {
-       content: "";
-       position: absolute;
-       top: -50%; left: -50%;
-       width: 200%; height: 200%;
-       background-image:
-         linear-gradient(45deg, rgba(255,255,255,0) 40%, rgba(255,240,200,0.15) 50%, rgba(255,255,255,0) 60%),
-         linear-gradient(45deg, rgba(255,255,255,0) 30%, rgba(255,240,200,0.1) 40%, rgba(255,255,255,0) 50%);
-       background-size: 50% 50%;
-       animation: sun-drift 10s alternate infinite ease-in-out;
-       mix-blend-mode: overlay;
+       content: ""; position: absolute; top: -100%; left: -100%; width: 300%; height: 300%;
+       background-image: repeating-linear-gradient(90deg, transparent 0%, rgba(255, 250, 200, 0.15) 10%, transparent 20%);
+       animation: god-rays 15s infinite alternate ease-in-out;
+       mix-blend-mode: color-dodge;
        pointer-events: none;
     }
     .env-sunlight { background-color: rgba(255, 235, 180, 0.05); }
 
-    .env-moonlight {
-       background-image: radial-gradient(circle at 50% 20%, rgba(150, 180, 255, 0.25) 0%, transparent 70%);
-       background-color: rgba(10, 15, 40, 0.7);
-       animation: moon-pulse 8s infinite alternate ease-in-out;
-       mix-blend-mode: multiply;
+    .env-moonlight::after {
+       content: ""; position: absolute; top: -100%; left: -100%; width: 300%; height: 300%;
+       background-image: repeating-linear-gradient(90deg, transparent 0%, rgba(150, 180, 255, 0.1) 15%, transparent 30%);
+       animation: moon-drift 15s infinite alternate ease-in-out;
+       mix-blend-mode: screen;
+       pointer-events: none;
     }
+    .env-moonlight { background-color: rgba(10, 15, 45, 0.5); mix-blend-mode: multiply; }
 
     .env-embers {
        background-image:
@@ -162,10 +156,7 @@ const EnvironmentOverlay = ({ environment }) => {
     }
     
     .env-toxic::before {
-       content: "";
-       position: absolute;
-       top: -50%; left: -50%;
-       width: 200%; height: 200%;
+       content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
        background-image:
          radial-gradient(circle at 20% 30%, rgba(34,197,94,0.15) 0%, transparent 20%),
          radial-gradient(circle at 80% 60%, rgba(16,185,129,0.1) 0%, transparent 25%);
@@ -354,7 +345,6 @@ export default function MapGrid({
   return (
     <div className={`relative w-full flex flex-col overflow-hidden h-full ${isDisplayMode ? 'rounded-none border-0 bg-black' : 'rounded-none md:rounded-2xl border-none md:border-[3px] border-slate-950 bg-slate-900 shadow-[6px_6px_0px_rgba(0,0,0,1)]'}`}>
       
-      {/* THE ENVIRONMENT OVERLAY - Injected directly over the map container */}
       <EnvironmentOverlay environment={mapData?.environment} />
 
       {!isDisplayMode && (

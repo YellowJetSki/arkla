@@ -31,7 +31,6 @@ export default function MapDrawings({
     );
   };
 
-  // FIXED: Bulletproof coordinate fetching for both precise Mouse and Touch screens
   const getCoords = (e, shouldSnap = false) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
@@ -73,10 +72,15 @@ export default function MapDrawings({
     setCurrentLine(prev => {
       if (prev.type === 'freehand' || prev.type === 'reveal') {
         return { ...prev, points: [...prev.points, coords] };
-      } else {
+      } else if (prev.type === 'ruler') {
+        // Ruler needs to retain Waypoints
         const updatedPoints = [...prev.points];
         updatedPoints[updatedPoints.length - 1] = coords;
+        if (updatedPoints.length === 1) updatedPoints.push(coords); 
         return { ...prev, points: updatedPoints };
+      } else {
+        // Geometric Shapes & Lights require EXACTLY 2 points (Start and Current)
+        return { ...prev, points: [prev.points[0], coords] };
       }
     });
   };
@@ -93,7 +97,6 @@ export default function MapDrawings({
     const fillColor = isMask ? "black" : (line.color || '#ef4444');
     const shapeType = line.type || line.shape; 
 
-    // FIXED: Properly renders single clicks as dots so the pen tool doesn't vanish
     if (shapeType === 'freehand' || shapeType === 'reveal') {
       if (line.points.length === 1) {
         return <circle key={index} cx={line.points[0].x * currentCellSize} cy={line.points[0].y * currentCellSize} r={shapeType === 'reveal' ? 30 : 3} fill={strokeColor} opacity={isMask ? 1 : 0.85} />;
@@ -169,7 +172,6 @@ export default function MapDrawings({
       );
     }
 
-    // UPDATED: Smooth, additive CSS animations for dynamic lights instead of clunky SVG anims
     if (shapeType === 'light_circle') {
       const radius = distance * currentCellSize;
       return (
