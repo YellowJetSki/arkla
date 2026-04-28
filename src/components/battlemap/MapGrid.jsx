@@ -76,10 +76,12 @@ const EnvironmentOverlay = ({ environment }) => {
        100% { background-position: 300px 1000px, 200px 800px, 150px 600px; }
     }
     
-    /* TRUE DRIFTING FOG */
+    /* TRUE DRIFTING FOG - Smooth panning oversized gradients */
     @keyframes fog-drift {
-       0% { background-position: 0px 0px, 0px 0px; }
-       100% { background-position: 1200px 600px, -800px 400px; }
+       0% { transform: translate(-5%, -5%); }
+       33% { transform: translate(5%, 2%); }
+       66% { transform: translate(2%, 8%); }
+       100% { transform: translate(-5%, -5%); }
     }
 
     /* GLOBAL PANNING GOD RAYS */
@@ -119,14 +121,20 @@ const EnvironmentOverlay = ({ environment }) => {
     }
 
     /* BEAUTIFUL DRIFTING FOG */
-    .env-fog { 
+    .env-fog::before {
+       content: "";
+       position: absolute;
+       top: -50%; left: -50%;
+       width: 200%; height: 200%;
        background-image:
-         radial-gradient(circle 300px at 0 0, rgba(255,255,255,0.15), transparent),
-         radial-gradient(circle 400px at 0 0, rgba(255,255,255,0.1), transparent);
-       background-size: 800px 800px, 1200px 1200px;
-       animation: fog-drift 40s linear infinite;
-       background-color: rgba(200, 210, 220, 0.08); 
+         radial-gradient(circle at 30% 40%, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 60%),
+         radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0) 60%),
+         radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 50%);
+       background-size: 100% 100%;
+       animation: fog-drift 30s ease-in-out infinite;
+       pointer-events: none;
     }
+    .env-fog { background-color: rgba(200, 210, 220, 0.08); }
 
     /* GLOBAL PANNING GOD RAYS */
     .env-sunlight::before {
@@ -156,15 +164,21 @@ const EnvironmentOverlay = ({ environment }) => {
        mix-blend-mode: hard-light;
     }
     
-    .env-toxic { 
+    .env-toxic::before {
+       content: "";
+       position: absolute;
+       top: -50%; left: -50%;
+       width: 200%; height: 200%;
        background-image:
-         radial-gradient(circle 300px at 0 0, rgba(34,197,94,0.15), transparent),
-         radial-gradient(circle 400px at 0 0, rgba(16,185,129,0.1), transparent);
-       background-size: 800px 800px, 1200px 1200px;
-       animation: fog-drift 40s linear infinite;
-       background-color: rgba(5, 150, 105, 0.1);
+         radial-gradient(circle at 30% 40%, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0) 60%),
+         radial-gradient(circle at 70% 60%, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0) 60%),
+         radial-gradient(circle at 40% 80%, rgba(5, 150, 105, 0.1) 0%, rgba(5, 150, 105, 0) 50%);
+       background-size: 100% 100%;
+       animation: fog-drift 30s ease-in-out infinite;
+       pointer-events: none;
        mix-blend-mode: hard-light;
     }
+    .env-toxic { background-color: rgba(5, 150, 105, 0.1); }
   `;
 
   return (
