@@ -15,13 +15,13 @@ const getShortName = (fullName) => {
 };
 
 export default function DMBattleMap() {
-  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [], fogOfWar: false });
+  // UPGRADED: Added environment to initial state
+  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [], fogOfWar: false, environment: 'none' });
   const [tokens, setTokens] = useState({});
   const [selectedTokenIds, setSelectedTokenIds] = useState([]);
   const tokensRef = useRef(tokens);
   
   const [showRulerFor, setShowRulerFor] = useState(null);
-  
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [drawingColor, setDrawingColor] = useState('#ef4444');
   const [drawingShape, setDrawingShape] = useState('freehand'); 
@@ -36,6 +36,9 @@ export default function DMBattleMap() {
   const [tempImageUrl, setTempImageUrl] = useState('');
   const [tempGridScale, setTempGridScale] = useState(30); 
   const [tempGridColor, setTempGridColor] = useState('rgba(255,255,255,0.35)');
+  
+  // NEW: State for the configuration menu
+  const [tempEnvironment, setTempEnvironment] = useState('none');
 
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
@@ -74,11 +77,12 @@ export default function DMBattleMap() {
           activeTokenId: data.activeTokenId || null,
           gridColor: data.gridColor || 'rgba(255,255,255,0.35)',
           drawings: data.drawings || [],
-          fogOfWar: data.fogOfWar || false
+          fogOfWar: data.fogOfWar || false,
+          environment: data.environment || 'none'
         });
         setTokens(data.tokens || {});
       } else {
-        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [], fogOfWar: false });
+        setDoc(mapRef, { imageUrl: '', cols: 20, rows: 15, isPublished: false, tokens: {}, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [], fogOfWar: false, environment: 'none' });
       }
     });
     return () => unsub();
@@ -89,12 +93,10 @@ export default function DMBattleMap() {
        const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
        setActivePlayers(players);
     });
-    
     const unsubEnemies = onSnapshot(collection(db, 'active_enemies'), (snap) => {
        const enemies = snap.docs.map(d => ({ id: d.id, ...d.data() }));
        setActiveEnemies(enemies);
     });
-
     return () => {
       unsubChars();
       unsubEnemies();
@@ -103,17 +105,11 @@ export default function DMBattleMap() {
 
   useEffect(() => {
     const activePlayerIds = activePlayers.map(p => p.id);
-    const tokensToRemove = Object.values(tokensRef.current).filter(
-      t => t.type === 'player' && !activePlayerIds.includes(t.id)
-    );
-    
+    const tokensToRemove = Object.values(tokensRef.current).filter(t => t.type === 'player' && !activePlayerIds.includes(t.id));
     if (tokensToRemove.length > 0) {
       const updates = {};
-      tokensToRemove.forEach(t => {
-        updates[`tokens.${t.id}`] = deleteField();
-      });
+      tokensToRemove.forEach(t => { updates[`tokens.${t.id}`] = deleteField(); });
       updateDoc(doc(db, 'campaign', 'battlemap'), updates).catch(console.error);
-      
       setSelectedTokenIds(prev => prev.filter(id => !tokensToRemove.some(t => t.id === id)));
     }
   }, [activePlayers]);
@@ -121,7 +117,7 @@ export default function DMBattleMap() {
   const handleUpdateMapSettings = () => {
     setIsSavingMap(true);
     if (!tempImageUrl) {
-      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: '', cols: 20, rows: 15, gridColor: tempGridColor }, { merge: true }).then(() => {
+      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: '', cols: 20, rows: 15, gridColor: tempGridColor, environment: tempEnvironment }, { merge: true }).then(() => {
         setIsSavingMap(false); setIsEditingMap(false);
       });
       return;
@@ -131,12 +127,12 @@ export default function DMBattleMap() {
     img.onload = () => {
       const calcCols = Math.min(100, Math.max(1, Math.round(img.naturalWidth / tempGridScale)));
       const calcRows = Math.min(100, Math.max(1, Math.round(img.naturalHeight / tempGridScale)));
-      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: tempImageUrl, cols: calcCols, rows: calcRows, gridColor: tempGridColor }, { merge: true }).then(() => {
+      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: tempImageUrl, cols: calcCols, rows: calcRows, gridColor: tempGridColor, environment: tempEnvironment }, { merge: true }).then(() => {
         setIsSavingMap(false); setIsEditingMap(false);
       });
     };
     img.onerror = () => {
-      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: tempImageUrl, cols: 20, rows: 15, gridColor: tempGridColor }, { merge: true }).then(() => {
+      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: tempImageUrl, cols: 20, rows: 15, gridColor: tempGridColor, environment: tempEnvironment }, { merge: true }).then(() => {
         setIsSavingMap(false); setIsEditingMap(false);
         setDialog({ isOpen: true, title: 'Dimension Error', message: 'Could not read image dimensions. Defaulted to 20x15.', type: 'alert', onConfirm: closeDialog });
       });
@@ -144,13 +140,8 @@ export default function DMBattleMap() {
     img.src = tempImageUrl;
   };
 
-  const togglePublish = async () => {
-    await setDoc(doc(db, 'campaign', 'battlemap'), { isPublished: !mapData.isPublished }, { merge: true });
-  };
-  
-  const toggleFogOfWar = async () => {
-    await setDoc(doc(db, 'campaign', 'battlemap'), { fogOfWar: !mapData.fogOfWar }, { merge: true });
-  };
+  const togglePublish = async () => await setDoc(doc(db, 'campaign', 'battlemap'), { isPublished: !mapData.isPublished }, { merge: true });
+  const toggleFogOfWar = async () => await setDoc(doc(db, 'campaign', 'battlemap'), { fogOfWar: !mapData.fogOfWar }, { merge: true });
 
   const handleRestorePreset = async (presetData) => {
     try {
@@ -219,16 +210,10 @@ export default function DMBattleMap() {
       'https://images.unsplash.com/photo-1598453406399-53e9a7e0a8aa?q=80&w=150&auto=format&fit=crop',
       'https://images.unsplash.com/photo-1601335804364-bb20b77749eb?q=80&w=150&auto=format&fit=crop'
     ];
-    
     const updates = {};
     for (let i = 0; i < crowdSize; i++) {
       const npcId = `npc_crowd_${Date.now()}_${i}`;
-      updates[`tokens.${npcId}`] = { 
-        id: npcId, name: `NPC ${i+1}`, type: 'npc', img: images[i], 
-        speed: 30, ac: 10, conditions: [], x: i + 1, y: 1, 
-        size: 1, isHidden: false, hp: 10, maxHp: 10,
-        tempHp: 0, aura: 0, elevation: 0, isConcentrating: false 
-      };
+      updates[`tokens.${npcId}`] = { id: npcId, name: `NPC ${i+1}`, type: 'npc', img: images[i], speed: 30, ac: 10, conditions: [], x: i + 1, y: 1, size: 1, isHidden: false, hp: 10, maxHp: 10, tempHp: 0, aura: 0, elevation: 0, isConcentrating: false };
     }
     await updateDoc(doc(db, 'campaign', 'battlemap'), updates);
   };
@@ -238,9 +223,7 @@ export default function DMBattleMap() {
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
-      if (targetToken && targetToken.type === 'enemy') {
-         batch.delete(doc(db, 'active_enemies', tokenId));
-      }
+      if (targetToken && targetToken.type === 'enemy') batch.delete(doc(db, 'active_enemies', tokenId));
       await batch.commit();
     } catch (e) {
       await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
@@ -262,7 +245,6 @@ export default function DMBattleMap() {
     e.preventDefault();
     const { tokenId, url } = imagePrompt;
     if (!tokenId || !tokens[tokenId] || !url) return setImagePrompt({ isOpen: false, tokenId: null, url: '' });
-    
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.img`]: url });
@@ -279,20 +261,15 @@ export default function DMBattleMap() {
     if (newHpVal === -99999) return removeToken(tokenId);
     const targetToken = tokens[tokenId];
     if (!targetToken) return;
-    
     const parsedHp = Math.max(0, Math.min(targetToken.maxHp || 1000, parseInt(newHpVal, 10)));
     if (isNaN(parsedHp)) return;
     
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp });
-      
       const collectionName = targetToken.type === 'player' ? 'characters' : 'active_enemies';
-      if (targetToken.type === 'enemy') {
-        batch.update(doc(db, collectionName, tokenId), { currentHp: parsedHp });
-      } else if (targetToken.type === 'player') {
-        batch.update(doc(db, collectionName, tokenId), { hp: parsedHp });
-      }
+      if (targetToken.type === 'enemy') batch.update(doc(db, collectionName, tokenId), { currentHp: parsedHp });
+      else if (targetToken.type === 'player') batch.update(doc(db, collectionName, tokenId), { hp: parsedHp });
       await batch.commit();
     } catch (e) {
       await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp });
@@ -321,7 +298,6 @@ export default function DMBattleMap() {
     if (!tokens[tokenId]) return;
     const t = tokens[tokenId];
     const newConcState = !t.isConcentrating;
-    
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.isConcentrating`]: newConcState });
@@ -338,7 +314,6 @@ export default function DMBattleMap() {
     const t = tokens[tokenId];
     const currentConds = t.conditions || [];
     const newConds = currentConds.includes(cond) ? currentConds.filter(c => c !== cond) : [...currentConds, cond];
-      
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.conditions`]: newConds });
@@ -379,8 +354,9 @@ export default function DMBattleMap() {
       setTempImageUrl(mapData.imageUrl);
       setTempGridScale(30); 
       setTempGridColor(mapData.gridColor || 'rgba(255,255,255,0.35)');
+      setTempEnvironment(mapData.environment || 'none');
     }
-  }, [isEditingMap, mapData.imageUrl, mapData.gridColor]);
+  }, [isEditingMap, mapData.imageUrl, mapData.gridColor, mapData.environment]);
 
   const launchDisplayTab = () => { window.open(window.location.pathname + '?display=true', '_blank'); };
   const returnToDashboard = () => { window.location.href = window.location.pathname; };
@@ -400,13 +376,7 @@ export default function DMBattleMap() {
                <button type="button" onClick={() => setImagePrompt({ isOpen: false, tokenId: null, url: '' })} className="text-slate-950 bg-indigo-500 hover:bg-indigo-400 border-2 border-slate-950 p-1.5 rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all"><X className="w-4 h-4 font-black" /></button>
              </div>
              <div className="p-6">
-                <ImageSelector 
-                  label="New Token Image"
-                  value={imagePrompt.url}
-                  onChange={(val) => setImagePrompt({...imagePrompt, url: val})}
-                  iconColor="text-indigo-400"
-                  inputClassName="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white text-sm font-bold focus:outline-none focus:border-indigo-500 shadow-inner"
-                />
+                <ImageSelector label="New Token Image" value={imagePrompt.url} onChange={(val) => setImagePrompt({...imagePrompt, url: val})} iconColor="text-indigo-400" inputClassName="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white text-sm font-bold focus:outline-none focus:border-indigo-500 shadow-inner" />
              </div>
              <div className="p-4 bg-slate-950 flex justify-end gap-3 border-t-2 border-slate-900">
                 <button type="button" onClick={() => setImagePrompt({ isOpen: false, tokenId: null, url: '' })} className="px-5 py-2.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest text-slate-400 hover:bg-slate-900 hover:text-white border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all">Cancel</button>
@@ -435,12 +405,8 @@ export default function DMBattleMap() {
           </button>
           
           <div className="flex bg-slate-800 rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] border-2 border-slate-950 shrink-0 divide-x-2 divide-slate-950 overflow-hidden">
-             <button onClick={spawnNPC} className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-slate-700 flex items-center gap-1.5 transition-colors">
-               <User className="w-4 h-4" /> +1 NPC
-             </button>
-             <button onClick={spawnCrowd} className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-slate-700 flex items-center gap-1.5 transition-colors" title="Add a crowd of 5 generic NPCs">
-               <Users className="w-4 h-4" /> Crowd
-             </button>
+             <button onClick={spawnNPC} className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-slate-700 flex items-center gap-1.5 transition-colors"><User className="w-4 h-4" /> +1 NPC</button>
+             <button onClick={spawnCrowd} className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-slate-700 flex items-center gap-1.5 transition-colors" title="Add a crowd of 5 generic NPCs"><Users className="w-4 h-4" /> Crowd</button>
           </div>
 
           <div className="flex items-center bg-slate-950 p-1 rounded-xl border-2 border-slate-900 shadow-inner shrink-0 mr-1 overflow-x-auto custom-scrollbar">
@@ -474,9 +440,10 @@ export default function DMBattleMap() {
         </div>
       </div>
 
+      {/* UPGRADED MAP CONFIGURATION WITH ENVIRONMENT DROPDOWN */}
       {isEditingMap && (
         <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 space-y-5 relative z-10 shrink-0">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             <div>
                <ImageSelector label="Custom Map Image" value={tempImageUrl} onChange={(val) => setTempImageUrl(val)} iconColor="text-indigo-400" inputClassName="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-indigo-500 shadow-inner" />
             </div>
@@ -491,6 +458,21 @@ export default function DMBattleMap() {
                 <option value="rgba(0,0,0,0.6)">Black (Snow Maps)</option>
                 <option value="rgba(220,38,38,0.6)">Red (High Contrast)</option>
                 <option value="transparent">Hidden</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Environment Overlay</label>
+              <select className="w-full bg-slate-950 border-2 border-slate-900 rounded-xl px-3 py-3 text-white font-bold text-sm focus:outline-none focus:border-indigo-500 shadow-inner" onChange={(e) => setTempEnvironment(e.target.value)} value={tempEnvironment}>
+                <option value="none">Clear Skies</option>
+                <option value="light_rain">Light Rain</option>
+                <option value="heavy_rain">Heavy Storm</option>
+                <option value="blizzard">Blizzard Snow</option>
+                <option value="embers">Embers & Ash</option>
+                <option value="toxic">Toxic Miasma</option>
+                <option value="fog">Creeping Fog</option>
+                <option value="torchlight">Flickering Torchlight</option>
+                <option value="sunlight">Bright Sunlight</option>
+                <option value="moonlight">Midnight Moon</option>
               </select>
             </div>
           </div>
@@ -538,21 +520,16 @@ export default function DMBattleMap() {
         )}
       </div>
 
-      {/* --- DM STAT BLOCK DRAWER (UPDATED FOR PLAYERS VS ENEMIES) --- */}
       {selectedEntity && (
         <div className="absolute top-4 right-4 bottom-4 w-80 bg-slate-900 border-[3px] border-slate-950 rounded-2xl shadow-[8px_8px_0px_rgba(0,0,0,1)] z-[100] flex flex-col overflow-hidden animate-in slide-in-from-right-8 duration-200">
-          
           <div className="bg-indigo-600 p-3 border-b-2 border-slate-950 flex justify-between items-start relative overflow-hidden">
             <div className="relative z-10">
               <h3 className="font-black text-slate-950 uppercase tracking-widest text-lg">{selectedEntity.name}</h3>
-              <p className="text-[10px] font-bold text-slate-900 bg-white/20 inline-block px-2 py-0.5 rounded mt-1">
-                {selectedEntity.type === 'player' ? `Level ${selectedEntity.level || '?'} Player` : `CR ${selectedEntity.cr || '?'} Enemy`}
-              </p>
+              <p className="text-[10px] font-bold text-slate-900 bg-white/20 inline-block px-2 py-0.5 rounded mt-1">{selectedEntity.type === 'player' ? `Level ${selectedEntity.level || '?'} Player` : `CR ${selectedEntity.cr || '?'} Enemy`}</p>
             </div>
             <button onClick={() => setSelectedTokenIds([])} className="text-slate-950 bg-indigo-500 hover:bg-indigo-400 border-2 border-slate-950 p-1 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none z-10"><X className="w-4 h-4 font-black" /></button>
             {selectedEntity.img && <img src={selectedEntity.img} className="absolute -right-4 -top-4 w-24 h-24 object-cover opacity-20 mix-blend-luminosity rounded-full" />}
           </div>
-
           <div className="flex bg-slate-950 border-b-2 border-slate-900">
             <div className="flex-1 p-2 text-center border-r-2 border-slate-900">
               <span className="block text-[10px] text-slate-500 font-black">AC</span>
@@ -567,9 +544,7 @@ export default function DMBattleMap() {
               <span className="text-emerald-400 font-black text-lg">{selectedEntity.speed || tokens[selectedTokenIds[0]]?.speed || 30}</span>
             </div>
           </div>
-
           <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
-            {/* FIXED: Safely maps Player Stats OR Enemy Attributes */}
             {(selectedEntity.attributes || selectedEntity.stats) && (
               <div className="grid grid-cols-3 gap-2">
                 {Object.entries(selectedEntity.attributes || selectedEntity.stats).map(([stat, val]) => {
@@ -584,21 +559,15 @@ export default function DMBattleMap() {
                 })}
               </div>
             )}
-            
-            {/* FIXED: Formats Player Weapons OR Enemy Actions */}
             <div>
               <h4 className="text-xs font-black text-indigo-400 uppercase border-b border-slate-800 pb-1 mb-2">Actions & Weapons</h4>
-              
               {selectedEntity.type === 'player' ? (
                  (selectedEntity.weapons || selectedEntity.attacks || selectedEntity.inventory?.filter(i => i.type === 'Weapon' && i.equipped) || []).length > 0 ? (
                    <div className="space-y-2">
                      {(selectedEntity.weapons || selectedEntity.attacks || selectedEntity.inventory?.filter(i => i.type === 'Weapon' && i.equipped) || []).map((w, i) => (
                         <div key={i} className="bg-slate-800/50 p-2 rounded-lg border border-slate-700 text-sm">
                           <p className="font-bold text-white mb-1">{w.name || w.itemName}</p>
-                          <p className="text-slate-300 text-xs">
-                            {w.damage ? `Dmg: ${w.damage} ${w.damageType || ''} ` : ''}
-                            {w.properties ? `(${w.properties})` : ''}
-                          </p>
+                          <p className="text-slate-300 text-xs">{w.damage ? `Dmg: ${w.damage} ${w.damageType || ''} ` : ''}{w.properties ? `(${w.properties})` : ''}</p>
                         </div>
                      ))}
                    </div>
@@ -616,11 +585,9 @@ export default function DMBattleMap() {
                 ) : <p className="text-xs text-slate-500 italic">No specific actions listed.</p>
               )}
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }

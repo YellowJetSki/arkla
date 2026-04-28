@@ -45,6 +45,113 @@ const TokenImage = ({ token, parsedName }) => {
   return <img src={imgSrc} alt={parsedName} className="w-full h-full rounded-full object-cover bg-slate-900 border-[3px] border-slate-950 shadow-inner relative" onError={handleError} />;
 };
 
+// =========================================================================
+// THE ENVIRONMENT ENGINE - Zero Dependencies! Pure layered CSS and SVG data URIs
+// =========================================================================
+const EnvironmentOverlay = ({ environment }) => {
+  if (!environment || environment === 'none') return null;
+
+  const styles = `
+    @keyframes fall-angled {
+      0% { background-position: 0px 0px, 0px 0px, 0px 0px; }
+      100% { background-position: 200px 1000px, 150px 800px, 100px 600px; }
+    }
+    @keyframes rise-angled {
+      0% { background-position: 0px 1000px, 0px 800px, 0px 600px; }
+      100% { background-position: 200px 0px, -150px 0px, 100px 0px; }
+    }
+    @keyframes drift-fog {
+      0% { background-position: 0% 0%; }
+      100% { background-position: 100% 100%; }
+    }
+    @keyframes flicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+      25%, 75% { opacity: 0.9; }
+    }
+
+    .env-overlay {
+       position: absolute;
+       inset: 0;
+       pointer-events: none;
+       z-index: 80; /* Perfect Z-level above map but below UI HUDs */
+    }
+
+    .env-light_rain {
+       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Cline x1='50' y1='0' x2='50' y2='15' stroke='rgba(255,255,255,0.4)' stroke-width='1.5'/%3E%3C/svg%3E");
+       animation: fall-angled 0.7s linear infinite;
+    }
+
+    .env-heavy_rain {
+       background-image:
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50'%3E%3Cline x1='25' y1='0' x2='25' y2='20' stroke='rgba(255,255,255,0.5)' stroke-width='2'/%3E%3C/svg%3E"),
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cline x1='40' y1='0' x2='40' y2='15' stroke='rgba(255,255,255,0.3)' stroke-width='1.5'/%3E%3C/svg%3E");
+       animation: fall-angled 0.3s linear infinite;
+       background-color: rgba(15, 23, 42, 0.4);
+    }
+
+    .env-blizzard {
+       background-image:
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Ccircle cx='40' cy='40' r='2.5' fill='white' opacity='0.9'/%3E%3Ccircle cx='120' cy='90' r='1.5' fill='white' opacity='0.7'/%3E%3C/svg%3E"),
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='80' cy='150' r='3.5' fill='white' opacity='0.8'/%3E%3Ccircle cx='220' cy='50' r='2' fill='white' opacity='0.6'/%3E%3C/svg%3E"),
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Ccircle cx='50' cy='100' r='4' fill='white' opacity='0.5'/%3E%3C/svg%3E");
+       animation: fall-angled 1.5s linear infinite;
+       background-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .env-embers {
+       background-image:
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Ccircle cx='50' cy='50' r='2.5' fill='%23ff6600' opacity='0.9'/%3E%3Ccircle cx='150' cy='120' r='3.5' fill='%23ff2200' opacity='0.7'/%3E%3C/svg%3E"),
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='100' cy='200' r='2' fill='%23ffaa00' opacity='0.9'/%3E%3C/svg%3E");
+       animation: rise-angled 5s linear infinite;
+       background-color: rgba(30, 10, 0, 0.4);
+       mix-blend-mode: overlay;
+    }
+
+    .env-toxic {
+       background-image:
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Ccircle cx='40' cy='40' r='6' fill='%2322c55e' opacity='0.3'/%3E%3Ccircle cx='120' cy='90' r='8' fill='%2310b981' opacity='0.2'/%3E%3C/svg%3E"),
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='80' cy='150' r='10' fill='%23059669' opacity='0.15'/%3E%3C/svg%3E");
+       animation: drift-fog 12s linear infinite alternate;
+       background-color: rgba(5, 150, 105, 0.15);
+       mix-blend-mode: hard-light;
+    }
+
+    .env-fog {
+       background-image:
+         radial-gradient(circle at 20% 30%, rgba(255,255,255,0.08) 0%, transparent 40%),
+         radial-gradient(circle at 80% 60%, rgba(255,255,255,0.05) 0%, transparent 50%);
+       background-size: 200% 200%;
+       animation: drift-fog 20s infinite alternate ease-in-out;
+       background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .env-moonlight {
+       background-color: rgba(20, 25, 60, 0.6);
+       mix-blend-mode: multiply;
+    }
+
+    .env-sunlight {
+       background-color: rgba(255, 235, 180, 0.25);
+       mix-blend-mode: overlay;
+    }
+
+    .env-torchlight {
+       background: radial-gradient(circle at center, rgba(0,0,0,0) 20%, rgba(15, 5, 0, 0.9) 100%);
+       mix-blend-mode: multiply;
+       animation: flicker 3s infinite;
+    }
+  `;
+
+  return (
+    <>
+      <style>{styles}</style>
+      <div className={`env-overlay env-${environment}`} />
+    </>
+  );
+};
+// =========================================================================
+
 export default function MapGrid({ 
   mapData, tokens, activePlayers = [], activeEnemies = [], activeActor = null,
   onTileClick, onTokenClick, onTokenSelectMultiple, selectedTokenIds = [], 
@@ -68,8 +175,6 @@ export default function MapGrid({
   const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
   const [initialPinchDist, setInitialPinchDist] = useState(null);
   const [initialPinchZoom, setInitialPinchZoom] = useState(null);
-  
-  // NEW: Multi-Select Drag Box State
   const [selectionBox, setSelectionBox] = useState(null);
 
   const centerOnMap = () => {
@@ -89,7 +194,6 @@ export default function MapGrid({
 
   const activeTurnId = activeActor?.id && tokens[activeActor.id] ? activeActor.id : null;
   const cameraTargetId = isPlayerMap ? (selectedTokenIds.length > 0 ? selectedTokenIds[0] : null) : activeTurnId;
-
   const targetTokenX = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].x : null;
   const targetTokenY = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].y : null;
 
@@ -121,31 +225,23 @@ export default function MapGrid({
 
   const handleMapMouseDown = (e) => {
     if (isDisplayMode || isDrawingMode) return;
-    
-    // START MULTI-SELECT BOX ON SHIFT+DRAG
     if (e.shiftKey) {
       hasPanned.current = false;
       const rect = scrollRef.current.children[0].getBoundingClientRect();
-      setSelectionBox({
-        startX: e.clientX - rect.left, startY: e.clientY - rect.top,
-        currentX: e.clientX - rect.left, currentY: e.clientY - rect.top
-      });
+      setSelectionBox({ startX: e.clientX - rect.left, startY: e.clientY - rect.top, currentX: e.clientX - rect.left, currentY: e.clientY - rect.top });
       return;
     }
-
     hasPanned.current = false;
     setIsPanning(true);
     setPanStart({ x: e.clientX, y: e.clientY, scrollLeft: scrollRef.current.scrollLeft, scrollTop: scrollRef.current.scrollTop });
   };
 
   const handleMapMouseMove = (e) => {
-    // UPDATE MULTI-SELECT BOX
     if (selectionBox) {
       const rect = scrollRef.current.children[0].getBoundingClientRect();
       setSelectionBox(prev => ({ ...prev, currentX: e.clientX - rect.left, currentY: e.clientY - rect.top }));
       return;
     }
-
     if (!isPanning || !scrollRef.current) return;
     hasPanned.current = true;
     scrollRef.current.scrollLeft = panStart.scrollLeft - (e.clientX - panStart.x);
@@ -153,13 +249,11 @@ export default function MapGrid({
   };
 
   const handleMapMouseUp = () => {
-    // FINISH MULTI-SELECT BOX
     if (selectionBox) {
       const minX = Math.min(selectionBox.startX, selectionBox.currentX) / currentCellSize;
       const maxX = Math.max(selectionBox.startX, selectionBox.currentX) / currentCellSize;
       const minY = Math.min(selectionBox.startY, selectionBox.currentY) / currentCellSize;
       const maxY = Math.max(selectionBox.startY, selectionBox.currentY) / currentCellSize;
-
       const selectedIds = Object.values(tokens).filter(t => {
         const cx = t.x + (t.size || 1) / 2;
         const cy = t.y + (t.size || 1) / 2;
@@ -226,6 +320,9 @@ export default function MapGrid({
   return (
     <div className={`relative w-full flex flex-col overflow-hidden h-full ${isDisplayMode ? 'rounded-none border-0 bg-black' : 'rounded-none md:rounded-2xl border-none md:border-[3px] border-slate-950 bg-slate-900 shadow-[6px_6px_0px_rgba(0,0,0,1)]'}`}>
       
+      {/* THE ENVIRONMENT OVERLAY - Injected directly over the map container so it doesn't move with pan/zoom! */}
+      <EnvironmentOverlay environment={mapData?.environment} />
+
       {!isDisplayMode && (
         <div className="absolute top-4 right-4 z-[90] flex flex-col gap-2 bg-slate-900 border-2 border-slate-950 p-2 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)]">
           <button onClick={() => setZoom(prev => Math.min(prev + 0.25, 3))} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700"><ZoomIn className="w-5 h-5"/></button>
@@ -433,7 +530,7 @@ export default function MapGrid({
           </div>
         </div>
 
-        {/* FREELY FLOATING CONTEXT MENU - UPGRADED FOR MULTI-SELECT */}
+        {/* FREELY FLOATING CONTEXT MENU */}
         {selectedTokenIds.length > 0 && !isDisplayMode && !isPlayerMap && isDM && (
           <TokenContextMenu 
             selectedTokens={selectedTokenIds.map(id => tokens[id]).filter(Boolean)}
