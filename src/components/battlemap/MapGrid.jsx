@@ -2,7 +2,8 @@ import {
   User, ZoomIn, ZoomOut, Target, 
   EyeOff, Heart, EarOff, Flame, Ghost, Link, 
   Ban, Cloud, Lock, Mountain, Skull, ArrowDown, 
-  Stars, Moon, AlertCircle, BrainCircuit, Maximize, Ruler, CircleDashed, ArrowUpCircle, Image as ImageIcon, Trash2, X, Activity, Eye, Hand
+  Stars, Moon, AlertCircle, BrainCircuit, Maximize, Ruler, CircleDashed, ArrowUpCircle, Image as ImageIcon, Trash2, X, Activity, Eye, Hand,
+  Swords // Added Swords since it's used in the turn banner!
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import MapDrawings from './MapDrawings';
@@ -112,6 +113,10 @@ export default function MapGrid({
   const activeTurnId = activeActor?.id && tokens[activeActor.id] ? activeActor.id : null;
   const cameraTargetId = isPlayerMap ? selectedTokenId : activeTurnId;
 
+  // NEW: Extract exactly where the target token is right now
+  const targetTokenX = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].x : null;
+  const targetTokenY = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].y : null;
+
   useEffect(() => {
     if (isDisplayMode || isPlayerMap) {
       const calculateOptimalZoom = () => {
@@ -136,6 +141,7 @@ export default function MapGrid({
     }
   }, [isDisplayMode, isPlayerMap, cols, rows, cameraTargetId]);
 
+  // NEW: targetTokenX and targetTokenY added to dependencies so it tracks movement!
   useEffect(() => {
     if (cameraTargetId && (isDisplayMode || isPlayerMap)) {
       const timer = setTimeout(() => centerOnToken(cameraTargetId), 300);
@@ -144,7 +150,7 @@ export default function MapGrid({
       const timer = setTimeout(() => centerOnMap(), 300);
       return () => clearTimeout(timer);
     }
-  }, [cameraTargetId, isDisplayMode, isPlayerMap, zoom]);
+  }, [cameraTargetId, targetTokenX, targetTokenY, isDisplayMode, isPlayerMap, zoom]);
 
   const handleMapMouseDown = (e) => {
     if (isDisplayMode || isDrawingMode) return;
