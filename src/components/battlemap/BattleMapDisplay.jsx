@@ -12,7 +12,6 @@ export default function BattleMapDisplay({ onLogout }) {
   const [activeHandout, setActiveHandout] = useState(null);
   const [initiative, setInitiative] = useState(null);
 
-  // FIXED: Added state for live characters/enemies to ensure visual states (like Bloodied rings) sync perfectly!
   const [activePlayers, setActivePlayers] = useState([]);
   const [activeEnemies, setActiveEnemies] = useState([]);
 
@@ -94,8 +93,8 @@ export default function BattleMapDisplay({ onLogout }) {
         <MapGrid 
           mapData={mapData} 
           tokens={tokens} 
-          activePlayers={activePlayers}    {/* ADDED */}
-          activeEnemies={activeEnemies}    {/* ADDED */}
+          activePlayers={activePlayers}   
+          activeEnemies={activeEnemies}   
           activeActor={activeActor} 
           onTileClick={() => {}} 
           onTokenClick={() => {}}
