@@ -47,7 +47,6 @@ export default function MapDrawings({
     if (!isDrawingMode) return;
     const needsSnapping = ['circle', 'cone', 'line', 'ruler', 'torch_circle', 'torch_cone', 'sun_circle', 'sun_cone'].includes(drawingShape);
     const coords = getCoords(e.nativeEvent || e, needsSnapping);
-    // Explicitly stage 2 points to prevent SVG shapes from collapsing to 0 length
     setCurrentLine({ type: drawingShape, points: [coords, coords], color: drawingColor });
   };
 
@@ -64,7 +63,6 @@ export default function MapDrawings({
         updatedPoints[updatedPoints.length - 1] = coords;
         return { ...prev, points: updatedPoints };
       } else {
-        // Shapes, Lines, and Lights require EXACTLY 2 points (Anchor and Drag)
         return { ...prev, points: [prev.points[0], coords] };
       }
     });
@@ -83,7 +81,13 @@ export default function MapDrawings({
     const shapeType = line.type || line.shape; 
 
     if (shapeType === 'freehand' || shapeType === 'reveal') {
-      const d = line.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * currentCellSize} ${p.y * currentCellSize}`).join(' ');
+      if (line.points.length === 1) {
+        return <circle key={index} cx={line.points[0].x * currentCellSize} cy={line.points[0].y * currentCellSize} r={shapeType === 'reveal' ? 30 : 3} fill={strokeColor} opacity={isMask ? 1 : 0.85} />;
+      }
+      const d = line.points.map((p, i) => {
+        if (p == null || isNaN(p.x) || isNaN(p.y)) return '';
+        return `${i === 0 ? 'M' : 'L'} ${p.x * currentCellSize} ${p.y * currentCellSize}`;
+      }).join(' ');
       if (!d.trim()) return null;
       return <path key={index} d={d} stroke={strokeColor} strokeWidth={shapeType === 'reveal' ? 60 : 4} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={isMask ? 1 : 0.85} />;
     }
@@ -151,12 +155,11 @@ export default function MapDrawings({
       );
     }
 
-    // NEW DYNAMIC LIGHTING: SPLIT INTO FLICKERING TORCH OR STATIC SUNLIGHT
     if (shapeType === 'torch_circle' || shapeType === 'sun_circle') {
       const radius = distance * currentCellSize;
       const isTorch = shapeType === 'torch_circle';
       return (
-        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: isTorch ? 'torch-flicker 0.4s infinite alternate ease-in-out' : 'none' }}>
+        <g key={index} style={{ mixBlendMode: 'screen', animation: isTorch ? 'torch-flicker 0.4s infinite alternate ease-in-out' : 'none' }}>
           <defs>
             <radialGradient id={`glow-circ-${index}`} cx={x1} cy={y1} r={radius} gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor={strokeColor} stopOpacity={isTorch ? "0.9" : "0.7"} />
@@ -182,7 +185,7 @@ export default function MapDrawings({
       const isTorch = shapeType === 'torch_cone';
 
       return (
-        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: isTorch ? 'torch-flicker 0.4s infinite alternate ease-in-out' : 'none' }}>
+        <g key={index} style={{ mixBlendMode: 'screen', animation: isTorch ? 'torch-flicker 0.4s infinite alternate ease-in-out' : 'none' }}>
           <defs>
             <radialGradient id={`glow-cone-${index}`} cx={x1} cy={y1} r={distPx} gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor={strokeColor} stopOpacity={isTorch ? "0.9" : "0.7"} />
@@ -216,7 +219,21 @@ export default function MapDrawings({
           100% { opacity: 0.85; } 
         }
       `}</style>
-      <svg ref={svgRef} className={`absolute inset-0 z-[35] ${isDrawingMode ? 'cursor-crosshair pointer-events-auto touch-none' : 'pointer-events-none'}`} style={{ width: cols * currentCellSize, height: rows * currentCellSize }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}>
+      <svg 
+        ref={svgRef} 
+        className={`absolute inset-0 z-[35] ${isDrawingMode ? 'cursor-crosshair pointer-events-auto touch-none select-none' : 'pointer-events-none'}`} 
+        draggable="false"
+        style={{ width: cols * currentCellSize, height: rows * currentCellSize }} 
+        onPointerDown={handlePointerDown} 
+        onPointerMove={handlePointerMove} 
+        onPointerUp={handlePointerUp} 
+        onPointerLeave={handlePointerUp} 
+        onPointerCancel={handlePointerUp}
+        onTouchStart={handlePointerDown} 
+        onTouchMove={handlePointerMove} 
+        onTouchEnd={handlePointerUp}
+        onTouchCancel={handlePointerUp}
+      >
         {fogOfWar && (
           <defs>
             <filter id="softRevealEdge" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="15" /></filter>
@@ -229,9 +246,13 @@ export default function MapDrawings({
             </mask>
           </defs>
         )}
-        {fogOfWar && <rect width="100%" height="100%" fill="#020617" mask="url(#fogMask)" opacity={isDM ? "0.45" : "0.98"} />}
-        {paints.map((line, i) => renderShape(line, `paint-${line.id || i}`))}
-        {currentPaints && renderShape(currentPaints, 'curr-paint')}
+        {fogOfWar && <rect width="100%" height="100%" fill="#020617" mask="url(#fogMask)" opacity={isDM ? "0.45" : "0.98"} className="pointer-events-none" />}
+        
+        {/* ENFORCING pointer-events-none SO DRAWINGS DON'T BLOCK THE MOUSE */}
+        <g style={{ pointerEvents: 'none' }}>
+          {paints.map((line, i) => renderShape(line, `paint-${line.id || i}`))}
+          {currentPaints && renderShape(currentPaints, 'curr-paint')}
+        </g>
       </svg>
     </>
   );

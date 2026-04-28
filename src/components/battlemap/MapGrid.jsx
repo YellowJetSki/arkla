@@ -53,11 +53,12 @@ const TokenImage = ({ token, parsedName }) => {
 };
 
 // =========================================================================
-// THE UPGRADED WEATHER & ENVIRONMENT ENGINE
+// THE UPGRADED WEATHER & ENVIRONMENT ENGINE (100% CHROME-SAFE)
 // =========================================================================
 const EnvironmentOverlay = ({ environment }) => {
   if (!environment || environment === 'none') return null;
 
+  // Replaced all instances of `transparent` with 0-opacity RGBAs to prevent Safari/Chrome grey boxes
   const styles = `
     .env-overlay {
        position: absolute;
@@ -76,7 +77,6 @@ const EnvironmentOverlay = ({ environment }) => {
        100% { background-position: 300px 1000px, 200px 800px, 150px 600px; }
     }
     
-    /* TRUE DRIFTING FOG - Smooth panning oversized gradients */
     @keyframes fog-drift {
        0% { transform: translate(-5%, -5%); }
        33% { transform: translate(5%, 2%); }
@@ -84,7 +84,6 @@ const EnvironmentOverlay = ({ environment }) => {
        100% { transform: translate(-5%, -5%); }
     }
 
-    /* GLOBAL PANNING GOD RAYS */
     @keyframes god-rays-pan {
        0% { background-position: 0% 0%; opacity: 0.6; }
        50% { opacity: 1; }
@@ -102,7 +101,6 @@ const EnvironmentOverlay = ({ environment }) => {
        animation: rain-fall 0.8s linear infinite;
     }
 
-    /* SOFTER, MOODIER HEAVY RAIN */
     .env-heavy_rain {
        background-image:
          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cline x1='40' y1='0' x2='30' y2='30' stroke='rgba(200,220,255,0.3)' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"),
@@ -120,7 +118,6 @@ const EnvironmentOverlay = ({ environment }) => {
        background-color: rgba(255, 255, 255, 0.15);
     }
 
-    /* BEAUTIFUL DRIFTING FOG */
     .env-fog::before {
        content: "";
        position: absolute;
@@ -136,10 +133,9 @@ const EnvironmentOverlay = ({ environment }) => {
     }
     .env-fog { background-color: rgba(200, 210, 220, 0.08); }
 
-    /* GLOBAL PANNING GOD RAYS */
     .env-sunlight::before {
        content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-       background-image: repeating-linear-gradient(60deg, transparent 0, transparent 150px, rgba(255, 250, 200, 0.2) 200px, transparent 250px);
+       background-image: repeating-linear-gradient(60deg, rgba(255,250,200,0) 0, rgba(255,250,200,0) 150px, rgba(255, 250, 200, 0.2) 200px, rgba(255,250,200,0) 250px);
        background-size: 200% 200%;
        animation: god-rays-pan 25s linear infinite;
        mix-blend-mode: overlay;
@@ -148,7 +144,7 @@ const EnvironmentOverlay = ({ environment }) => {
     .env-sunlight { background-color: rgba(255, 235, 180, 0.05); }
 
     .env-moonlight { 
-       background-image: radial-gradient(circle at center, rgba(150, 180, 255, 0.15) 0%, transparent 60%);
+       background-image: radial-gradient(circle at center, rgba(150, 180, 255, 0.15) 0%, rgba(150, 180, 255, 0) 60%);
        background-size: 150% 150%;
        animation: moon-drift 8s ease-in-out infinite alternate;
        background-color: rgba(10, 15, 45, 0.6);
@@ -437,8 +433,8 @@ export default function MapGrid({
                   const dist = Math.max(dx, dy) * 5;
                   const speed = showMovementRangeFor.speed || 30;
 
-                  if (dist > 0 && dist <= speed) tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.5),_transparent)] border border-emerald-400/50 hover:bg-emerald-400/70';
-                  else if (dist > speed && dist <= speed * 2) tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.5),_transparent)] border border-amber-400/50 hover:bg-amber-400/70';
+                  if (dist > 0 && dist <= speed) tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.5),_rgba(16,185,129,0))] border border-emerald-400/50 hover:bg-emerald-400/70';
+                  else if (dist > speed && dist <= speed * 2) tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.5),_rgba(245,158,11,0))] border border-amber-400/50 hover:bg-amber-400/70';
               }
 
               return (
