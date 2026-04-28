@@ -26,7 +26,6 @@ const CONDITION_ICONS = {
   'Unconscious': { icon: Moon, color: 'bg-indigo-800 text-indigo-200 border-indigo-500' }
 };
 
-// NEW: Helper to parse quoted short names (e.g. Michael "Mickey" Mouse -> Mickey)
 const getShortName = (fullName) => {
   if (!fullName) return 'Unknown';
   const match = fullName.match(/["'“”‘’]([^"'“”‘’]+)["'“”‘’]/);
@@ -53,6 +52,9 @@ const TokenImage = ({ token, parsedName }) => {
   return <img src={imgSrc} alt={parsedName} className="w-full h-full rounded-full object-cover bg-slate-900 border-[3px] border-slate-950 shadow-inner relative" onError={handleError} />;
 };
 
+// =========================================================================
+// THE UPGRADED WEATHER & ENVIRONMENT ENGINE
+// =========================================================================
 const EnvironmentOverlay = ({ environment }) => {
   if (!environment || environment === 'none') return null;
 
@@ -61,18 +63,21 @@ const EnvironmentOverlay = ({ environment }) => {
       0% { background-position: 0px 0px, 0px 0px, 0px 0px; }
       100% { background-position: 200px 1000px, 150px 800px, 100px 600px; }
     }
-    @keyframes rise-angled {
-      0% { background-position: 0px 1000px, 0px 800px, 0px 600px; }
-      100% { background-position: 200px 0px, -150px 0px, 100px 0px; }
+    @keyframes god-rays {
+      0% { background-position: 0% 0%, 0% 0%; opacity: 0.7; }
+      100% { background-position: 100% 100%, -50% 50%; opacity: 0.9; }
+    }
+    @keyframes moonlight-drift {
+      0% { opacity: 0.8; }
+      100% { opacity: 1; }
+    }
+    @keyframes rain-fall {
+       0% { background-position: 0px 0px, 0px 0px; }
+       100% { background-position: -50px 200px, -80px 300px; }
     }
     @keyframes drift-fog {
-      0% { background-position: 0% 0%; }
-      100% { background-position: 100% 100%; }
-    }
-    @keyframes flicker {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.8; }
-      25%, 75% { opacity: 0.9; }
+       0% { background-position: 0% 0%, 200% 200%; }
+       100% { background-position: 200% 0%, 0% 200%; }
     }
 
     .env-overlay {
@@ -89,62 +94,44 @@ const EnvironmentOverlay = ({ environment }) => {
 
     .env-heavy_rain {
        background-image:
-         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50'%3E%3Cline x1='25' y1='0' x2='25' y2='20' stroke='rgba(255,255,255,0.5)' stroke-width='2'/%3E%3C/svg%3E"),
-         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cline x1='40' y1='0' x2='40' y2='15' stroke='rgba(255,255,255,0.3)' stroke-width='1.5'/%3E%3C/svg%3E");
-       animation: fall-angled 0.3s linear infinite;
-       background-color: rgba(15, 23, 42, 0.4);
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cline x1='75' y1='0' x2='65' y2='25' stroke='rgba(200,220,255,0.25)' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"),
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cline x1='125' y1='0' x2='110' y2='35' stroke='rgba(200,220,255,0.15)' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+       animation: rain-fall 0.4s linear infinite;
+       background-color: rgba(15, 25, 40, 0.3); /* Much softer darkening */
     }
 
     .env-blizzard {
        background-image:
          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Ccircle cx='40' cy='40' r='2.5' fill='white' opacity='0.9'/%3E%3Ccircle cx='120' cy='90' r='1.5' fill='white' opacity='0.7'/%3E%3C/svg%3E"),
-         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='80' cy='150' r='3.5' fill='white' opacity='0.8'/%3E%3Ccircle cx='220' cy='50' r='2' fill='white' opacity='0.6'/%3E%3C/svg%3E"),
-         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Ccircle cx='50' cy='100' r='4' fill='white' opacity='0.5'/%3E%3C/svg%3E");
+         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='80' cy='150' r='3.5' fill='white' opacity='0.8'/%3E%3Ccircle cx='220' cy='50' r='2' fill='white' opacity='0.6'/%3E%3C/svg%3E");
        animation: fall-angled 1.5s linear infinite;
        background-color: rgba(255, 255, 255, 0.15);
     }
 
-    .env-embers {
+    .env-sunlight {
        background-image:
-         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Ccircle cx='50' cy='50' r='2.5' fill='%23ff6600' opacity='0.9'/%3E%3Ccircle cx='150' cy='120' r='3.5' fill='%23ff2200' opacity='0.7'/%3E%3C/svg%3E"),
-         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='100' cy='200' r='2' fill='%23ffaa00' opacity='0.9'/%3E%3C/svg%3E");
-       animation: rise-angled 5s linear infinite;
-       background-color: rgba(30, 10, 0, 0.4);
+         linear-gradient(45deg, rgba(255,255,255,0) 30%, rgba(255,240,200,0.15) 50%, rgba(255,255,255,0) 70%),
+         radial-gradient(circle at 50% 50%, rgba(255,235,180,0.2) 0%, transparent 60%);
+       background-size: 200% 200%, 100% 100%;
+       animation: god-rays 12s infinite alternate ease-in-out;
        mix-blend-mode: overlay;
+       background-color: rgba(255, 235, 180, 0.1);
     }
 
-    .env-toxic {
-       background-image:
-         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Ccircle cx='40' cy='40' r='6' fill='%2322c55e' opacity='0.3'/%3E%3Ccircle cx='120' cy='90' r='8' fill='%2310b981' opacity='0.2'/%3E%3C/svg%3E"),
-         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='80' cy='150' r='10' fill='%23059669' opacity='0.15'/%3E%3C/svg%3E");
-       animation: drift-fog 12s linear infinite alternate;
-       background-color: rgba(5, 150, 105, 0.15);
-       mix-blend-mode: hard-light;
+    .env-moonlight {
+       background-image: radial-gradient(circle at 70% 30%, rgba(150, 180, 255, 0.1) 0%, transparent 70%);
+       background-color: rgba(10, 15, 40, 0.6);
+       animation: moonlight-drift 6s infinite alternate ease-in-out;
+       mix-blend-mode: multiply;
     }
 
     .env-fog {
        background-image:
-         radial-gradient(circle at 20% 30%, rgba(255,255,255,0.08) 0%, transparent 40%),
-         radial-gradient(circle at 80% 60%, rgba(255,255,255,0.05) 0%, transparent 50%);
-       background-size: 200% 200%;
-       animation: drift-fog 20s infinite alternate ease-in-out;
-       background-color: rgba(255, 255, 255, 0.05);
-    }
-
-    .env-moonlight {
-       background-color: rgba(20, 25, 60, 0.6);
-       mix-blend-mode: multiply;
-    }
-
-    .env-sunlight {
-       background-color: rgba(255, 235, 180, 0.25);
-       mix-blend-mode: overlay;
-    }
-
-    .env-torchlight {
-       background: radial-gradient(circle at center, rgba(0,0,0,0) 20%, rgba(15, 5, 0, 0.9) 100%);
-       mix-blend-mode: multiply;
-       animation: flicker 3s infinite;
+         radial-gradient(circle at 30% 40%, rgba(255,255,255,0.1) 0%, transparent 50%),
+         radial-gradient(circle at 70% 60%, rgba(255,255,255,0.08) 0%, transparent 60%);
+       background-size: 300% 300%, 250% 250%;
+       animation: drift-fog 40s linear infinite;
+       background-color: rgba(200, 210, 220, 0.05);
     }
   `;
 
@@ -155,6 +142,7 @@ const EnvironmentOverlay = ({ environment }) => {
     </>
   );
 };
+// =========================================================================
 
 export default function MapGrid({ 
   mapData, tokens, activePlayers = [], activeEnemies = [], activeActor = null,
@@ -198,8 +186,6 @@ export default function MapGrid({
 
   const activeTurnId = activeActor?.id && tokens[activeActor.id] ? activeActor.id : null;
   const cameraTargetId = isPlayerMap ? (selectedTokenIds.length > 0 ? selectedTokenIds[0] : null) : activeTurnId;
-  
-  // FIXED: Explicitly tracking token coordinates to trigger smooth scroll auto-pan!
   const targetTokenX = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].x : null;
   const targetTokenY = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].y : null;
 
@@ -219,7 +205,6 @@ export default function MapGrid({
     }
   }, [isDisplayMode, isPlayerMap, cols, rows, cameraTargetId]);
 
-  // Runs exactly when active token coordinates update to drag the camera
   useEffect(() => {
     if (cameraTargetId && (isDisplayMode || isPlayerMap)) {
       const timer = setTimeout(() => centerOnToken(cameraTargetId), 300);
@@ -342,7 +327,6 @@ export default function MapGrid({
         <div className="fixed top-8 left-8 z-[200] flex items-center gap-4 bg-slate-950/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-3 shadow-2xl animate-in slide-in-from-left-8 fade-in duration-500">
           {tokens[activeActor.id] ? (
              <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-slate-800 shrink-0">
-               {/* APPLIED GET SHORT NAME TO THE ICON FALLBACK */}
                <TokenImage token={tokens[activeActor.id]} parsedName={getShortName(activeActor.name)} />
              </div>
           ) : (
@@ -352,7 +336,6 @@ export default function MapGrid({
           )}
           <div className="flex flex-col pr-4">
             <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-0.5">Current Turn</span>
-            {/* APPLIED GET SHORT NAME SO IT STRIPS OUT "QUOTES" */}
             <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
               {getShortName(activeActor.name)}
             </h1>

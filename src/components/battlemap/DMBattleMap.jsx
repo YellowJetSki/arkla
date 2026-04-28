@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler, User, RotateCcw } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler, User, RotateCcw, Sun, Flashlight } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
@@ -15,7 +15,6 @@ const getShortName = (fullName) => {
 };
 
 export default function DMBattleMap() {
-  // UPGRADED: Added environment to initial state
   const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, gridColor: 'rgba(255,255,255,0.35)', drawings: [], fogOfWar: false, environment: 'none' });
   const [tokens, setTokens] = useState({});
   const [selectedTokenIds, setSelectedTokenIds] = useState([]);
@@ -23,7 +22,7 @@ export default function DMBattleMap() {
   
   const [showRulerFor, setShowRulerFor] = useState(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
-  const [drawingColor, setDrawingColor] = useState('#ef4444');
+  const [drawingColor, setDrawingColor] = useState('#f59e0b'); // Default to amber for light
   const [drawingShape, setDrawingShape] = useState('freehand'); 
   
   const [activePlayers, setActivePlayers] = useState([]);
@@ -36,13 +35,10 @@ export default function DMBattleMap() {
   const [tempImageUrl, setTempImageUrl] = useState('');
   const [tempGridScale, setTempGridScale] = useState(30); 
   const [tempGridColor, setTempGridColor] = useState('rgba(255,255,255,0.35)');
-  
-  // NEW: State for the configuration menu
   const [tempEnvironment, setTempEnvironment] = useState('none');
 
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
-  
   const [imagePrompt, setImagePrompt] = useState({ isOpen: false, tokenId: null, url: '' });
 
   const getSelectedEntity = () => {
@@ -57,9 +53,7 @@ export default function DMBattleMap() {
   
   const selectedEntity = getSelectedEntity();
 
-  useEffect(() => {
-    tokensRef.current = tokens;
-  }, [tokens]);
+  useEffect(() => { tokensRef.current = tokens; }, [tokens]);
 
   useEffect(() => {
     const mapRef = doc(db, 'campaign', 'battlemap');
@@ -70,15 +64,9 @@ export default function DMBattleMap() {
         const safeRows = Math.min(100, Math.max(1, isNaN(Number(data.rows)) ? 15 : Number(data.rows)));
 
         setMapData({
-          imageUrl: data.imageUrl || '',
-          cols: safeCols,
-          rows: safeRows,
-          isPublished: data.isPublished || false,
-          activeTokenId: data.activeTokenId || null,
-          gridColor: data.gridColor || 'rgba(255,255,255,0.35)',
-          drawings: data.drawings || [],
-          fogOfWar: data.fogOfWar || false,
-          environment: data.environment || 'none'
+          imageUrl: data.imageUrl || '', cols: safeCols, rows: safeRows, isPublished: data.isPublished || false,
+          activeTokenId: data.activeTokenId || null, gridColor: data.gridColor || 'rgba(255,255,255,0.35)',
+          drawings: data.drawings || [], fogOfWar: data.fogOfWar || false, environment: data.environment || 'none'
         });
         setTokens(data.tokens || {});
       } else {
@@ -89,18 +77,9 @@ export default function DMBattleMap() {
   }, []);
 
   useEffect(() => {
-    const unsubChars = onSnapshot(collection(db, 'characters'), (snap) => {
-       const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-       setActivePlayers(players);
-    });
-    const unsubEnemies = onSnapshot(collection(db, 'active_enemies'), (snap) => {
-       const enemies = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-       setActiveEnemies(enemies);
-    });
-    return () => {
-      unsubChars();
-      unsubEnemies();
-    };
+    const unsubChars = onSnapshot(collection(db, 'characters'), (snap) => setActivePlayers(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubEnemies = onSnapshot(collection(db, 'active_enemies'), (snap) => setActiveEnemies(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => { unsubChars(); unsubEnemies(); };
   }, []);
 
   useEffect(() => {
@@ -117,9 +96,7 @@ export default function DMBattleMap() {
   const handleUpdateMapSettings = () => {
     setIsSavingMap(true);
     if (!tempImageUrl) {
-      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: '', cols: 20, rows: 15, gridColor: tempGridColor, environment: tempEnvironment }, { merge: true }).then(() => {
-        setIsSavingMap(false); setIsEditingMap(false);
-      });
+      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: '', cols: 20, rows: 15, gridColor: tempGridColor, environment: tempEnvironment }, { merge: true }).then(() => { setIsSavingMap(false); setIsEditingMap(false); });
       return;
     }
     const img = new Image();
@@ -127,9 +104,7 @@ export default function DMBattleMap() {
     img.onload = () => {
       const calcCols = Math.min(100, Math.max(1, Math.round(img.naturalWidth / tempGridScale)));
       const calcRows = Math.min(100, Math.max(1, Math.round(img.naturalHeight / tempGridScale)));
-      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: tempImageUrl, cols: calcCols, rows: calcRows, gridColor: tempGridColor, environment: tempEnvironment }, { merge: true }).then(() => {
-        setIsSavingMap(false); setIsEditingMap(false);
-      });
+      setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: tempImageUrl, cols: calcCols, rows: calcRows, gridColor: tempGridColor, environment: tempEnvironment }, { merge: true }).then(() => { setIsSavingMap(false); setIsEditingMap(false); });
     };
     img.onerror = () => {
       setDoc(doc(db, 'campaign', 'battlemap'), { imageUrl: tempImageUrl, cols: 20, rows: 15, gridColor: tempGridColor, environment: tempEnvironment }, { merge: true }).then(() => {
@@ -176,8 +151,7 @@ export default function DMBattleMap() {
     const newToken = { 
       id: actor.id, name: getShortName(actor.name), type: type, img: actor.img || '', 
       speed: actor.speed || 30, ac: actor.ac || 10, conditions: actor.conditions || [], x: 0, y: 0, 
-      size: getCreatureSize(actor.name), isHidden: false, 
-      hp: actor.currentHp ?? actor.hp ?? 0, maxHp: actor.maxHp ?? actor.hp ?? 1,
+      size: getCreatureSize(actor.name), isHidden: false, hp: actor.currentHp ?? actor.hp ?? 0, maxHp: actor.maxHp ?? actor.hp ?? 1,
       tempHp: actor.tempHp || 0, aura: 0, elevation: 0, isConcentrating: actor.isConcentrating || false
     };
     await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${actor.id}`]: newToken });
@@ -186,12 +160,8 @@ export default function DMBattleMap() {
   const stageAllActive = async () => {
     const updates = {};
     let pX = 0, eX = 0;
-    activePlayers.filter(p => !tokens[p.id]).forEach(p => {
-      updates[`tokens.${p.id}`] = { id: p.id, name: getShortName(p.name), type: 'player', img: p.img || '', speed: p.speed || 30, ac: p.ac || 10, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false };
-    });
-    activeEnemies.filter(e => !tokens[e.id]).forEach(e => {
-      updates[`tokens.${e.id}`] = { id: e.id, name: getShortName(e.name), type: 'enemy', img: e.img || '', speed: e.speed || 30, ac: e.ac || 10, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false };
-    });
+    activePlayers.filter(p => !tokens[p.id]).forEach(p => { updates[`tokens.${p.id}`] = { id: p.id, name: getShortName(p.name), type: 'player', img: p.img || '', speed: p.speed || 30, ac: p.ac || 10, conditions: p.conditions || [], x: pX++, y: 0, size: getCreatureSize(p.name), isHidden: false, hp: p.hp || 0, maxHp: p.maxHp || 1, tempHp: p.tempHp || 0, aura: 0, elevation: 0, isConcentrating: p.isConcentrating || false }; });
+    activeEnemies.filter(e => !tokens[e.id]).forEach(e => { updates[`tokens.${e.id}`] = { id: e.id, name: getShortName(e.name), type: 'enemy', img: e.img || '', speed: e.speed || 30, ac: e.ac || 10, conditions: e.conditions || [], x: eX++, y: 2, size: getCreatureSize(e.name), isHidden: false, hp: e.currentHp ?? e.hp ?? 0, maxHp: e.maxHp ?? e.hp ?? 1, tempHp: e.tempHp || 0, aura: 0, elevation: 0, isConcentrating: e.isConcentrating || false }; });
     if (Object.keys(updates).length > 0) await updateDoc(doc(db, 'campaign', 'battlemap'), updates);
   };
 
@@ -203,13 +173,7 @@ export default function DMBattleMap() {
 
   const spawnCrowd = async () => {
     const crowdSize = 5;
-    const images = [
-      'https://images.unsplash.com/photo-1554224311-b98dc6d8b28f?q=80&w=150&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1618336753974-aae8e04506aa?q=80&w=150&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1531362624558-8d193309e3e3?q=80&w=150&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1598453406399-53e9a7e0a8aa?q=80&w=150&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1601335804364-bb20b77749eb?q=80&w=150&auto=format&fit=crop'
-    ];
+    const images = ['https://images.unsplash.com/photo-1554224311-b98dc6d8b28f?q=80&w=150&auto=format&fit=crop', 'https://images.unsplash.com/photo-1618336753974-aae8e04506aa?q=80&w=150&auto=format&fit=crop', 'https://images.unsplash.com/photo-1531362624558-8d193309e3e3?q=80&w=150&auto=format&fit=crop', 'https://images.unsplash.com/photo-1598453406399-53e9a7e0a8aa?q=80&w=150&auto=format&fit=crop', 'https://images.unsplash.com/photo-1601335804364-bb20b77749eb?q=80&w=150&auto=format&fit=crop'];
     const updates = {};
     for (let i = 0; i < crowdSize; i++) {
       const npcId = `npc_crowd_${Date.now()}_${i}`;
@@ -225,9 +189,7 @@ export default function DMBattleMap() {
       batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
       if (targetToken && targetToken.type === 'enemy') batch.delete(doc(db, 'active_enemies', tokenId));
       await batch.commit();
-    } catch (e) {
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() });
-    }
+    } catch (e) { await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}`]: deleteField() }); }
     setSelectedTokenIds(prev => prev.filter(id => id !== tokenId));
   };
 
@@ -251,9 +213,7 @@ export default function DMBattleMap() {
       const collectionName = tokens[tokenId].type === 'player' ? 'characters' : 'active_enemies';
       batch.update(doc(db, collectionName, tokenId), { img: url });
       await batch.commit();
-    } catch (error) { 
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.img`]: url });
-    }
+    } catch (error) { await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.img`]: url }); }
     setImagePrompt({ isOpen: false, tokenId: null, url: '' });
   };
 
@@ -263,7 +223,6 @@ export default function DMBattleMap() {
     if (!targetToken) return;
     const parsedHp = Math.max(0, Math.min(targetToken.maxHp || 1000, parseInt(newHpVal, 10)));
     if (isNaN(parsedHp)) return;
-    
     try {
       const batch = writeBatch(db);
       batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp });
@@ -271,9 +230,7 @@ export default function DMBattleMap() {
       if (targetToken.type === 'enemy') batch.update(doc(db, collectionName, tokenId), { currentHp: parsedHp });
       else if (targetToken.type === 'player') batch.update(doc(db, collectionName, tokenId), { hp: parsedHp });
       await batch.commit();
-    } catch (e) {
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp });
-    }
+    } catch (e) { await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.hp`]: parsedHp }); }
   };
 
   const handleToggleTokenSize = async (tokenId) => {
@@ -304,9 +261,7 @@ export default function DMBattleMap() {
       const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
       batch.update(doc(db, collectionName, tokenId), { isConcentrating: newConcState });
       await batch.commit();
-    } catch(e) {
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.isConcentrating`]: newConcState });
-    }
+    } catch(e) { await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.isConcentrating`]: newConcState }); }
   };
 
   const toggleCondition = async (tokenId, cond) => {
@@ -320,17 +275,12 @@ export default function DMBattleMap() {
       const collectionName = t.type === 'player' ? 'characters' : 'active_enemies';
       batch.update(doc(db, collectionName, tokenId), { conditions: newConds });
       await batch.commit();
-    } catch(e) {
-      await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.conditions`]: newConds });
-    }
+    } catch(e) { await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${tokenId}.conditions`]: newConds }); }
   };
 
   const handleTileClick = async (x, y) => {
     if (selectedTokenIds.length !== 1) return;
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { 
-      [`tokens.${selectedTokenIds[0]}.x`]: x, 
-      [`tokens.${selectedTokenIds[0]}.y`]: y 
-    });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { [`tokens.${selectedTokenIds[0]}.x`]: x, [`tokens.${selectedTokenIds[0]}.y`]: y });
   };
 
   const handleDrawEnd = async (lineData) => {
@@ -339,27 +289,20 @@ export default function DMBattleMap() {
     await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [...mapData.drawings, newLine] });
   };
 
-  const handleClearDrawings = () => {
-    setDialog({ isOpen: true, title: 'Clear Drawings', message: 'Clear all drawings and templates from the map?', type: 'confirm', onConfirm: async () => { await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [] }); closeDialog(); }});
-  };
-
+  const handleClearDrawings = () => setDialog({ isOpen: true, title: 'Clear Drawings', message: 'Clear all drawings and templates from the map?', type: 'confirm', onConfirm: async () => { await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [] }); closeDialog(); }});
   const handleUndoDrawing = async () => {
     if (!mapData.drawings || mapData.drawings.length === 0) return;
-    const newDrawings = mapData.drawings.slice(0, -1);
-    await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: newDrawings });
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: mapData.drawings.slice(0, -1) });
   };
 
   useEffect(() => {
     if (isEditingMap) {
-      setTempImageUrl(mapData.imageUrl);
-      setTempGridScale(30); 
-      setTempGridColor(mapData.gridColor || 'rgba(255,255,255,0.35)');
-      setTempEnvironment(mapData.environment || 'none');
+      setTempImageUrl(mapData.imageUrl); setTempGridScale(30); setTempGridColor(mapData.gridColor || 'rgba(255,255,255,0.35)'); setTempEnvironment(mapData.environment || 'none');
     }
   }, [isEditingMap, mapData.imageUrl, mapData.gridColor, mapData.environment]);
 
-  const launchDisplayTab = () => { window.open(window.location.pathname + '?display=true', '_blank'); };
-  const returnToDashboard = () => { window.location.href = window.location.pathname; };
+  const launchDisplayTab = () => window.open(window.location.pathname + '?display=true', '_blank');
+  const returnToDashboard = () => window.location.href = window.location.pathname;
 
   const unstagedPlayers = activePlayers.filter(p => !tokens[p.id]);
   const unstagedEnemies = activeEnemies.filter(e => !tokens[e.id]);
@@ -391,18 +334,12 @@ export default function DMBattleMap() {
 
       <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-3 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 shrink-0 z-20">
         <div className="flex items-center gap-4 pl-2">
-            <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pr-4 border-r-2 border-slate-950">
-            <Map className="w-5 h-5" /> War Table
-            </h2>
-            <button onClick={returnToDashboard} className="text-slate-400 hover:text-white text-xs font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors">
-            <LayoutDashboard className="w-4 h-4" /> Command Center
-            </button>
+            <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pr-4 border-r-2 border-slate-950"><Map className="w-5 h-5" /> War Table</h2>
+            <button onClick={returnToDashboard} className="text-slate-400 hover:text-white text-xs font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors"><LayoutDashboard className="w-4 h-4" /> Command Center</button>
         </div>
         
         <div className="flex flex-wrap items-center gap-y-2 gap-x-2 w-full xl:w-auto">
-          <button onClick={toggleFogOfWar} className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 ${mapData.fogOfWar ? 'bg-slate-400 border-slate-950 text-slate-950' : 'bg-slate-950 border-slate-900 text-slate-500 hover:text-white'}`}>
-            <Eye className="w-4 h-4" /> Fog
-          </button>
+          <button onClick={toggleFogOfWar} className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 ${mapData.fogOfWar ? 'bg-slate-400 border-slate-950 text-slate-950' : 'bg-slate-950 border-slate-900 text-slate-500 hover:text-white'}`}><Eye className="w-4 h-4" /> Fog</button>
           
           <div className="flex bg-slate-800 rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] border-2 border-slate-950 shrink-0 divide-x-2 divide-slate-950 overflow-hidden">
              <button onClick={spawnNPC} className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-slate-700 flex items-center gap-1.5 transition-colors"><User className="w-4 h-4" /> +1 NPC</button>
@@ -417,8 +354,14 @@ export default function DMBattleMap() {
                 <button onClick={() => setDrawingShape('line')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'line' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><div className="w-3 h-0.5 bg-current rotate-45" /></button>
                 <button onClick={() => setDrawingShape('circle')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'circle' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><Circle className="w-3 h-3" /></button>
                 <button onClick={() => setDrawingShape('cone')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'cone' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><Triangle className="w-3 h-3" /></button>
-                <button onClick={() => setDrawingShape('reveal')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'reveal' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`} title="Reveal Fog"><Eye className="w-3 h-3" /></button>
+                
+                {/* NEW DYNAMIC LIGHTING TOOLS */}
                 <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
+                <button onClick={() => setDrawingShape('light_circle')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'light_circle' ? 'bg-amber-500 border-slate-950 text-slate-950 shadow-inner' : 'border-transparent text-slate-500 hover:text-amber-400'}`} title="Draw Light Radius"><Sun className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('light_cone')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'light_cone' ? 'bg-amber-500 border-slate-950 text-slate-950 shadow-inner' : 'border-transparent text-slate-500 hover:text-amber-400'}`} title="Draw Light Cone"><Flashlight className="w-3 h-3" /></button>
+                <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
+
+                <button onClick={() => setDrawingShape('reveal')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'reveal' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`} title="Reveal Fog"><Eye className="w-3 h-3" /></button>
                 <button onClick={() => setDrawingShape('ruler')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'ruler' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`} title="Quick Measure Distance"><Ruler className="w-3 h-3" /></button>
                 <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
                 {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
@@ -440,7 +383,6 @@ export default function DMBattleMap() {
         </div>
       </div>
 
-      {/* UPGRADED MAP CONFIGURATION WITH ENVIRONMENT DROPDOWN */}
       {isEditingMap && (
         <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-5 shadow-[6px_6px_0px_rgba(0,0,0,1)] animate-in fade-in slide-in-from-top-2 space-y-5 relative z-10 shrink-0">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -487,9 +429,7 @@ export default function DMBattleMap() {
       {hasUnstagedActors && (
         <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-3 flex items-center flex-wrap gap-2 shadow-[6px_6px_0px_rgba(0,0,0,1)] shrink-0 z-10">
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest mr-2 pl-2 hidden xl:block">Stage Actors:</span>
-          <button onClick={stageAllActive} className="text-[10px] md:text-xs font-black uppercase tracking-widest bg-emerald-500 hover:bg-emerald-400 border-2 border-slate-950 text-slate-950 px-4 py-2 rounded-lg transition-all mr-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
-            <Users className="w-3.5 h-3.5"/> Deploy All
-          </button>
+          <button onClick={stageAllActive} className="text-[10px] md:text-xs font-black uppercase tracking-widest bg-emerald-500 hover:bg-emerald-400 border-2 border-slate-950 text-slate-950 px-4 py-2 rounded-lg transition-all mr-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none"><Users className="w-3.5 h-3.5"/> Deploy All</button>
           <div className="w-0.5 h-6 bg-slate-950 mx-1"></div>
           {unstagedPlayers.map(p => <button key={p.id} onClick={() => stageToken(p, 'player')} className="text-[10px] md:text-xs font-black bg-indigo-500 hover:bg-indigo-400 border-2 border-slate-950 text-slate-950 px-3 py-2 rounded-lg transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">+ {getShortName(p.name)}</button>)}
           {unstagedEnemies.map(e => <button key={e.id} onClick={() => stageToken(e, 'enemy')} className="text-[10px] md:text-xs font-black bg-red-500 hover:bg-red-400 border-2 border-slate-950 text-slate-950 px-3 py-2 rounded-lg transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">+ {getShortName(e.name)}</button>)}

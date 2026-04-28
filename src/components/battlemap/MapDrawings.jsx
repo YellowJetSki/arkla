@@ -7,14 +7,12 @@ export default function MapDrawings({
   const [currentLine, setCurrentLine] = useState(null);
   const svgRef = useRef(null);
 
-  // NEW: Shift Key listener to drop Ruler Waypoints seamlessly during movement
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Shift' && currentLine?.type === 'ruler') {
         setCurrentLine(prev => {
           if (!prev || prev.points.length === 0) return prev;
           const lastPoint = prev.points[prev.points.length - 1];
-          // Commit the current cursor position as a locked waypoint
           return { ...prev, points: [...prev.points, lastPoint] };
         });
       }
@@ -45,22 +43,20 @@ export default function MapDrawings({
 
   const handlePointerDown = (e) => {
     if (!isDrawingMode) return;
-    const needsSnapping = ['circle', 'cone', 'line', 'ruler'].includes(drawingShape);
+    const needsSnapping = ['circle', 'cone', 'line', 'ruler', 'light_circle', 'light_cone'].includes(drawingShape);
     const coords = getCoords(e.nativeEvent || e, needsSnapping);
     setCurrentLine({ type: drawingShape, points: [coords], color: drawingColor });
   };
 
   const handlePointerMove = (e) => {
     if (!isDrawingMode || !currentLine) return;
-    const needsSnapping = ['circle', 'cone', 'line', 'ruler'].includes(currentLine.type);
+    const needsSnapping = ['circle', 'cone', 'line', 'ruler', 'light_circle', 'light_cone'].includes(currentLine.type);
     const coords = getCoords(e.nativeEvent || e, needsSnapping);
     
     setCurrentLine(prev => {
       if (prev.type === 'freehand' || prev.type === 'reveal') {
         return { ...prev, points: [...prev.points, coords] };
       } else {
-        // For shapes and rulers, we always update the final point in the array. 
-        // If Waypoints were added by Shift, we update the NEW end of the array!
         const updatedPoints = [...prev.points];
         updatedPoints[updatedPoints.length - 1] = coords;
         return { ...prev, points: updatedPoints };
@@ -87,7 +83,6 @@ export default function MapDrawings({
 
     if (line.points.length < 2) return null;
 
-    // THE UPGRADED WAYPOINT RULER
     if (shapeType === 'ruler') {
       let totalDistance = 0;
       const segments = [];
@@ -96,7 +91,7 @@ export default function MapDrawings({
          const pB = line.points[i+1];
          totalDistance += Math.hypot(pB.x - pA.x, pB.y - pA.y);
          segments.push(<line key={`seg-${i}`} x1={pA.x * currentCellSize} y1={pA.y * currentCellSize} x2={pB.x * currentCellSize} y2={pB.y * currentCellSize} stroke={strokeColor} strokeWidth={6} strokeDasharray="8 8" strokeLinecap="round" opacity={isMask ? 1 : 0.8} />);
-         if (i > 0) segments.push(<circle key={`dot-${i}`} cx={pA.x * currentCellSize} cy={pA.y * currentCellSize} r={5} fill={strokeColor} opacity={0.9} />); // Draw Waypoint Joint
+         if (i > 0) segments.push(<circle key={`dot-${i}`} cx={pA.x * currentCellSize} cy={pA.y * currentCellSize} r={5} fill={strokeColor} opacity={0.9} />); 
       }
       const endPoint = line.points[line.points.length - 1];
       const distFt = Math.round(totalDistance * 5);
@@ -112,7 +107,8 @@ export default function MapDrawings({
     const p2 = line.points[line.points.length - 1];
     const x1 = p1.x * currentCellSize, y1 = p1.y * currentCellSize;
     const x2 = p2.x * currentCellSize, y2 = p2.y * currentCellSize;
-    const distanceFt = Math.round(Math.hypot(p2.x - p1.x, p2.y - p1.y) * 5);
+    const distance = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const distanceFt = Math.round(distance * 5);
     const midX = (x1 + x2) / 2, midY = (y1 + y2) / 2;
 
     if (shapeType === 'line') return (
@@ -120,10 +116,10 @@ export default function MapDrawings({
           <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeColor} strokeWidth={12} strokeLinecap="round" opacity={isMask ? 1 : 0.6} />
           {distanceFt > 0 && <DistanceBadge x={midX} y={midY} text={`${distanceFt}ft`} color={strokeColor} isMask={isMask} />}
         </g>
-      );
+    );
 
     if (shapeType === 'circle') {
-      const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      const radius = distance * currentCellSize;
       return (
         <g key={index}>
           <circle cx={x1} cy={y1} r={radius} stroke={strokeColor} strokeWidth={4} fill={fillColor} fillOpacity={isMask ? 1 : 0.2} opacity={isMask ? 1 : 0.85} />
@@ -134,16 +130,67 @@ export default function MapDrawings({
 
     if (shapeType === 'cone') {
       const angle = Math.atan2(y2 - y1, x2 - x1);
-      const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      const distPx = distance * currentCellSize;
       const halfAngle = (53 / 2) * (Math.PI / 180); 
-      const p2x = x1 + distance * Math.cos(angle - halfAngle);
-      const p2y = y1 + distance * Math.sin(angle - halfAngle);
-      const p3x = x1 + distance * Math.cos(angle + halfAngle);
-      const p3y = y1 + distance * Math.sin(angle + halfAngle);
+      const p2x = x1 + distPx * Math.cos(angle - halfAngle);
+      const p2y = y1 + distPx * Math.sin(angle - halfAngle);
+      const p3x = x1 + distPx * Math.cos(angle + halfAngle);
+      const p3y = y1 + distPx * Math.sin(angle + halfAngle);
       return (
         <g key={index}>
           <polygon points={`${x1},${y1} ${p2x},${p2y} ${p3x},${p3y}`} stroke={strokeColor} strokeWidth={4} fill={fillColor} fillOpacity={isMask ? 1 : 0.2} strokeLinejoin="round" opacity={isMask ? 1 : 0.85} />
           {distanceFt > 0 && <DistanceBadge x={x2} y={y2} text={`${distanceFt}ft`} color={strokeColor} isMask={isMask} />}
+        </g>
+      );
+    }
+
+    // NEW: Dynamic Light Shapes (Players see glowing gradient, DM sees faint dashed borders)
+    if (shapeType === 'light_circle') {
+      const radius = distance * currentCellSize;
+      return (
+        <g key={index} className="mix-blend-screen pointer-events-none">
+          <defs>
+            <radialGradient id={`glow-circ-${index}`} cx={x1} cy={y1} r={radius} gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.8">
+                <animate attributeName="stop-opacity" values="0.8;0.4;0.9;0.5;0.8" dur={`${2 + (index % 3) * 0.5}s`} repeatCount="indefinite" />
+              </stop>
+              <stop offset="50%" stopColor={strokeColor} stopOpacity="0.3">
+                <animate attributeName="stop-opacity" values="0.3;0.1;0.4;0.2;0.3" dur={`${2.5 + (index % 2) * 0.5}s`} repeatCount="indefinite" />
+              </stop>
+              <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <circle cx={x1} cy={y1} r={radius} fill={`url(#glow-circ-${index})`} />
+          {isDM && <circle cx={x1} cy={y1} r={radius} stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeDasharray="6 6" fill="none" />}
+          {distanceFt > 0 && isDM && <DistanceBadge x={x1} y={y1 - radius} text={`${distanceFt}ft`} color="rgba(255,255,255,0.6)" isMask={isMask} />}
+        </g>
+      );
+    }
+
+    if (shapeType === 'light_cone') {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const distPx = distance * currentCellSize;
+      const halfAngle = (53 / 2) * (Math.PI / 180); 
+      const p2x = x1 + distPx * Math.cos(angle - halfAngle);
+      const p2y = y1 + distPx * Math.sin(angle - halfAngle);
+      const p3x = x1 + distPx * Math.cos(angle + halfAngle);
+      const p3y = y1 + distPx * Math.sin(angle + halfAngle);
+      return (
+        <g key={index} className="mix-blend-screen pointer-events-none">
+          <defs>
+            <radialGradient id={`glow-cone-${index}`} cx={x1} cy={y1} r={distPx} gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.8">
+                <animate attributeName="stop-opacity" values="0.8;0.4;0.9;0.5;0.8" dur={`${2 + (index % 3) * 0.5}s`} repeatCount="indefinite" />
+              </stop>
+              <stop offset="50%" stopColor={strokeColor} stopOpacity="0.3">
+                <animate attributeName="stop-opacity" values="0.3;0.1;0.4;0.2;0.3" dur={`${2.5 + (index % 2) * 0.5}s`} repeatCount="indefinite" />
+              </stop>
+              <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <polygon points={`${x1},${y1} ${p2x},${p2y} ${p3x},${p3y}`} fill={`url(#glow-cone-${index})`} />
+          {isDM && <polygon points={`${x1},${y1} ${p2x},${p2y} ${p3x},${p3y}`} stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" strokeDasharray="6 6" fill="none" strokeLinejoin="round" />}
+          {distanceFt > 0 && isDM && <DistanceBadge x={x2} y={y2} text={`${distanceFt}ft`} color="rgba(255,255,255,0.6)" isMask={isMask} />}
         </g>
       );
     }
