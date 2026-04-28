@@ -105,15 +105,39 @@ export default function DMPlayerCard({ charId }) {
   const acBuffTotal = (char.tempBuffs || []).filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
   const displayAc = autoAc + acBuffTotal;
 
-  // FIXED: Properly hunt for weapons across all possible DB structures
+  // Accurately fetches equipped weapons mirroring the CombatTab logic
   const getEquippedWeapons = () => {
-    if (char.weapons && char.weapons.length > 0) return char.weapons;
-    if (char.attacks && char.attacks.length > 0) return char.attacks;
-    if (char.inventory && char.inventory.length > 0) {
-      return char.inventory.filter(i => (i.type === 'Weapon' || i.isWeapon) && i.equipped);
-    }
-    return [];
+    if (!char) return [];
+    
+    // 1. Safely extract from inventory using category === 'Weapon'
+    const safeInventory = Array.isArray(char.inventory) ? char.inventory : Object.values(char.inventory || {});
+    
+    const inventoryWeapons = safeInventory
+      .filter(item => item.category === 'Weapon' && item.equipped)
+      .map(w => {
+        let propsStr = '';
+        if (Array.isArray(w.properties)) propsStr = w.properties.map(p => p.name).join(', ');
+        else if (typeof w.properties === 'string') propsStr = w.properties;
+        
+        return {
+          name: w.name,
+          damage: w.damageDice || w.damage?.damage_dice || '1d4',
+          damageType: w.damageType || w.damage?.damage_type?.name || 'Slashing',
+          properties: propsStr
+        };
+      });
+
+    // 2. Also include anything from the legacy 'attacks' or 'weapons' arrays just in case
+    const legacyAttacks = (char.attacks || char.weapons || []).map(atk => ({
+      name: atk.name,
+      damage: atk.damage || atk.damageDice || '',
+      damageType: atk.type || atk.damageType || '',
+      properties: atk.notes || atk.properties || ''
+    }));
+
+    return [...inventoryWeapons, ...legacyAttacks];
   };
+
   const equippedWeapons = getEquippedWeapons();
 
   return (
@@ -285,7 +309,7 @@ export default function DMPlayerCard({ charId }) {
               <Swords className="w-3.5 h-3.5"/> Equipped Arsenal
             </h4>
             {equippedWeapons.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
                 {equippedWeapons.map((w, i) => (
                   <div key={i} className="bg-slate-950 p-2 rounded-lg border border-slate-800 text-xs">
                     <p className="font-bold text-white mb-0.5">{w.name || w.itemName}</p>

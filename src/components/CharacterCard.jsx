@@ -74,17 +74,27 @@ const THEMES = {
 const CardWrapper = ({ isDM, onClose, children }) => {
   if (isDM) {
     return createPortal(
-      <div className="fixed inset-0 z-[99999] flex justify-end bg-slate-950/60 backdrop-blur-sm h-[100dvh] overflow-hidden animate-in fade-in duration-200">
-        <div className="absolute inset-0 cursor-pointer" onClick={onClose} />
-        <div className="bg-slate-900 border-l-[3px] border-indigo-500 w-full max-w-[95vw] md:max-w-2xl xl:max-w-4xl h-full shadow-[-12px_0px_30px_rgba(0,0,0,1)] flex flex-col animate-in slide-in-from-right-full duration-300 relative overflow-hidden">
-          <button 
-            onClick={onClose} 
-            className="absolute top-4 right-4 z-[50] bg-slate-950 text-slate-400 hover:text-white p-2 rounded-xl border-2 border-slate-800 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-500 hover:border-red-950 transition-all active:translate-y-[2px] active:shadow-none"
-            title="Close Sheet"
-          >
-             <X className="w-5 h-5 font-black" />
-          </button>
-          <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center p-2 sm:p-6 pointer-events-none">
+        
+        {/* Soft, translucent backdrop so the DM can still see the board behind it */}
+        <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm pointer-events-auto" onClick={onClose} />
+        
+        {/* Floating Centered Window - Wide enough to prevent layout cut-offs */}
+        <div className="bg-slate-900 border-[3px] border-indigo-500 rounded-2xl w-full max-w-[95vw] xl:max-w-7xl shadow-[0_20px_50px_rgba(0,0,0,1)] flex flex-col h-[95dvh] md:h-[90dvh] animate-in zoom-in-95 duration-200 relative overflow-hidden pointer-events-auto">
+          
+          {/* Header Bar for clean UI and easy closing */}
+          <div className="bg-slate-950 border-b-[3px] border-indigo-900/50 p-3 flex justify-between items-center shrink-0">
+            <span className="text-indigo-400 font-black tracking-widest uppercase text-[10px] sm:text-xs">Player Sheet Interface</span>
+            <button 
+              onClick={onClose} 
+              className="bg-slate-900 text-slate-400 hover:text-white p-1.5 rounded-lg border-2 border-slate-800 shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:bg-red-500 hover:border-red-950 transition-all active:translate-y-[2px] active:shadow-none"
+              title="Close Sheet"
+            >
+               <X className="w-4 h-4 font-black" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar relative">
              {children}
           </div>
         </div>
