@@ -26,6 +26,14 @@ const CONDITION_ICONS = {
   'Unconscious': { icon: Moon, color: 'bg-indigo-800 text-indigo-200 border-indigo-500' }
 };
 
+// NEW: Helper to parse quoted short names (e.g. Michael "Mickey" Mouse -> Mickey)
+const getShortName = (fullName) => {
+  if (!fullName) return 'Unknown';
+  const match = fullName.match(/["'“”‘’]([^"'“”‘’]+)["'“”‘’]/);
+  if (match) return match[1];
+  return fullName.split(' ')[0];
+};
+
 const TokenImage = ({ token, parsedName }) => {
   const [fallbackStep, setFallbackStep] = useState(0);
   useEffect(() => { setFallbackStep(0); }, [parsedName, token.img]);
@@ -45,9 +53,6 @@ const TokenImage = ({ token, parsedName }) => {
   return <img src={imgSrc} alt={parsedName} className="w-full h-full rounded-full object-cover bg-slate-900 border-[3px] border-slate-950 shadow-inner relative" onError={handleError} />;
 };
 
-// =========================================================================
-// THE ENVIRONMENT ENGINE - Zero Dependencies! Pure layered CSS and SVG data URIs
-// =========================================================================
 const EnvironmentOverlay = ({ environment }) => {
   if (!environment || environment === 'none') return null;
 
@@ -74,7 +79,7 @@ const EnvironmentOverlay = ({ environment }) => {
        position: absolute;
        inset: 0;
        pointer-events: none;
-       z-index: 80; /* Perfect Z-level above map but below UI HUDs */
+       z-index: 80;
     }
 
     .env-light_rain {
@@ -150,7 +155,6 @@ const EnvironmentOverlay = ({ environment }) => {
     </>
   );
 };
-// =========================================================================
 
 export default function MapGrid({ 
   mapData, tokens, activePlayers = [], activeEnemies = [], activeActor = null,
@@ -194,6 +198,8 @@ export default function MapGrid({
 
   const activeTurnId = activeActor?.id && tokens[activeActor.id] ? activeActor.id : null;
   const cameraTargetId = isPlayerMap ? (selectedTokenIds.length > 0 ? selectedTokenIds[0] : null) : activeTurnId;
+  
+  // FIXED: Explicitly tracking token coordinates to trigger smooth scroll auto-pan!
   const targetTokenX = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].x : null;
   const targetTokenY = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].y : null;
 
@@ -213,6 +219,7 @@ export default function MapGrid({
     }
   }, [isDisplayMode, isPlayerMap, cols, rows, cameraTargetId]);
 
+  // Runs exactly when active token coordinates update to drag the camera
   useEffect(() => {
     if (cameraTargetId && (isDisplayMode || isPlayerMap)) {
       const timer = setTimeout(() => centerOnToken(cameraTargetId), 300);
@@ -320,7 +327,6 @@ export default function MapGrid({
   return (
     <div className={`relative w-full flex flex-col overflow-hidden h-full ${isDisplayMode ? 'rounded-none border-0 bg-black' : 'rounded-none md:rounded-2xl border-none md:border-[3px] border-slate-950 bg-slate-900 shadow-[6px_6px_0px_rgba(0,0,0,1)]'}`}>
       
-      {/* THE ENVIRONMENT OVERLAY - Injected directly over the map container so it doesn't move with pan/zoom! */}
       <EnvironmentOverlay environment={mapData?.environment} />
 
       {!isDisplayMode && (
@@ -336,7 +342,8 @@ export default function MapGrid({
         <div className="fixed top-8 left-8 z-[200] flex items-center gap-4 bg-slate-950/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-3 shadow-2xl animate-in slide-in-from-left-8 fade-in duration-500">
           {tokens[activeActor.id] ? (
              <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-slate-800 shrink-0">
-               <TokenImage token={tokens[activeActor.id]} parsedName={activeActor.name} />
+               {/* APPLIED GET SHORT NAME TO THE ICON FALLBACK */}
+               <TokenImage token={tokens[activeActor.id]} parsedName={getShortName(activeActor.name)} />
              </div>
           ) : (
              <div className="w-14 h-14 rounded-full border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.3)] bg-slate-900 flex items-center justify-center shrink-0">
@@ -345,7 +352,10 @@ export default function MapGrid({
           )}
           <div className="flex flex-col pr-4">
             <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-0.5">Current Turn</span>
-            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">{activeActor.name}</h1>
+            {/* APPLIED GET SHORT NAME SO IT STRIPS OUT "QUOTES" */}
+            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+              {getShortName(activeActor.name)}
+            </h1>
           </div>
         </div>
       )}

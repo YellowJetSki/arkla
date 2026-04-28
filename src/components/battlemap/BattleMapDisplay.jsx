@@ -7,7 +7,7 @@ import DisplayWaitingScreen from './DisplayWaitingScreen';
 import DisplayHandoutOverlay from './DisplayHandoutOverlay';
 
 export default function BattleMapDisplay({ onLogout }) {
-  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, fogOfWar: false, drawings: [] });
+  const [mapData, setMapData] = useState({ imageUrl: '', cols: 20, rows: 15, isPublished: false, activeTokenId: null, fogOfWar: false, drawings: [], environment: 'none', gridColor: 'rgba(255,255,255,0.35)' });
   const [tokens, setTokens] = useState({});
   const [activeHandout, setActiveHandout] = useState(null);
   const [initiative, setInitiative] = useState(null);
@@ -17,14 +17,21 @@ export default function BattleMapDisplay({ onLogout }) {
     const unsub = onSnapshot(mapRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        
+        // Safety bounds for cols/rows to prevent crash
+        const safeCols = Math.min(100, Math.max(1, isNaN(Number(data.cols)) ? 20 : Number(data.cols)));
+        const safeRows = Math.min(100, Math.max(1, isNaN(Number(data.rows)) ? 15 : Number(data.rows)));
+
         setMapData({
           imageUrl: data.imageUrl || '',
-          cols: data.cols || 20,
-          rows: data.rows || 15,
+          cols: safeCols,
+          rows: safeRows,
           isPublished: data.isPublished || false,
           activeTokenId: data.activeTokenId || null,
+          gridColor: data.gridColor || 'rgba(255,255,255,0.35)',
           fogOfWar: data.fogOfWar || false,
-          drawings: data.drawings || []
+          drawings: data.drawings || [],
+          environment: data.environment || 'none'
         });
         setTokens(data.tokens || {});
       }
