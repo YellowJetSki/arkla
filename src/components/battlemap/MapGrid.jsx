@@ -64,7 +64,6 @@ const EnvironmentOverlay = ({ environment }) => {
        inset: 0;
        pointer-events: none;
        z-index: 80;
-       overflow: hidden;
     }
 
     @keyframes rain-fall {
@@ -75,19 +74,24 @@ const EnvironmentOverlay = ({ environment }) => {
        0% { background-position: 0px 0px, 0px 0px, 0px 0px; }
        100% { background-position: 300px 1000px, 200px 800px, 150px 600px; }
     }
+    
+    /* NEW: Pixel-based infinite scrolling for true drifting fog */
     @keyframes fog-drift {
-      0% { transform: translate(0, 0); }
-      100% { transform: translate(25%, 25%); } 
+       0% { background-position: 0px 0px, 0px 0px; }
+       100% { background-position: 1200px 600px, -800px 400px; }
     }
+
+    /* NEW: Diagonal beams of sunlight panning across the map */
     @keyframes god-rays {
-       0% { transform: translateX(-10%) rotate(25deg); opacity: 0.3; }
-       50% { opacity: 0.6; }
-       100% { transform: translateX(10%) rotate(25deg); opacity: 0.3; }
+       0% { background-position: -800px 0; opacity: 0.4; }
+       50% { opacity: 0.85; }
+       100% { background-position: 800px 0; opacity: 0.4; }
     }
+
     @keyframes moon-drift {
-       0% { transform: translateX(-5%) rotate(-15deg); opacity: 0.3; }
-       50% { opacity: 0.6; }
-       100% { transform: translateX(5%) rotate(-15deg); opacity: 0.3; }
+       0% { background-position: 0% 0%; opacity: 0.6; }
+       50% { opacity: 0.9; }
+       100% { background-position: 100% 100%; opacity: 0.6; }
     }
 
     .env-light_rain {
@@ -114,37 +118,31 @@ const EnvironmentOverlay = ({ environment }) => {
     }
 
     /* BEAUTIFUL DRIFTING FOG */
-    .env-fog::before {
-       content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+    .env-fog { 
        background-image:
-         radial-gradient(circle at 20% 30%, rgba(255,255,255,0.15) 0%, transparent 20%),
-         radial-gradient(circle at 80% 60%, rgba(255,255,255,0.1) 0%, transparent 25%),
-         radial-gradient(circle at 50% 80%, rgba(255,255,255,0.08) 0%, transparent 20%),
-         radial-gradient(circle at 10% 80%, rgba(255,255,255,0.05) 0%, transparent 15%);
-       background-size: 50% 50%;
-       animation: fog-drift 30s linear infinite;
-       pointer-events: none;
+         radial-gradient(circle 300px at 0 0, rgba(255,255,255,0.15), transparent),
+         radial-gradient(circle 400px at 0 0, rgba(255,255,255,0.1), transparent);
+       background-size: 800px 800px, 1200px 1200px;
+       animation: fog-drift 40s linear infinite;
+       background-color: rgba(200, 210, 220, 0.08); 
     }
-    .env-fog { background-color: rgba(200, 210, 220, 0.08); }
 
     /* ETHEREAL SHIFTING GOD-RAYS */
-    .env-sunlight::before {
-       content: ""; position: absolute; top: -100%; left: -100%; width: 300%; height: 300%;
-       background-image: repeating-linear-gradient(90deg, transparent 0%, rgba(255, 250, 200, 0.15) 10%, transparent 20%);
-       animation: god-rays 15s infinite alternate ease-in-out;
-       mix-blend-mode: color-dodge;
-       pointer-events: none;
+    .env-sunlight { 
+       background-image: linear-gradient(105deg, transparent 20%, rgba(255, 245, 200, 0.25) 25%, transparent 35%, transparent 50%, rgba(255, 245, 200, 0.15) 60%, transparent 70%);
+       background-size: 200% 100%;
+       animation: god-rays 12s ease-in-out infinite alternate;
+       background-color: rgba(255, 235, 180, 0.05);
+       mix-blend-mode: hard-light;
     }
-    .env-sunlight { background-color: rgba(255, 235, 180, 0.05); }
 
-    .env-moonlight::after {
-       content: ""; position: absolute; top: -100%; left: -100%; width: 300%; height: 300%;
-       background-image: repeating-linear-gradient(90deg, transparent 0%, rgba(150, 180, 255, 0.1) 15%, transparent 30%);
-       animation: moon-drift 15s infinite alternate ease-in-out;
-       mix-blend-mode: screen;
-       pointer-events: none;
+    .env-moonlight { 
+       background-image: radial-gradient(circle at center, rgba(150, 180, 255, 0.15) 0%, transparent 60%);
+       background-size: 150% 150%;
+       animation: moon-drift 8s ease-in-out infinite alternate;
+       background-color: rgba(10, 15, 45, 0.6);
+       mix-blend-mode: hard-light;
     }
-    .env-moonlight { background-color: rgba(10, 15, 45, 0.5); mix-blend-mode: multiply; }
 
     .env-embers {
        background-image:
@@ -152,20 +150,18 @@ const EnvironmentOverlay = ({ environment }) => {
          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='100' cy='200' r='2' fill='%23ffaa00' opacity='0.9'/%3E%3C/svg%3E");
        animation: blizzard-fall 4s linear infinite reverse;
        background-color: rgba(30, 10, 0, 0.4);
-       mix-blend-mode: overlay;
-    }
-    
-    .env-toxic::before {
-       content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
-       background-image:
-         radial-gradient(circle at 20% 30%, rgba(34,197,94,0.15) 0%, transparent 20%),
-         radial-gradient(circle at 80% 60%, rgba(16,185,129,0.1) 0%, transparent 25%);
-       background-size: 50% 50%;
-       animation: fog-drift 25s linear infinite;
-       pointer-events: none;
        mix-blend-mode: hard-light;
     }
-    .env-toxic { background-color: rgba(5, 150, 105, 0.1); }
+    
+    .env-toxic { 
+       background-image:
+         radial-gradient(circle 300px at 0 0, rgba(34,197,94,0.15), transparent),
+         radial-gradient(circle 400px at 0 0, rgba(16,185,129,0.1), transparent);
+       background-size: 800px 800px, 1200px 1200px;
+       animation: fog-drift 40s linear infinite;
+       background-color: rgba(5, 150, 105, 0.1);
+       mix-blend-mode: hard-light;
+    }
   `;
 
   return (

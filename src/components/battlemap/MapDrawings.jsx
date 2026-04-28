@@ -34,22 +34,8 @@ export default function MapDrawings({
   const getCoords = (e, shouldSnap = false) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
-    let clientX = 0;
-    let clientY = 0;
-    
-    if (e.touches && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else if (e.changedTouches && e.changedTouches.length > 0) {
-      clientX = e.changedTouches[0].clientX;
-      clientY = e.changedTouches[0].clientY;
-    } else if (e.clientX !== undefined) {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    } else if (e.nativeEvent && e.nativeEvent.clientX !== undefined) {
-      clientX = e.nativeEvent.clientX;
-      clientY = e.nativeEvent.clientY;
-    }
+    let clientX = e.clientX ?? (e.touches ? e.touches[0].clientX : 0);
+    let clientY = e.clientY ?? (e.touches ? e.touches[0].clientY : 0);
 
     let x = (clientX - rect.left) / currentCellSize;
     let y = (clientY - rect.top) / currentCellSize;
@@ -61,7 +47,8 @@ export default function MapDrawings({
     if (!isDrawingMode) return;
     const needsSnapping = ['circle', 'cone', 'line', 'ruler', 'light_circle', 'light_cone'].includes(drawingShape);
     const coords = getCoords(e.nativeEvent || e, needsSnapping);
-    setCurrentLine({ type: drawingShape, points: [coords], color: drawingColor });
+    // Ensure we start with an anchor point and a current point to prevent 0-pixel collapse
+    setCurrentLine({ type: drawingShape, points: [coords, coords], color: drawingColor });
   };
 
   const handlePointerMove = (e) => {
@@ -73,13 +60,11 @@ export default function MapDrawings({
       if (prev.type === 'freehand' || prev.type === 'reveal') {
         return { ...prev, points: [...prev.points, coords] };
       } else if (prev.type === 'ruler') {
-        // Ruler needs to retain Waypoints
         const updatedPoints = [...prev.points];
         updatedPoints[updatedPoints.length - 1] = coords;
-        if (updatedPoints.length === 1) updatedPoints.push(coords); 
         return { ...prev, points: updatedPoints };
       } else {
-        // Geometric Shapes & Lights require EXACTLY 2 points (Start and Current)
+        // Geometric Shapes & Lights require EXACTLY 2 points (Start Anchor and Current Drag)
         return { ...prev, points: [prev.points[0], coords] };
       }
     });
@@ -87,7 +72,7 @@ export default function MapDrawings({
 
   const handlePointerUp = () => {
     if (!isDrawingMode || !currentLine) return;
-    if (currentLine.points.length > 0 && onDrawEnd) onDrawEnd(currentLine);
+    if (currentLine.points.length > 1 && onDrawEnd) onDrawEnd(currentLine);
     setCurrentLine(null);
   };
 
@@ -98,13 +83,7 @@ export default function MapDrawings({
     const shapeType = line.type || line.shape; 
 
     if (shapeType === 'freehand' || shapeType === 'reveal') {
-      if (line.points.length === 1) {
-        return <circle key={index} cx={line.points[0].x * currentCellSize} cy={line.points[0].y * currentCellSize} r={shapeType === 'reveal' ? 30 : 3} fill={strokeColor} opacity={isMask ? 1 : 0.85} />;
-      }
-      const d = line.points.map((p, i) => {
-        if (p == null || isNaN(p.x) || isNaN(p.y)) return '';
-        return `${i === 0 ? 'M' : 'L'} ${p.x * currentCellSize} ${p.y * currentCellSize}`;
-      }).join(' ');
+      const d = line.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * currentCellSize} ${p.y * currentCellSize}`).join(' ');
       if (!d.trim()) return null;
       return <path key={index} d={d} stroke={strokeColor} strokeWidth={shapeType === 'reveal' ? 60 : 4} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={isMask ? 1 : 0.85} />;
     }
@@ -175,7 +154,7 @@ export default function MapDrawings({
     if (shapeType === 'light_circle') {
       const radius = distance * currentCellSize;
       return (
-        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: 'pulse-light 3s infinite alternate ease-in-out' }}>
+        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: 'pulse-light 4s infinite alternate ease-in-out' }}>
           <defs>
             <radialGradient id={`glow-circ-${index}`} cx={x1} cy={y1} r={radius} gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor={strokeColor} stopOpacity="0.85" />
@@ -199,7 +178,7 @@ export default function MapDrawings({
       const p3x = x1 + distPx * Math.cos(angle + halfAngle);
       const p3y = y1 + distPx * Math.sin(angle + halfAngle);
       return (
-        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: 'pulse-light 3s infinite alternate ease-in-out' }}>
+        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: 'pulse-light 4s infinite alternate ease-in-out' }}>
           <defs>
             <radialGradient id={`glow-cone-${index}`} cx={x1} cy={y1} r={distPx} gradientUnits="userSpaceOnUse">
               <stop offset="0%" stopColor={strokeColor} stopOpacity="0.85" />
