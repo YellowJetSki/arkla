@@ -79,8 +79,9 @@ export default function MapGrid({
   const cols = Math.min(100, Math.max(1, isNaN(rawCols) ? 20 : rawCols));
   const rows = Math.min(100, Math.max(1, isNaN(rawRows) ? 15 : rawRows));
   
-  const [zoom, setZoom] = useState(isDM ? 1 : 1.5);
-  const currentCellSize = 30 * zoom;
+  // 1. INCREASE BASE CELL SIZE FOR BETTER TOKEN RESOLUTION
+  const [zoom, setZoom] = useState(isDM ? 1.5 : 2); // Start zoomed in closer
+  const currentCellSize = 40 * zoom; // Increased from 30 to 40 for a larger baseline
   const scrollRef = useRef(null);
 
   const [isPanning, setIsPanning] = useState(false);
@@ -113,24 +114,27 @@ export default function MapGrid({
   const activeTurnId = activeActor?.id && tokens[activeActor.id] ? activeActor.id : null;
   const cameraTargetId = isPlayerMap ? selectedTokenId : activeTurnId;
 
-  // NEW: Extract exactly where the target token is right now
+  // Extract exactly where the target token is right now
   const targetTokenX = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].x : null;
   const targetTokenY = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].y : null;
 
   useEffect(() => {
     if (isDisplayMode || isPlayerMap) {
       const calculateOptimalZoom = () => {
-        const mapPixelWidth = cols * 30; 
-        const mapPixelHeight = rows * 30; 
+        const mapPixelWidth = cols * 40; 
+        const mapPixelHeight = rows * 40; 
         const padding = 40; 
         const zoomX = (window.innerWidth - padding) / mapPixelWidth;
         const zoomY = (window.innerHeight - padding) / mapPixelHeight;
-        const baseZoom = Math.min(zoomX, zoomY);
+        
+        // 2. CLAMP THE MINIMUM ZOOM SO MASSIVE MAPS DON'T BECOME MICROSCOPIC
+        // We ensure the baseZoom never drops below 1.2 (meaning squares are always at least ~48px wide)
+        const baseZoom = Math.max(Math.min(zoomX, zoomY), 1.2); 
         
         if (isPlayerMap) {
-          setZoom(Math.max(baseZoom * 2.5, 2.0)); 
+          setZoom(Math.max(baseZoom * 1.8, 1.5)); 
         } else if (cameraTargetId) {
-          setZoom(Math.max(baseZoom * 2.2, 1.5)); 
+          setZoom(Math.max(baseZoom * 1.5, 1.5)); 
         } else {
           setZoom(baseZoom); 
         }
@@ -141,7 +145,7 @@ export default function MapGrid({
     }
   }, [isDisplayMode, isPlayerMap, cols, rows, cameraTargetId]);
 
-  // NEW: targetTokenX and targetTokenY added to dependencies so it tracks movement!
+  // targetTokenX and targetTokenY added to dependencies so it tracks movement!
   useEffect(() => {
     if (cameraTargetId && (isDisplayMode || isPlayerMap)) {
       const timer = setTimeout(() => centerOnToken(cameraTargetId), 300);

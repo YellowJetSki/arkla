@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler, User } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler, User, RotateCcw } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
@@ -389,6 +389,12 @@ export default function DMBattleMap() {
     setDialog({ isOpen: true, title: 'Clear Drawings', message: 'Clear all drawings and templates from the map?', type: 'confirm', onConfirm: async () => { await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: [] }); closeDialog(); }});
   };
 
+  const handleUndoDrawing = async () => {
+    if (!mapData.drawings || mapData.drawings.length === 0) return;
+    const newDrawings = mapData.drawings.slice(0, -1);
+    await updateDoc(doc(db, 'campaign', 'battlemap'), { drawings: newDrawings });
+  };
+
   useEffect(() => {
     if (isEditingMap) {
       setTempImageUrl(mapData.imageUrl);
@@ -477,9 +483,16 @@ export default function DMBattleMap() {
                 {['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#000000'].map(c => (
                   <button key={c} onClick={() => setDrawingColor(c)} className={`w-5 h-5 rounded-full border-[3px] transition-all ${drawingColor === c ? 'scale-110 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]' : 'border-transparent opacity-50 hover:opacity-100'}`} style={{ backgroundColor: c }} />
                 ))}
+                
+                <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
+                
+                {/* NEW UNDO BUTTON */}
+                <button onClick={handleUndoDrawing} className="p-1.5 rounded-lg transition-colors border-2 border-transparent text-slate-500 hover:text-amber-400 hover:bg-slate-900" title="Undo Last Drawing">
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
-            <button onClick={handleClearDrawings} className="text-slate-500 hover:text-red-500 hover:bg-slate-900 p-2 ml-1 border-l-2 border-slate-900 transition-colors rounded-lg"><Eraser className="w-4 h-4" /></button>
+            <button onClick={handleClearDrawings} className="text-slate-500 hover:text-red-500 hover:bg-slate-900 p-1.5 ml-1 border-l-2 border-slate-900 transition-colors rounded-lg" title="Clear All Drawings"><Eraser className="w-4 h-4" /></button>
           </div>
 
           <button onClick={launchDisplayTab} className="bg-indigo-600 hover:bg-indigo-500 text-slate-950 border-2 border-slate-950 px-3 py-2 rounded-lg font-black text-[10px] flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 uppercase tracking-widest"><MonitorPlay className="w-4 h-4" /> Cast</button>
