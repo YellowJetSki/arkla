@@ -15,26 +15,47 @@ export default function MapDrawings({
   const [currentLine, setCurrentLine] = useState(null);
   const svgRef = useRef(null);
 
-  const getCoords = (e) => {
+  // Helper to draw the measurement badges cleanly
+  const DistanceBadge = ({ x, y, text, color, isMask }) => {
+    if (isMask) return null;
+    return (
+      <g className="animate-in zoom-in duration-200">
+        <rect x={x - 30} y={y - 14} width="60" height="28" fill="#0f172a" rx="6" stroke={color} strokeWidth={2} />
+        <text x={x} y={y + 4} fill="white" fontSize="12" fontWeight="900" textAnchor="middle" pointerEvents="none drop-shadow-md">
+          {text}
+        </text>
+      </g>
+    );
+  };
+
+  const getCoords = (e, shouldSnap = false) => {
     const rect = svgRef.current.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     
-    return {
-      x: (clientX - rect.left) / currentCellSize,
-      y: (clientY - rect.top) / currentCellSize
-    };
+    let x = (clientX - rect.left) / currentCellSize;
+    let y = (clientY - rect.top) / currentCellSize;
+
+    // Snap to intersections or half-squares for precision AoE
+    if (shouldSnap) {
+      x = Math.round(x * 2) / 2;
+      y = Math.round(y * 2) / 2;
+    }
+
+    return { x, y };
   };
 
   const handlePointerDown = (e) => {
     if (!isDrawingMode) return;
-    const coords = getCoords(e.nativeEvent || e);
+    const needsSnapping = ['circle', 'cone', 'line', 'ruler'].includes(drawingShape);
+    const coords = getCoords(e.nativeEvent || e, needsSnapping);
     setCurrentLine({ type: drawingShape, points: [coords], color: drawingColor });
   };
 
   const handlePointerMove = (e) => {
     if (!isDrawingMode || !currentLine) return;
-    const coords = getCoords(e.nativeEvent || e);
+    const needsSnapping = ['circle', 'cone', 'line', 'ruler'].includes(currentLine.type);
+    const coords = getCoords(e.nativeEvent || e, needsSnapping);
     
     setCurrentLine(prev => {
       if (prev.type === 'freehand' || prev.type === 'reveal') {
@@ -75,35 +96,43 @@ export default function MapDrawings({
     const x2 = p2.x * currentCellSize;
     const y2 = p2.y * currentCellSize;
 
-    // THE NEW RULER LOGIC
+    const rawDistance = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const distanceFt = Math.round(rawDistance * 5);
+    const midX = (x1 + x2) / 2;
+    const midY = (y1 + y2) / 2;
+
     if (shapeType === 'ruler') {
-      const distance = Math.round(Math.hypot(p2.x - p1.x, p2.y - p1.y) * 5);
-      const midX = (x1 + x2) / 2;
-      const midY = (y1 + y2) / 2;
       return (
         <g key={index}>
           <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeColor} strokeWidth={6} strokeDasharray="8 8" strokeLinecap="round" opacity={isMask ? 1 : 0.8} />
-          <rect x={midX - 30} y={midY - 14} width="60" height="28" fill="#0f172a" rx="6" stroke={strokeColor} strokeWidth={2} />
-          <text x={midX} y={midY + 4} fill="white" fontSize="12" fontWeight="900" textAnchor="middle" pointerEvents="none">{distance}ft</text>
+          <DistanceBadge x={midX} y={midY} text={`${distanceFt}ft`} color={strokeColor} isMask={isMask} />
         </g>
       );
     }
 
     if (shapeType === 'line') {
-      return <line key={index} x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeColor} strokeWidth={8} strokeLinecap="round" opacity={isMask ? 1 : 0.6} />;
+      return (
+        <g key={index}>
+          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeColor} strokeWidth={12} strokeLinecap="round" opacity={isMask ? 1 : 0.6} />
+          {distanceFt > 0 && <DistanceBadge x={midX} y={midY} text={`${distanceFt}ft`} color={strokeColor} isMask={isMask} />}
+        </g>
+      );
     }
 
     if (shapeType === 'circle') {
       const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
       return (
-        <circle key={index} cx={x1} cy={y1} r={radius} stroke={strokeColor} strokeWidth={4} fill={fillColor} fillOpacity={isMask ? 1 : 0.2} opacity={isMask ? 1 : 0.85} />
+        <g key={index}>
+          <circle cx={x1} cy={y1} r={radius} stroke={strokeColor} strokeWidth={4} fill={fillColor} fillOpacity={isMask ? 1 : 0.2} opacity={isMask ? 1 : 0.85} />
+          {distanceFt > 0 && <DistanceBadge x={x1} y={y1 - radius} text={`${distanceFt}ft`} color={strokeColor} isMask={isMask} />}
+        </g>
       );
     }
 
     if (shapeType === 'cone') {
       const angle = Math.atan2(y2 - y1, x2 - x1);
       const distance = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-      const halfAngle = (53 / 2) * (Math.PI / 180); 
+      const halfAngle = (53 / 2) * (Math.PI / 180); // 53 degrees creates a standard D&D cone ratio
       
       const p2x = x1 + distance * Math.cos(angle - halfAngle);
       const p2y = y1 + distance * Math.sin(angle - halfAngle);
@@ -112,7 +141,10 @@ export default function MapDrawings({
       const p3y = y1 + distance * Math.sin(angle + halfAngle);
 
       return (
-        <polygon key={index} points={`${x1},${y1} ${p2x},${p2y} ${p3x},${p3y}`} stroke={strokeColor} strokeWidth={4} fill={fillColor} fillOpacity={isMask ? 1 : 0.2} strokeLinejoin="round" opacity={isMask ? 1 : 0.85} />
+        <g key={index}>
+          <polygon points={`${x1},${y1} ${p2x},${p2y} ${p3x},${p3y}`} stroke={strokeColor} strokeWidth={4} fill={fillColor} fillOpacity={isMask ? 1 : 0.2} strokeLinejoin="round" opacity={isMask ? 1 : 0.85} />
+          {distanceFt > 0 && <DistanceBadge x={x2} y={y2} text={`${distanceFt}ft`} color={strokeColor} isMask={isMask} />}
+        </g>
       );
     }
 
