@@ -2,8 +2,7 @@ import {
   User, ZoomIn, ZoomOut, Target, 
   EyeOff, Heart, EarOff, Flame, Ghost, Link, 
   Ban, Cloud, Lock, Mountain, Skull, ArrowDown, 
-  Stars, Moon, AlertCircle, BrainCircuit, Maximize, Ruler, CircleDashed, ArrowUpCircle, Image as ImageIcon, Trash2, X, Activity, Eye, Hand,
-  Swords // Added Swords since it's used in the turn banner!
+  Stars, Moon, AlertCircle, BrainCircuit, Maximize, Ruler, CircleDashed, ArrowUpCircle, Image as ImageIcon, Trash2, X, Activity, Eye, Hand, Swords 
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import MapDrawings from './MapDrawings';
@@ -29,16 +28,11 @@ const CONDITION_ICONS = {
 
 const TokenImage = ({ token, parsedName }) => {
   const [fallbackStep, setFallbackStep] = useState(0);
-
-  useEffect(() => {
-    setFallbackStep(0);
-  }, [parsedName, token.img]);
-
+  useEffect(() => { setFallbackStep(0); }, [parsedName, token.img]);
   const handleError = () => {
     if (fallbackStep === 0) setFallbackStep(token.img ? 1 : 2);
     else if (fallbackStep === 1) setFallbackStep(2);
   };
-
   if (fallbackStep === 2) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-full border-[3px] border-slate-950 shadow-inner relative">
@@ -46,31 +40,17 @@ const TokenImage = ({ token, parsedName }) => {
       </div>
     );
   }
-
   const formattedName = parsedName ? parsedName.toLowerCase().split(' ')[0] : 'unknown';
   const imgSrc = fallbackStep === 0 ? `/${formattedName}_bm.png` : token.img;
-
   return <img src={imgSrc} alt={parsedName} className="w-full h-full rounded-full object-cover bg-slate-900 border-[3px] border-slate-950 shadow-inner relative" onError={handleError} />;
 };
 
 export default function MapGrid({ 
-  mapData, 
-  tokens, 
-  activePlayers = [],
-  activeEnemies = [],
-  activeActor = null,
-  onTileClick,
-  onTokenClick, 
-  selectedTokenId, 
-  isDM,
-  showMovementRangeFor = null,
-  onToggleRuler,
-  isDisplayMode = false,
-  isPlayerMap = false,
-  isDrawingMode = false, 
-  drawingColor = '#ef4444',
-  drawingShape = 'freehand',
-  onDrawEnd,
+  mapData, tokens, activePlayers = [], activeEnemies = [], activeActor = null,
+  onTileClick, onTokenClick, onTokenSelectMultiple, selectedTokenIds = [], 
+  isDM, showMovementRangeFor = null, onToggleRuler,
+  isDisplayMode = false, isPlayerMap = false, isDrawingMode = false, 
+  drawingColor = '#ef4444', drawingShape = 'freehand', onDrawEnd,
   onUpdateHpLive, onToggleSize, onToggleAura, onToggleElevation, onToggleConcentration, onToggleCondition, onUpdateImage, onToggleHidden, onRemoveToken, onDeselect
 }) {
   
@@ -79,9 +59,8 @@ export default function MapGrid({
   const cols = Math.min(100, Math.max(1, isNaN(rawCols) ? 20 : rawCols));
   const rows = Math.min(100, Math.max(1, isNaN(rawRows) ? 15 : rawRows));
   
-  // 1. INCREASE BASE CELL SIZE FOR BETTER TOKEN RESOLUTION
-  const [zoom, setZoom] = useState(isDM ? 1.5 : 2); // Start zoomed in closer
-  const currentCellSize = 40 * zoom; // Increased from 30 to 40 for a larger baseline
+  const [zoom, setZoom] = useState(isDM ? 1.5 : 2); 
+  const currentCellSize = 40 * zoom; 
   const scrollRef = useRef(null);
 
   const [isPanning, setIsPanning] = useState(false);
@@ -89,13 +68,14 @@ export default function MapGrid({
   const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
   const [initialPinchDist, setInitialPinchDist] = useState(null);
   const [initialPinchZoom, setInitialPinchZoom] = useState(null);
+  
+  // NEW: Multi-Select Drag Box State
+  const [selectionBox, setSelectionBox] = useState(null);
 
   const centerOnMap = () => {
     if (scrollRef.current) {
       const container = scrollRef.current;
-      const targetX = (cols * currentCellSize) / 2;
-      const targetY = (rows * currentCellSize) / 2;
-      container.scrollTo({ left: targetX - (container.clientWidth / 2), top: targetY - (container.clientHeight / 2), behavior: 'smooth' });
+      container.scrollTo({ left: (cols * currentCellSize) / 2 - (container.clientWidth / 2), top: (rows * currentCellSize) / 2 - (container.clientHeight / 2), behavior: 'smooth' });
     }
   };
 
@@ -104,40 +84,24 @@ export default function MapGrid({
     const container = scrollRef.current;
     const token = tokens[tokenId];
     const tSize = token.size || 1;
-    
-    const targetX = (token.x * currentCellSize) + ((currentCellSize * tSize) / 2);
-    const targetY = (token.y * currentCellSize) + ((currentCellSize * tSize) / 2);
-    
-    container.scrollTo({ left: targetX - (container.clientWidth / 2), top: targetY - (container.clientHeight / 2), behavior: 'smooth' });
+    container.scrollTo({ left: (token.x * currentCellSize) + ((currentCellSize * tSize) / 2) - (container.clientWidth / 2), top: (token.y * currentCellSize) + ((currentCellSize * tSize) / 2) - (container.clientHeight / 2), behavior: 'smooth' });
   };
 
   const activeTurnId = activeActor?.id && tokens[activeActor.id] ? activeActor.id : null;
-  const cameraTargetId = isPlayerMap ? selectedTokenId : activeTurnId;
+  const cameraTargetId = isPlayerMap ? (selectedTokenIds.length > 0 ? selectedTokenIds[0] : null) : activeTurnId;
 
-  // Extract exactly where the target token is right now
   const targetTokenX = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].x : null;
   const targetTokenY = cameraTargetId && tokens[cameraTargetId] ? tokens[cameraTargetId].y : null;
 
   useEffect(() => {
     if (isDisplayMode || isPlayerMap) {
       const calculateOptimalZoom = () => {
-        const mapPixelWidth = cols * 40; 
-        const mapPixelHeight = rows * 40; 
-        const padding = 40; 
-        const zoomX = (window.innerWidth - padding) / mapPixelWidth;
-        const zoomY = (window.innerHeight - padding) / mapPixelHeight;
-        
-        // 2. CLAMP THE MINIMUM ZOOM SO MASSIVE MAPS DON'T BECOME MICROSCOPIC
-        // We ensure the baseZoom never drops below 1.2 (meaning squares are always at least ~48px wide)
+        const zoomX = (window.innerWidth - 40) / (cols * 40);
+        const zoomY = (window.innerHeight - 40) / (rows * 40);
         const baseZoom = Math.max(Math.min(zoomX, zoomY), 1.2); 
-        
-        if (isPlayerMap) {
-          setZoom(Math.max(baseZoom * 1.8, 1.5)); 
-        } else if (cameraTargetId) {
-          setZoom(Math.max(baseZoom * 1.5, 1.5)); 
-        } else {
-          setZoom(baseZoom); 
-        }
+        if (isPlayerMap) setZoom(Math.max(baseZoom * 1.8, 1.5)); 
+        else if (cameraTargetId) setZoom(Math.max(baseZoom * 1.5, 1.5)); 
+        else setZoom(baseZoom); 
       };
       calculateOptimalZoom();
       window.addEventListener('resize', calculateOptimalZoom);
@@ -145,7 +109,6 @@ export default function MapGrid({
     }
   }, [isDisplayMode, isPlayerMap, cols, rows, cameraTargetId]);
 
-  // targetTokenX and targetTokenY added to dependencies so it tracks movement!
   useEffect(() => {
     if (cameraTargetId && (isDisplayMode || isPlayerMap)) {
       const timer = setTimeout(() => centerOnToken(cameraTargetId), 300);
@@ -158,81 +121,90 @@ export default function MapGrid({
 
   const handleMapMouseDown = (e) => {
     if (isDisplayMode || isDrawingMode) return;
+    
+    // START MULTI-SELECT BOX ON SHIFT+DRAG
+    if (e.shiftKey) {
+      hasPanned.current = false;
+      const rect = scrollRef.current.children[0].getBoundingClientRect();
+      setSelectionBox({
+        startX: e.clientX - rect.left, startY: e.clientY - rect.top,
+        currentX: e.clientX - rect.left, currentY: e.clientY - rect.top
+      });
+      return;
+    }
+
     hasPanned.current = false;
     setIsPanning(true);
-    setPanStart({
-      x: e.clientX,
-      y: e.clientY,
-      scrollLeft: scrollRef.current.scrollLeft,
-      scrollTop: scrollRef.current.scrollTop
-    });
+    setPanStart({ x: e.clientX, y: e.clientY, scrollLeft: scrollRef.current.scrollLeft, scrollTop: scrollRef.current.scrollTop });
   };
 
   const handleMapMouseMove = (e) => {
+    // UPDATE MULTI-SELECT BOX
+    if (selectionBox) {
+      const rect = scrollRef.current.children[0].getBoundingClientRect();
+      setSelectionBox(prev => ({ ...prev, currentX: e.clientX - rect.left, currentY: e.clientY - rect.top }));
+      return;
+    }
+
     if (!isPanning || !scrollRef.current) return;
     hasPanned.current = true;
-    const dx = e.clientX - panStart.x;
-    const dy = e.clientY - panStart.y;
-    scrollRef.current.scrollLeft = panStart.scrollLeft - dx;
-    scrollRef.current.scrollTop = panStart.scrollTop - dy;
+    scrollRef.current.scrollLeft = panStart.scrollLeft - (e.clientX - panStart.x);
+    scrollRef.current.scrollTop = panStart.scrollTop - (e.clientY - panStart.y);
   };
 
   const handleMapMouseUp = () => {
+    // FINISH MULTI-SELECT BOX
+    if (selectionBox) {
+      const minX = Math.min(selectionBox.startX, selectionBox.currentX) / currentCellSize;
+      const maxX = Math.max(selectionBox.startX, selectionBox.currentX) / currentCellSize;
+      const minY = Math.min(selectionBox.startY, selectionBox.currentY) / currentCellSize;
+      const maxY = Math.max(selectionBox.startY, selectionBox.currentY) / currentCellSize;
+
+      const selectedIds = Object.values(tokens).filter(t => {
+        const cx = t.x + (t.size || 1) / 2;
+        const cy = t.y + (t.size || 1) / 2;
+        return cx >= minX && cx <= maxX && cy >= minY && cy <= maxY;
+      }).map(t => t.id);
+
+      if (selectedIds.length > 0) {
+        if (onTokenSelectMultiple) onTokenSelectMultiple(selectedIds);
+      } else {
+        if (onDeselect) onDeselect();
+      }
+      setSelectionBox(null);
+      return;
+    }
     setIsPanning(false);
   };
 
-  const getPinchDistance = (touches) => {
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  };
+  const getPinchDistance = (touches) => Math.sqrt(Math.pow(touches[0].clientX - touches[1].clientX, 2) + Math.pow(touches[0].clientY - touches[1].clientY, 2));
 
   const handleTouchStart = (e) => {
     if (isDisplayMode) return;
     hasPanned.current = false;
-    
     if (e.touches.length === 2) {
-      setIsPanning(false);
-      setInitialPinchDist(getPinchDistance(e.touches));
-      setInitialPinchZoom(zoom);
+      setIsPanning(false); setInitialPinchDist(getPinchDistance(e.touches)); setInitialPinchZoom(zoom);
     } else if (e.touches.length === 1 && !isDrawingMode) {
-      setIsPanning(true);
-      setPanStart({
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
-        scrollLeft: scrollRef.current.scrollLeft,
-        scrollTop: scrollRef.current.scrollTop
-      });
+      setIsPanning(true); setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY, scrollLeft: scrollRef.current.scrollLeft, scrollTop: scrollRef.current.scrollTop });
     }
   };
 
   const handleTouchMove = (e) => {
     if (!scrollRef.current || isDisplayMode) return;
-
     if (e.touches.length === 2 && initialPinchDist) {
       if (e.cancelable) e.preventDefault(); 
       hasPanned.current = true;
-      const currentDist = getPinchDistance(e.touches);
-      const scale = currentDist / initialPinchDist;
-      const newZoom = Math.min(Math.max(initialPinchZoom * scale, 0.5), 3);
-      setZoom(newZoom);
+      setZoom(Math.min(Math.max(initialPinchZoom * (getPinchDistance(e.touches) / initialPinchDist), 0.5), 3));
     } else if (e.touches.length === 1 && isPanning) {
       hasPanned.current = true;
-      const dx = e.touches[0].clientX - panStart.x;
-      const dy = e.touches[0].clientY - panStart.y;
-      scrollRef.current.scrollLeft = panStart.scrollLeft - dx;
-      scrollRef.current.scrollTop = panStart.scrollTop - dy;
+      scrollRef.current.scrollLeft = panStart.scrollLeft - (e.touches[0].clientX - panStart.x);
+      scrollRef.current.scrollTop = panStart.scrollTop - (e.touches[0].clientY - panStart.y);
     }
   };
 
   const handleTouchEnd = (e) => {
-    if (e.touches.length < 2) {
-      setInitialPinchDist(null);
-      setInitialPinchZoom(null);
-    }
-    if (e.touches.length === 0) {
-      setIsPanning(false);
-    }
+    if (e.touches.length < 2) { setInitialPinchDist(null); setInitialPinchZoom(null); }
+    if (e.touches.length === 0) setIsPanning(false);
   };
 
   const gridColor = mapData?.gridColor || 'rgba(255,255,255,0.35)';
@@ -247,11 +219,8 @@ export default function MapGrid({
 
   let mapCursorClass = 'cursor-auto';
   if (!isDisplayMode) {
-     if (isDrawingMode) {
-       mapCursorClass = 'cursor-crosshair touch-none'; 
-     } else {
-       mapCursorClass = isPanning ? 'cursor-grabbing' : 'cursor-grab';
-     }
+     if (isDrawingMode) mapCursorClass = 'cursor-crosshair touch-none'; 
+     else mapCursorClass = isPanning ? 'cursor-grabbing' : 'cursor-grab';
   }
 
   return (
@@ -259,10 +228,10 @@ export default function MapGrid({
       
       {!isDisplayMode && (
         <div className="absolute top-4 right-4 z-[90] flex flex-col gap-2 bg-slate-900 border-2 border-slate-950 p-2 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)]">
-          <button onClick={() => setZoom(prev => Math.min(prev + 0.25, 3))} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700" title="Zoom In"><ZoomIn className="w-5 h-5"/></button>
-          <button onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700" title="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
+          <button onClick={() => setZoom(prev => Math.min(prev + 0.25, 3))} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700"><ZoomIn className="w-5 h-5"/></button>
+          <button onClick={() => setZoom(prev => Math.max(prev - 0.25, 0.5))} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700"><ZoomOut className="w-5 h-5"/></button>
           <div className="w-full h-0.5 bg-slate-950 my-0.5"></div>
-          <button onClick={() => centerOnToken(cameraTargetId || mapData?.activeTokenId)} className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-indigo-900/50" title="Center on Active Turn/Me"><Target className="w-5 h-5"/></button>
+          <button onClick={() => centerOnToken(cameraTargetId || mapData?.activeTokenId)} className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-indigo-900/50"><Target className="w-5 h-5"/></button>
         </div>
       )}
 
@@ -279,9 +248,7 @@ export default function MapGrid({
           )}
           <div className="flex flex-col pr-4">
             <span className="text-[10px] font-black text-amber-400 uppercase tracking-[0.2em] mb-0.5">Current Turn</span>
-            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-              {activeActor.name}
-            </h1>
+            <h1 className="text-xl md:text-2xl font-black text-white uppercase tracking-widest leading-none drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]">{activeActor.name}</h1>
           </div>
         </div>
       )}
@@ -302,21 +269,24 @@ export default function MapGrid({
           className="relative transition-all duration-700 origin-top-left ease-in-out"
           style={{ width: cols * currentCellSize, height: rows * currentCellSize, backgroundImage: mapData?.imageUrl ? `url(${mapData.imageUrl})` : 'none', backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'top left', imageRendering: 'crisp-edges' }}
         >
+          
+          {selectionBox && !isDisplayMode && (
+            <div className="absolute border-[3px] border-indigo-400 bg-indigo-500/20 z-[100] pointer-events-none transition-all duration-75" style={{
+              left: Math.min(selectionBox.startX, selectionBox.currentX),
+              top: Math.min(selectionBox.startY, selectionBox.currentY),
+              width: Math.abs(selectionBox.currentX - selectionBox.startX),
+              height: Math.abs(selectionBox.currentY - selectionBox.startY)
+            }} />
+          )}
+
           {!isDisplayMode && gridColor !== 'transparent' && (
             <div className="absolute inset-0 pointer-events-none z-0 transition-all duration-500" style={{ backgroundImage: `linear-gradient(to right, ${gridColor} 1px, transparent 1px), linear-gradient(to bottom, ${gridColor} 1px, transparent 1px)`, backgroundSize: `${currentCellSize}px ${currentCellSize}px` }}></div>
           )}
 
           <MapDrawings 
-            drawings={mapData?.drawings || []} 
-            fogOfWar={mapData?.fogOfWar}
-            isDM={isDM}
-            isDrawingMode={isDrawingMode && !isDisplayMode} 
-            drawingShape={drawingShape} 
-            onDrawEnd={onDrawEnd} 
-            currentCellSize={currentCellSize} 
-            cols={cols} 
-            rows={rows} 
-            drawingColor={drawingColor} 
+            drawings={mapData?.drawings || []} fogOfWar={mapData?.fogOfWar} isDM={isDM}
+            isDrawingMode={isDrawingMode && !isDisplayMode} drawingShape={drawingShape} 
+            onDrawEnd={onDrawEnd} currentCellSize={currentCellSize} cols={cols} rows={rows} drawingColor={drawingColor} 
           />
 
           <div className={`absolute inset-0 grid z-20 ${isDrawingMode ? 'pointer-events-none' : ''}`} style={{ gridTemplateColumns: `repeat(${cols}, ${currentCellSize}px)`, gridTemplateRows: `repeat(${rows}, ${currentCellSize}px)` }}>
@@ -331,11 +301,8 @@ export default function MapGrid({
                   const dist = Math.max(dx, dy) * 5;
                   const speed = showMovementRangeFor.speed || 30;
 
-                  if (dist > 0 && dist <= speed) {
-                     tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.5),_transparent)] border border-emerald-400/50 hover:bg-emerald-400/70';
-                  } else if (dist > speed && dist <= speed * 2) {
-                     tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.5),_transparent)] border border-amber-400/50 hover:bg-amber-400/70';
-                  }
+                  if (dist > 0 && dist <= speed) tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(16,185,129,0.5),_transparent)] border border-emerald-400/50 hover:bg-emerald-400/70';
+                  else if (dist > speed && dist <= speed * 2) tileClass = 'bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.5),_transparent)] border border-amber-400/50 hover:bg-amber-400/70';
               }
 
               return (
@@ -346,7 +313,7 @@ export default function MapGrid({
                     if(isDrawingMode) e.stopPropagation(); 
                   }}
                   onClick={(e) => { 
-                    if(isPanning || hasPanned.current) return; 
+                    if(isPanning || hasPanned.current || selectionBox) return; 
                     if(!isDisplayMode && !isPlayerMap && onTileClick) onTileClick(tile.x, tile.y); 
                   }}
                   className={`w-full h-full transition-colors ${tileClass}`}
@@ -356,16 +323,14 @@ export default function MapGrid({
           </div>
 
           <div className="absolute inset-0 pointer-events-none z-30">
-            {Object.values(tokens || {})
-              .sort((a, b) => {
+            {Object.values(tokens || {}).sort((a, b) => {
                 const aDead = (a.hp !== undefined && a.hp <= 0);
                 const bDead = (b.hp !== undefined && b.hp <= 0);
                 if (aDead && !bDead) return -1;
                 if (!aDead && bDead) return 1;
                 return (b.size || 1) - (a.size || 1);
-              })
-              .map(token => {
-              const isSelected = selectedTokenId === token.id;
+              }).map(token => {
+              const isSelected = selectedTokenIds.includes(token.id);
               const isActiveTurn = activeActor?.id === token.id; 
               
               const isEnemy = token.type === 'enemy';
@@ -375,7 +340,6 @@ export default function MapGrid({
               const tSize = token.size || 1; 
               
               const entityData = isEnemy ? activeEnemies.find(e => e.id === token.id) : isPlayer ? activePlayers.find(p => p.id === token.id) : null;
-              
               const rawName = entityData ? entityData.name : token.name;
               const match = rawName ? rawName.match(/["']([^"']+)["']/) : null;
               const displayName = match ? match[1] : (rawName ? rawName.split(' ')[0] : 'Unknown');
@@ -391,7 +355,6 @@ export default function MapGrid({
 
               const safeX = token.x || 0;
               const safeY = token.y || 0;
-
               const group = cellGroups[`${safeX},${safeY}`]?.sort() || [];
               const stackIndex = group.indexOf(token.id);
               const offsetXY = stackIndex > 0 ? stackIndex * 6 : 0;
@@ -400,9 +363,9 @@ export default function MapGrid({
                 <div
                   key={token.id}
                   onMouseDown={(e) => {
-                    if (!isDisplayMode && !isPlayerMap && onTokenClick && (isDM || token.id === selectedTokenId)) {
+                    if (!isDisplayMode && !isPlayerMap && onTokenClick && (isDM || isSelected)) {
                       e.stopPropagation();
-                      if (!isDrawingMode) onTokenClick(token.id);
+                      if (!isDrawingMode) onTokenClick(token.id, e.shiftKey);
                     }
                   }}
                   className={`absolute transition-all duration-700 ease-in-out flex items-center justify-center ${isDisplayMode || isDrawingMode || isPlayerMap ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer hover:scale-105'} ${token.isHidden ? 'opacity-40 grayscale' : ''}`}
@@ -410,14 +373,8 @@ export default function MapGrid({
                 >
                   
                   {token.aura > 0 && !isDead && (
-                    <div 
-                      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0"
-                      style={{ width: currentCellSize * (tSize + (token.aura / 5) * 2), height: currentCellSize * (tSize + (token.aura / 5) * 2) }}
-                    >
-                      <div className={`w-full h-full rounded-full border-[4px] border-dashed transition-all duration-500
-                        ${isEnemy ? 'border-red-500/80 bg-red-500/20' : 'border-indigo-400/80 bg-indigo-400/20'} 
-                        ${isDisplayMode ? 'animate-[spin_20s_linear_infinite]' : 'animate-[spin_30s_linear_infinite]'}`}
-                      />
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" style={{ width: currentCellSize * (tSize + (token.aura / 5) * 2), height: currentCellSize * (tSize + (token.aura / 5) * 2) }}>
+                      <div className={`w-full h-full rounded-full border-[4px] border-dashed transition-all duration-500 ${isEnemy ? 'border-red-500/80 bg-red-500/20' : 'border-indigo-400/80 bg-indigo-400/20'} ${isDisplayMode ? 'animate-[spin_20s_linear_infinite]' : 'animate-[spin_30s_linear_infinite]'}`} />
                     </div>
                   )}
 
@@ -432,28 +389,20 @@ export default function MapGrid({
                   `}>
                     
                     {token.elevation > 0 && !isDead && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-sky-500 border-2 border-slate-950 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-[2px_2px_0px_rgba(0,0,0,1)] z-50 whitespace-nowrap pointer-events-none">
-                        +{token.elevation}ft
-                      </div>
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-sky-500 border-2 border-slate-950 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full shadow-[2px_2px_0px_rgba(0,0,0,1)] z-50 whitespace-nowrap pointer-events-none">+{token.elevation}ft</div>
                     )}
 
                     {token.isConcentrating && !isDead && (
-                      <div className="absolute -top-2 -left-2 bg-amber-400 rounded-full p-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] border-2 border-slate-950 z-50 pointer-events-none animate-pulse">
-                        <BrainCircuit className={`${isDisplayMode ? 'w-6 h-6' : 'w-4 h-4'} text-slate-950`} />
-                      </div>
+                      <div className="absolute -top-2 -left-2 bg-amber-400 rounded-full p-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] border-2 border-slate-950 z-50 pointer-events-none animate-pulse"><BrainCircuit className={`${isDisplayMode ? 'w-6 h-6' : 'w-4 h-4'} text-slate-950`} /></div>
                     )}
 
                     <TokenImage token={token} parsedName={displayName} />
 
                     {isDead && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-red-950/80 rounded-full z-40 pointer-events-none">
-                         <Skull className="w-2/3 h-2/3 text-red-500 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]" />
-                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center bg-red-950/80 rounded-full z-40 pointer-events-none"><Skull className="w-2/3 h-2/3 text-red-500 drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]" /></div>
                     )}
 
-                    {(tTempHp > 0) && !isDead && (
-                      <div className="absolute inset-0 rounded-full ring-[4px] ring-inset ring-indigo-400 shadow-[inset_0_0_20px_rgba(129,140,248,0.8)] z-30 pointer-events-none animate-pulse"></div>
-                    )}
+                    {(tTempHp > 0) && !isDead && <div className="absolute inset-0 rounded-full ring-[4px] ring-inset ring-indigo-400 shadow-[inset_0_0_20px_rgba(129,140,248,0.8)] z-30 pointer-events-none animate-pulse"></div>}
 
                     {(token.conditions?.length > 0) && !isDead && (
                       <div className={`absolute ${isDisplayMode ? '-top-3 -right-5 gap-2' : '-top-2 -right-3 gap-1'} flex flex-wrap-reverse justify-end w-20 z-50 pointer-events-none`}>
@@ -466,27 +415,17 @@ export default function MapGrid({
                       </div>
                     )}
                     
-                    {token.isHidden && isDM && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-900 text-amber-500 rounded-full p-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] border-2 border-slate-950 z-50">
-                        <EyeOff className="w-3 h-3 md:w-4 md:h-4" />
-                      </div>
-                    )}
+                    {token.isHidden && isDM && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-900 text-amber-500 rounded-full p-1 shadow-[2px_2px_0px_rgba(0,0,0,1)] border-2 border-slate-950 z-50"><EyeOff className="w-3 h-3 md:w-4 md:h-4" /></div>}
                   </div>
 
                   {isDM && !isDisplayMode && tHp !== undefined && !isDead && !isNPC && (
                     <div className="absolute -bottom-2 left-[5%] w-[90%] h-2 bg-slate-950 rounded-full overflow-hidden border-2 border-slate-950 z-50 shadow-[2px_2px_0px_rgba(0,0,0,1)] pointer-events-none">
-                       {(tTempHp > 0) && (
-                         <div className="absolute top-0 left-0 h-full bg-indigo-500 z-20 shadow-[0_0_5px_rgba(99,102,241,0.8)]" style={{ width: `${Math.min(100, (tTempHp / (tMaxHp || 1)) * 100)}%` }} />
-                       )}
+                       {(tTempHp > 0) && <div className="absolute top-0 left-0 h-full bg-indigo-500 z-20 shadow-[0_0_5px_rgba(99,102,241,0.8)]" style={{ width: `${Math.min(100, (tTempHp / (tMaxHp || 1)) * 100)}%` }} />}
                        <div className={`absolute top-0 left-0 h-full z-10 transition-all ${tHp / (tMaxHp || 1) > 0.5 ? 'bg-emerald-500' : tHp / (tMaxHp || 1) > 0.2 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.max(0, Math.min(100, (tHp / (tMaxHp || 1)) * 100))}%` }} />
                     </div>
                   )}
 
-                  {isDM && !isDisplayMode && currentCellSize >= 30 && (
-                    <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 bg-slate-900 border-2 border-slate-950 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] whitespace-nowrap pointer-events-none z-40">
-                      {displayName.substring(0, 10)}
-                    </div>
-                  )}
+                  {isDM && !isDisplayMode && currentCellSize >= 30 && <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 bg-slate-900 border-2 border-slate-950 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-[2px_2px_0px_rgba(0,0,0,1)] whitespace-nowrap pointer-events-none z-40">{displayName.substring(0, 10)}</div>}
 
                 </div>
               );
@@ -494,18 +433,12 @@ export default function MapGrid({
           </div>
         </div>
 
-        {/* FREELY FLOATING CONTEXT MENU */}
-        {selectedTokenId && tokens[selectedTokenId] && !isDisplayMode && !isPlayerMap && isDM && (
+        {/* FREELY FLOATING CONTEXT MENU - UPGRADED FOR MULTI-SELECT */}
+        {selectedTokenIds.length > 0 && !isDisplayMode && !isPlayerMap && isDM && (
           <TokenContextMenu 
-            token={tokens[selectedTokenId]}
-            displayName={(() => {
-              const isE = tokens[selectedTokenId].type === 'enemy';
-              const isP = tokens[selectedTokenId].type === 'player';
-              const eData = isE ? activeEnemies.find(e => e.id === selectedTokenId) : isP ? activePlayers.find(p => p.id === selectedTokenId) : null;
-              const rName = eData ? eData.name : tokens[selectedTokenId].name;
-              const m = rName ? rName.match(/["']([^"']+)["']/) : null;
-              return m ? m[1] : (rName ? rName.split(' ')[0] : 'Unknown');
-            })()}
+            selectedTokens={selectedTokenIds.map(id => tokens[id]).filter(Boolean)}
+            activeEnemies={activeEnemies}
+            activePlayers={activePlayers}
             onUpdateHpLive={onUpdateHpLive}
             onDeselect={onDeselect}
             onToggleSize={onToggleSize}
