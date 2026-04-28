@@ -64,6 +64,7 @@ const EnvironmentOverlay = ({ environment }) => {
        inset: 0;
        pointer-events: none;
        z-index: 80;
+       overflow: hidden;
     }
 
     @keyframes rain-fall {
@@ -75,17 +76,17 @@ const EnvironmentOverlay = ({ environment }) => {
        100% { background-position: 300px 1000px, 200px 800px, 150px 600px; }
     }
     
-    /* NEW: Pixel-based infinite scrolling for true drifting fog */
+    /* TRUE DRIFTING FOG */
     @keyframes fog-drift {
        0% { background-position: 0px 0px, 0px 0px; }
        100% { background-position: 1200px 600px, -800px 400px; }
     }
 
-    /* NEW: Diagonal beams of sunlight panning across the map */
-    @keyframes god-rays {
-       0% { background-position: -800px 0; opacity: 0.4; }
-       50% { opacity: 0.85; }
-       100% { background-position: 800px 0; opacity: 0.4; }
+    /* GLOBAL PANNING GOD RAYS */
+    @keyframes god-rays-pan {
+       0% { background-position: 0% 0%; opacity: 0.6; }
+       50% { opacity: 1; }
+       100% { background-position: 100% 100%; opacity: 0.6; }
     }
 
     @keyframes moon-drift {
@@ -127,14 +128,16 @@ const EnvironmentOverlay = ({ environment }) => {
        background-color: rgba(200, 210, 220, 0.08); 
     }
 
-    /* ETHEREAL SHIFTING GOD-RAYS */
-    .env-sunlight { 
-       background-image: linear-gradient(105deg, transparent 20%, rgba(255, 245, 200, 0.25) 25%, transparent 35%, transparent 50%, rgba(255, 245, 200, 0.15) 60%, transparent 70%);
-       background-size: 200% 100%;
-       animation: god-rays 12s ease-in-out infinite alternate;
-       background-color: rgba(255, 235, 180, 0.05);
-       mix-blend-mode: hard-light;
+    /* GLOBAL PANNING GOD RAYS */
+    .env-sunlight::before {
+       content: ""; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+       background-image: repeating-linear-gradient(60deg, transparent 0, transparent 150px, rgba(255, 250, 200, 0.2) 200px, transparent 250px);
+       background-size: 200% 200%;
+       animation: god-rays-pan 25s linear infinite;
+       mix-blend-mode: overlay;
+       pointer-events: none;
     }
+    .env-sunlight { background-color: rgba(255, 235, 180, 0.05); }
 
     .env-moonlight { 
        background-image: radial-gradient(circle at center, rgba(150, 180, 255, 0.15) 0%, transparent 60%);

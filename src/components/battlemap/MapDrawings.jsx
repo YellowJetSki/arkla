@@ -45,15 +45,15 @@ export default function MapDrawings({
 
   const handlePointerDown = (e) => {
     if (!isDrawingMode) return;
-    const needsSnapping = ['circle', 'cone', 'line', 'ruler', 'light_circle', 'light_cone'].includes(drawingShape);
+    const needsSnapping = ['circle', 'cone', 'line', 'ruler', 'torch_circle', 'torch_cone', 'sun_circle', 'sun_cone'].includes(drawingShape);
     const coords = getCoords(e.nativeEvent || e, needsSnapping);
-    // Ensure we start with an anchor point and a current point to prevent 0-pixel collapse
+    // Explicitly stage 2 points to prevent SVG shapes from collapsing to 0 length
     setCurrentLine({ type: drawingShape, points: [coords, coords], color: drawingColor });
   };
 
   const handlePointerMove = (e) => {
     if (!isDrawingMode || !currentLine) return;
-    const needsSnapping = ['circle', 'cone', 'line', 'ruler', 'light_circle', 'light_cone'].includes(currentLine.type);
+    const needsSnapping = ['circle', 'cone', 'line', 'ruler', 'torch_circle', 'torch_cone', 'sun_circle', 'sun_cone'].includes(currentLine.type);
     const coords = getCoords(e.nativeEvent || e, needsSnapping);
     
     setCurrentLine(prev => {
@@ -64,7 +64,7 @@ export default function MapDrawings({
         updatedPoints[updatedPoints.length - 1] = coords;
         return { ...prev, points: updatedPoints };
       } else {
-        // Geometric Shapes & Lights require EXACTLY 2 points (Start Anchor and Current Drag)
+        // Shapes, Lines, and Lights require EXACTLY 2 points (Anchor and Drag)
         return { ...prev, points: [prev.points[0], coords] };
       }
     });
@@ -151,13 +151,15 @@ export default function MapDrawings({
       );
     }
 
-    if (shapeType === 'light_circle') {
+    // NEW DYNAMIC LIGHTING: SPLIT INTO FLICKERING TORCH OR STATIC SUNLIGHT
+    if (shapeType === 'torch_circle' || shapeType === 'sun_circle') {
       const radius = distance * currentCellSize;
+      const isTorch = shapeType === 'torch_circle';
       return (
-        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: 'pulse-light 4s infinite alternate ease-in-out' }}>
+        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: isTorch ? 'torch-flicker 0.4s infinite alternate ease-in-out' : 'none' }}>
           <defs>
             <radialGradient id={`glow-circ-${index}`} cx={x1} cy={y1} r={radius} gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.85" />
+              <stop offset="0%" stopColor={strokeColor} stopOpacity={isTorch ? "0.9" : "0.7"} />
               <stop offset="50%" stopColor={strokeColor} stopOpacity="0.3" />
               <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
             </radialGradient>
@@ -169,7 +171,7 @@ export default function MapDrawings({
       );
     }
 
-    if (shapeType === 'light_cone') {
+    if (shapeType === 'torch_cone' || shapeType === 'sun_cone') {
       const angle = Math.atan2(y2 - y1, x2 - x1);
       const distPx = distance * currentCellSize;
       const halfAngle = (53 / 2) * (Math.PI / 180); 
@@ -177,11 +179,13 @@ export default function MapDrawings({
       const p2y = y1 + distPx * Math.sin(angle - halfAngle);
       const p3x = x1 + distPx * Math.cos(angle + halfAngle);
       const p3y = y1 + distPx * Math.sin(angle + halfAngle);
+      const isTorch = shapeType === 'torch_cone';
+
       return (
-        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: 'pulse-light 4s infinite alternate ease-in-out' }}>
+        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: isTorch ? 'torch-flicker 0.4s infinite alternate ease-in-out' : 'none' }}>
           <defs>
             <radialGradient id={`glow-cone-${index}`} cx={x1} cy={y1} r={distPx} gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.85" />
+              <stop offset="0%" stopColor={strokeColor} stopOpacity={isTorch ? "0.9" : "0.7"} />
               <stop offset="50%" stopColor={strokeColor} stopOpacity="0.3" />
               <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
             </radialGradient>
@@ -203,7 +207,15 @@ export default function MapDrawings({
 
   return (
     <>
-      <style>{`@keyframes pulse-light { 0% { opacity: 0.65; } 100% { opacity: 1; } }`}</style>
+      <style>{`
+        @keyframes torch-flicker { 
+          0% { opacity: 0.8; } 
+          25% { opacity: 1; } 
+          50% { opacity: 0.7; } 
+          75% { opacity: 0.95; } 
+          100% { opacity: 0.85; } 
+        }
+      `}</style>
       <svg ref={svgRef} className={`absolute inset-0 z-[35] ${isDrawingMode ? 'cursor-crosshair pointer-events-auto touch-none' : 'pointer-events-none'}`} style={{ width: cols * currentCellSize, height: rows * currentCellSize }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}>
         {fogOfWar && (
           <defs>

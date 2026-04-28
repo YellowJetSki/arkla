@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot, setDoc, updateDoc, collection, getDocs, writeBatch, deleteField } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler, User, RotateCcw, Sun, Flashlight } from 'lucide-react';
+import { Map, Send, EyeOff, Eye, Settings, Trash2, X, Image as ImageIcon, MonitorPlay, Loader2, Save, Users, PenTool, Circle, Triangle, Eraser, LayoutDashboard, Ruler, User, RotateCcw, Sun, Flashlight, Flame } from 'lucide-react';
 import MapGrid from './MapGrid';
 import BattlemapPresetsModal from './BattlemapPresetsModal';
 import DialogModal from '../shared/DialogModal';
@@ -22,7 +22,7 @@ export default function DMBattleMap() {
   
   const [showRulerFor, setShowRulerFor] = useState(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
-  const [drawingColor, setDrawingColor] = useState('#f59e0b'); // Default to amber for light
+  const [drawingColor, setDrawingColor] = useState('#f59e0b');
   const [drawingShape, setDrawingShape] = useState('freehand'); 
   
   const [activePlayers, setActivePlayers] = useState([]);
@@ -334,12 +334,18 @@ export default function DMBattleMap() {
 
       <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl mb-4 p-3 shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 shrink-0 z-20">
         <div className="flex items-center gap-4 pl-2">
-            <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pr-4 border-r-2 border-slate-950"><Map className="w-5 h-5" /> War Table</h2>
-            <button onClick={returnToDashboard} className="text-slate-400 hover:text-white text-xs font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors"><LayoutDashboard className="w-4 h-4" /> Command Center</button>
+            <h2 className="text-lg font-black text-indigo-400 flex items-center gap-2 shrink-0 uppercase tracking-widest drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] pr-4 border-r-2 border-slate-950">
+            <Map className="w-5 h-5" /> War Table
+            </h2>
+            <button onClick={returnToDashboard} className="text-slate-400 hover:text-white text-xs font-black uppercase tracking-widest flex items-center gap-1.5 transition-colors">
+            <LayoutDashboard className="w-4 h-4" /> Command Center
+            </button>
         </div>
         
         <div className="flex flex-wrap items-center gap-y-2 gap-x-2 w-full xl:w-auto">
-          <button onClick={toggleFogOfWar} className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 ${mapData.fogOfWar ? 'bg-slate-400 border-slate-950 text-slate-950' : 'bg-slate-950 border-slate-900 text-slate-500 hover:text-white'}`}><Eye className="w-4 h-4" /> Fog</button>
+          <button onClick={toggleFogOfWar} className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border-2 flex items-center gap-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none shrink-0 ${mapData.fogOfWar ? 'bg-slate-400 border-slate-950 text-slate-950' : 'bg-slate-950 border-slate-900 text-slate-500 hover:text-white'}`}>
+            <Eye className="w-4 h-4" /> Fog
+          </button>
           
           <div className="flex bg-slate-800 rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] border-2 border-slate-950 shrink-0 divide-x-2 divide-slate-950 overflow-hidden">
              <button onClick={spawnNPC} className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-slate-700 flex items-center gap-1.5 transition-colors"><User className="w-4 h-4" /> +1 NPC</button>
@@ -355,10 +361,13 @@ export default function DMBattleMap() {
                 <button onClick={() => setDrawingShape('circle')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'circle' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><Circle className="w-3 h-3" /></button>
                 <button onClick={() => setDrawingShape('cone')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'cone' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`}><Triangle className="w-3 h-3" /></button>
                 
-                {/* NEW DYNAMIC LIGHTING TOOLS */}
+                {/* NEW LIGHTING TOOLS: FLICKERING TORCH & STATIC SUNLIGHT */}
                 <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
-                <button onClick={() => setDrawingShape('light_circle')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'light_circle' ? 'bg-amber-500 border-slate-950 text-slate-950 shadow-inner' : 'border-transparent text-slate-500 hover:text-amber-400'}`} title="Draw Light Radius"><Sun className="w-3 h-3" /></button>
-                <button onClick={() => setDrawingShape('light_cone')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'light_cone' ? 'bg-amber-500 border-slate-950 text-slate-950 shadow-inner' : 'border-transparent text-slate-500 hover:text-amber-400'}`} title="Draw Light Cone"><Flashlight className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('torch_circle')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'torch_circle' ? 'bg-orange-500 border-slate-950 text-slate-950 shadow-inner' : 'border-transparent text-slate-500 hover:text-orange-400'}`} title="Draw Torch Radius (Flickering)"><Flame className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('torch_cone')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'torch_cone' ? 'bg-orange-500 border-slate-950 text-slate-950 shadow-inner' : 'border-transparent text-slate-500 hover:text-orange-400'}`} title="Draw Torch Cone (Flickering)"><Flashlight className="w-3 h-3" /></button>
+                <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
+                <button onClick={() => setDrawingShape('sun_circle')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'sun_circle' ? 'bg-yellow-400 border-slate-950 text-slate-950 shadow-inner' : 'border-transparent text-slate-500 hover:text-yellow-300'}`} title="Draw Sunlight Radius (Static)"><Sun className="w-3 h-3" /></button>
+                <button onClick={() => setDrawingShape('sun_cone')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'sun_cone' ? 'bg-yellow-400 border-slate-950 text-slate-950 shadow-inner' : 'border-transparent text-slate-500 hover:text-yellow-300'}`} title="Draw Sunlight Cone (Static)"><Triangle className="w-3 h-3 text-yellow-300" /></button>
                 <div className="w-0.5 h-4 bg-slate-900 mx-1"></div>
 
                 <button onClick={() => setDrawingShape('reveal')} className={`p-1.5 rounded-lg transition-colors border-2 ${drawingShape === 'reveal' ? 'bg-slate-800 border-slate-950 text-white shadow-inner' : 'border-transparent text-slate-500 hover:text-slate-300'}`} title="Reveal Fog"><Eye className="w-3 h-3" /></button>
