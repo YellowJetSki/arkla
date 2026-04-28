@@ -1,20 +1,33 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot, updateDoc, writeBatch, arrayRemove } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Shield, Activity, Heart, Eye, Target, Sparkles, Plus, Minus, PawPrint, Droplets, Flame, UserMinus } from 'lucide-react';
-import CharacterCard from './CharacterCard';
+import { Shield, Activity, Heart, Eye, Target, Sparkles, Plus, Minus, Droplets, Flame, UserMinus, ChevronDown, ChevronUp, Swords, Save } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
+import CharacterCard from './CharacterCard';
 import { calculateAC } from '../services/arklaEngine';
 
 export default function DMPlayerCard({ charId }) {
   const [char, setChar] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
+  
+  // FIXED: Restored BOTH views!
+  const [isEditing, setIsEditing] = useState(false); // The Full Character Sheet Modal
+  const [isExpanded, setIsExpanded] = useState(false); // The Quick Drop-down Rundown
+  
+  // Quick Edit States
+  const [editMaxHp, setEditMaxHp] = useState('');
+  const [editLevel, setEditLevel] = useState('');
+
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'characters', charId), (docSnap) => {
-      if (docSnap.exists()) setChar(docSnap.data());
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setChar(data);
+        setEditMaxHp(data.maxHp || '');
+        setEditLevel(data.level || '');
+      }
     });
     return () => unsubscribe();
   }, [charId]);
@@ -22,11 +35,9 @@ export default function DMPlayerCard({ charId }) {
   const updateHp = async (amount) => {
     if (!char) return;
     const newHp = Math.max(0, Math.min(char.maxHp, char.hp + amount));
-    
     const batch = writeBatch(db);
     batch.update(doc(db, 'characters', charId), { hp: newHp });
     batch.update(doc(db, 'campaign', 'battlemap'), { [`tokens.${charId}.hp`]: newHp });
-    
     await batch.commit().catch(e => console.error("Map sync error:", e));
   };
 
@@ -51,23 +62,25 @@ export default function DMPlayerCard({ charId }) {
     await updateDoc(doc(db, 'characters', charId), { spellSlots: updatedSlots });
   };
 
+  const saveQuickEdits = async () => {
+    const updates = {};
+    if (editMaxHp) updates.maxHp = parseInt(editMaxHp, 10);
+    if (editLevel) updates.level = parseInt(editLevel, 10);
+    await updateDoc(doc(db, 'characters', charId), updates);
+  };
+
   const handleKickAndReset = () => {
     setDialog({
-      isOpen: true,
-      title: 'Boot Player?',
+      isOpen: true, title: 'Boot Player?',
       message: `Boot ${char.name} from the active session and force them to re-do the onboarding tutorial next time they join?`,
       type: 'confirm',
       onConfirm: async () => {
         try {
           const batch = writeBatch(db);
           batch.update(doc(db, 'characters', charId), { hasCompletedTutorial: false });
-          batch.update(doc(db, 'campaign', 'main_session'), {
-            unlockedCharacters: arrayRemove(charId)
-          });
+          batch.update(doc(db, 'campaign', 'main_session'), { unlockedCharacters: arrayRemove(charId) });
           await batch.commit();
-        } catch (e) {
-          console.error("Error kicking player: ", e);
-        }
+        } catch (e) { console.error("Error kicking player: ", e); }
         closeDialog();
       }
     });
@@ -90,15 +103,23 @@ export default function DMPlayerCard({ charId }) {
   const passivePerception = 10 + wisMod + (isPerceptionProf ? pb : 0);
 
   const autoAc = calculateAC(char);
-  const acBuffTotal = (char.tempBuffs || [])
-    .filter(b => b.target === 'AC')
-    .reduce((sum, b) => sum + b.value, 0);
+  const acBuffTotal = (char.tempBuffs || []).filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
   const displayAc = autoAc + acBuffTotal;
 
+  const equippedWeapons = (char.inventory || []).filter(i => i.type === 'Weapon' && i.equipped);
+
   return (
-    <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden group">
+    <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden group transition-all">
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
-      {isEditing && <CharacterCard currentUser={{ charId }} isDM={true} onClose={() => setIsEditing(false)} />}
+      
+      {/* FIXED: Restored the full CharacterCard modal component */}
+      {isEditing && (
+        <CharacterCard 
+          currentUser={{ charId }} 
+          isDM={true} 
+          onClose={() => setIsEditing(false)} 
+        />
+      )}
       
       <div className={`absolute top-0 right-0 w-32 h-32 blur-[50px] rounded-full pointer-events-none opacity-20 bg-${char.theme || 'indigo'}-500`}></div>
 
@@ -109,17 +130,37 @@ export default function DMPlayerCard({ charId }) {
             {char.name} 
             {activeConditions.length > 0 && <span className="flex w-2.5 h-2.5 rounded-full bg-red-500 border border-slate-950 animate-pulse shadow-sm" title="Has Conditions"></span>}
           </h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Lv {char.level} {char.class}</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+            Lv {char.level} {char.class}
+          </p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {char.inspiration && <Sparkles className="w-5 h-5 text-amber-400 drop-shadow-[0_0_5px_rgba(245,158,11,0.8)]" title="Has Inspiration" />}
           
-          <button onClick={handleKickAndReset} className="text-slate-950 bg-slate-400 hover:bg-red-500 transition-all p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Kick & Reset Onboarding">
+          <button 
+            onClick={handleKickAndReset} 
+            className="text-slate-950 bg-slate-400 hover:bg-red-500 transition-all p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" 
+            title="Kick & Reset"
+          >
             <UserMinus className="w-4 h-4 font-black" />
           </button>
 
-          <button onClick={() => setIsEditing(true)} className="text-slate-950 bg-indigo-500 hover:bg-indigo-400 transition-all p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" title="Open Character Sheet">
+          {/* OPEN FULL SHEET BUTTON */}
+          <button 
+            onClick={() => setIsEditing(true)} 
+            className="text-slate-950 bg-indigo-500 hover:bg-indigo-400 transition-all p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" 
+            title="Open Full Character Sheet"
+          >
             <Eye className="w-4 h-4 font-black" />
+          </button>
+
+          {/* TOGGLE QUICK RUNDOWN BUTTON */}
+          <button 
+            onClick={() => setIsExpanded(!isExpanded)} 
+            className="text-slate-950 bg-indigo-500 hover:bg-indigo-400 transition-all p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" 
+            title="Toggle Rundown"
+          >
+            {isExpanded ? <ChevronUp className="w-4 h-4 font-black" /> : <ChevronDown className="w-4 h-4 font-black" />}
           </button>
         </div>
       </div>
@@ -131,9 +172,13 @@ export default function DMPlayerCard({ charId }) {
              <div className={`h-full ${hpColor} transition-all duration-500`} style={{ width: `${hpPercentage}%` }}></div>
           </div>
           <div className="flex justify-between items-center w-full mb-1 px-1">
-             <button onClick={() => updateHp(-1)} className="text-white hover:text-red-400 bg-slate-900 rounded p-1 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center"><Minus className="w-3 h-3"/></button>
+             <button onClick={() => updateHp(-1)} className="text-white hover:text-red-400 bg-slate-900 rounded p-1 border-2 border-slate-950 shadow-sm">
+               <Minus className="w-3 h-3"/>
+             </button>
              <span className="text-[10px] text-red-500 font-black uppercase tracking-widest drop-shadow-[1px_1px_0px_rgba(0,0,0,1)]">HP</span>
-             <button onClick={() => updateHp(1)} className="text-white hover:text-emerald-400 bg-slate-900 rounded p-1 border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none transition-all flex items-center justify-center"><Plus className="w-3 h-3"/></button>
+             <button onClick={() => updateHp(1)} className="text-white hover:text-emerald-400 bg-slate-900 rounded p-1 border-2 border-slate-950 shadow-sm">
+               <Plus className="w-3 h-3"/>
+             </button>
           </div>
           <span className="text-xl font-black text-white leading-none">
             {char.hp} <span className="text-[10px] text-slate-500">/ {char.maxHp}</span>
@@ -141,30 +186,125 @@ export default function DMPlayerCard({ charId }) {
         </div>
         
         <div className={`bg-slate-950 border-2 rounded-xl p-2 flex flex-col items-center justify-center shadow-inner transition-colors ${acBuffTotal > 0 ? 'border-emerald-500' : acBuffTotal < 0 ? 'border-red-500' : 'border-slate-900'}`}>
-          <span className={`text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1 ${acBuffTotal > 0 ? 'text-emerald-500' : acBuffTotal < 0 ? 'text-red-500' : 'text-amber-500'}`}><Shield className="w-3 h-3"/> AC</span>
-          <span className={`text-lg font-black leading-none ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-white'}`}>{displayAc}</span>
+          <span className={`text-[10px] font-black uppercase tracking-widest mb-1 flex items-center gap-1 ${acBuffTotal > 0 ? 'text-emerald-500' : acBuffTotal < 0 ? 'text-red-500' : 'text-amber-500'}`}>
+            <Shield className="w-3 h-3"/> AC
+          </span>
+          <span className={`text-lg font-black leading-none ${acBuffTotal > 0 ? 'text-emerald-400' : acBuffTotal < 0 ? 'text-red-400' : 'text-white'}`}>
+            {displayAc}
+          </span>
         </div>
         
         <div className="bg-slate-950 border-2 border-slate-900 rounded-xl p-2 flex flex-col items-center justify-center shadow-inner">
-          <span className="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-1"><Target className="w-3 h-3"/> PP</span>
-          <span className="text-lg font-black text-white leading-none">{passivePerception}</span>
+          <span className="text-[10px] font-black text-sky-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+            <Target className="w-3 h-3"/> PP
+          </span>
+          <span className="text-lg font-black text-white leading-none">
+            {passivePerception}
+          </span>
         </div>
       </div>
 
       {/* Experience Row */}
       <div className="bg-slate-950 border-2 border-slate-900 rounded-xl p-2 flex items-center justify-between shadow-inner relative z-10 mb-4">
-        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none pl-2 flex items-center gap-1.5"><Sparkles className="w-3 h-3"/> Experience</span>
+        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none pl-2 flex items-center gap-1.5">
+          <Sparkles className="w-3 h-3"/> Experience
+        </span>
         <div className="flex items-center gap-2">
-          <button onClick={() => updateXp(-10)} className="text-slate-400 hover:text-indigo-400 bg-slate-800 rounded p-1 border border-slate-700 active:translate-y-[1px]"><Minus className="w-3 h-3"/></button>
-          <span className="text-sm font-black text-white leading-none w-12 text-center">{char.exp || 0}</span>
-          <button onClick={() => updateXp(10)} className="text-slate-400 hover:text-indigo-400 bg-slate-800 rounded p-1 border border-slate-700 active:translate-y-[1px]"><Plus className="w-3 h-3"/></button>
+          <button onClick={() => updateXp(-10)} className="text-slate-400 hover:text-indigo-400 bg-slate-800 rounded p-1 border border-slate-700 active:translate-y-[1px]">
+            <Minus className="w-3 h-3"/>
+          </button>
+          <span className="text-sm font-black text-white leading-none w-12 text-center">
+            {char.exp || 0}
+          </span>
+          <button onClick={() => updateXp(10)} className="text-slate-400 hover:text-indigo-400 bg-slate-800 rounded p-1 border border-slate-700 active:translate-y-[1px]">
+            <Plus className="w-3 h-3"/>
+          </button>
         </div>
       </div>
 
-      <div className="space-y-3 relative z-10">
+      {/* THE NEW RUNDOWN & QUICK EDITOR */}
+      {isExpanded && (
+        <div className="pt-2 border-t-2 border-slate-800 mt-2 space-y-4 animate-in fade-in slide-in-from-top-2 relative z-10">
+          
+          {/* Attributes */}
+          <div className="grid grid-cols-6 gap-1 bg-slate-950 p-2 rounded-xl border-2 border-slate-900 shadow-inner">
+             {['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'].map(stat => {
+               const score = char.stats?.[stat] || 10;
+               const mod = Math.floor((score - 10) / 2);
+               return (
+                 <div key={stat} className="text-center flex flex-col">
+                   <span className="text-[8px] uppercase font-black text-slate-500">{stat}</span>
+                   <span className="text-sm font-black text-white">{score}</span>
+                   <span className="text-[9px] font-bold text-slate-400">{mod >= 0 ? `+${mod}` : mod}</span>
+                 </div>
+               );
+             })}
+          </div>
+
+          {/* Quick Edit Inputs */}
+          <div className="bg-slate-900 p-3 rounded-xl border-2 border-slate-800">
+             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+               <Activity className="w-3.5 h-3.5"/> Quick Tweaks
+             </h4>
+             <div className="grid grid-cols-2 gap-3 mb-3">
+               <div>
+                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Max HP</label>
+                 <input 
+                   type="number" 
+                   value={editMaxHp} 
+                   onChange={e => setEditMaxHp(e.target.value)} 
+                   className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-xs font-bold focus:border-indigo-500 outline-none" 
+                 />
+               </div>
+               <div>
+                 <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 block">Level</label>
+                 <input 
+                   type="number" 
+                   value={editLevel} 
+                   onChange={e => setEditLevel(e.target.value)} 
+                   className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-xs font-bold focus:border-indigo-500 outline-none" 
+                 />
+               </div>
+             </div>
+             <button 
+               onClick={saveQuickEdits} 
+               className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-slate-950 font-black text-[10px] uppercase tracking-widest rounded transition-colors flex items-center justify-center gap-1 shadow-sm"
+             >
+               <Save className="w-3 h-3"/> Save Tweaks
+             </button>
+          </div>
+
+          {/* Equipped Weapons */}
+          <div className="bg-slate-900 p-3 rounded-xl border-2 border-slate-800">
+            <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <Swords className="w-3.5 h-3.5"/> Equipped Arsenal
+            </h4>
+            {equippedWeapons.length > 0 ? (
+              <div className="space-y-2">
+                {equippedWeapons.map((w, i) => (
+                  <div key={i} className="bg-slate-950 p-2 rounded-lg border border-slate-800 text-xs">
+                    <p className="font-bold text-white mb-0.5">{w.itemName}</p>
+                    <p className="text-slate-400 text-[10px]">
+                      {w.damage ? `Dmg: ${w.damage} ${w.damageType || ''} ` : ''}
+                      {w.properties ? `(${w.properties})` : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[10px] text-slate-500 italic">No weapons equipped.</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Expandable Resources & Slots */}
+      <div className="space-y-3 relative z-10 mt-3">
         {Object.keys(spellSlots).length > 0 && (
           <div className="bg-slate-900 p-3 rounded-xl border-2 border-fuchsia-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-             <h4 className="text-[10px] font-black text-fuchsia-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Flame className="w-3.5 h-3.5"/> Spell Slots</h4>
+             <h4 className="text-[10px] font-black text-fuchsia-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+               <Flame className="w-3.5 h-3.5"/> Spell Slots
+             </h4>
              <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
                {Object.entries(spellSlots).map(([lvl, data]) => (
                  <div key={lvl} className="flex items-center justify-between">
@@ -174,7 +314,7 @@ export default function DMPlayerCard({ charId }) {
                         <button 
                           key={i} 
                           onClick={() => handleSlotToggle(lvl, i < data.current ? i : i + 1, data.max)} 
-                          className={`w-5 h-5 rounded-md border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${i < data.current ? 'bg-fuchsia-500 border-slate-950' : 'bg-slate-900 border-slate-950 cursor-pointer'}`} 
+                          className={`w-5 h-5 rounded-md border-2 transition-all shadow-sm ${i < data.current ? 'bg-fuchsia-500 border-slate-950' : 'bg-slate-900 border-slate-950 cursor-pointer'}`} 
                         />
                       ))}
                     </div>
@@ -183,18 +323,35 @@ export default function DMPlayerCard({ charId }) {
              </div>
           </div>
         )}
+        
         {resources.length > 0 && (
           <div className="bg-slate-900 p-3 rounded-xl border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)]">
-             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Droplets className="w-3.5 h-3.5"/> Trackers</h4>
+             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+               <Droplets className="w-3.5 h-3.5"/> Trackers
+             </h4>
              <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
                {resources.map((res, idx) => (
                  <div key={idx} className="flex items-center justify-between bg-slate-950 px-2 py-1.5 rounded-lg border-2 border-slate-900 shadow-inner">
-                    <span className="text-[10px] font-bold text-white uppercase tracking-widest truncate max-w-[100px]">{res.name}</span>
+                    <span className="text-[10px] font-bold text-white uppercase tracking-widest truncate max-w-[100px]">
+                      {res.name}
+                    </span>
                     {res.isPool ? (
                       <div className="flex items-center gap-2">
-                        <button onClick={() => handleResourceToggle(idx, Math.max(0, res.current - 1))} className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-black flex items-center justify-center text-xs border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">-</button>
-                        <span className="text-[10px] font-black text-indigo-400 w-6 text-center">{res.current}</span>
-                        <button onClick={() => handleResourceToggle(idx, Math.min(res.max, res.current + 1))} className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-black flex items-center justify-center text-xs border-2 border-slate-950 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">+</button>
+                        <button 
+                          onClick={() => handleResourceToggle(idx, Math.max(0, res.current - 1))} 
+                          className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-black flex items-center justify-center text-xs border-2 border-slate-950 transition-all shadow-sm"
+                        >
+                          -
+                        </button>
+                        <span className="text-[10px] font-black text-indigo-400 w-6 text-center">
+                          {res.current}
+                        </span>
+                        <button 
+                          onClick={() => handleResourceToggle(idx, Math.min(res.max, res.current + 1))} 
+                          className="w-6 h-6 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-black flex items-center justify-center text-xs border-2 border-slate-950 transition-all shadow-sm"
+                        >
+                          +
+                        </button>
                       </div>
                     ) : (
                       <div className="flex gap-1.5">
@@ -202,7 +359,7 @@ export default function DMPlayerCard({ charId }) {
                           <button 
                             key={slotIdx} 
                             onClick={() => handleResourceToggle(idx, slotIdx < res.current ? slotIdx : slotIdx + 1)} 
-                            className={`w-5 h-5 rounded-md border-2 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none ${slotIdx < res.current ? 'bg-indigo-500 border-slate-950' : 'bg-slate-900 border-slate-950'}`} 
+                            className={`w-5 h-5 rounded-md border-2 transition-all shadow-sm ${slotIdx < res.current ? 'bg-indigo-500 border-slate-950' : 'bg-slate-900 border-slate-950'}`} 
                           />
                         ))}
                       </div>
