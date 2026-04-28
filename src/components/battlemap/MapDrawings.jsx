@@ -31,10 +31,27 @@ export default function MapDrawings({
     );
   };
 
+  // FIXED: Bulletproof coordinate fetching for both precise Mouse and Touch screens
   const getCoords = (e, shouldSnap = false) => {
+    if (!svgRef.current) return { x: 0, y: 0 };
     const rect = svgRef.current.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    let clientX = 0;
+    let clientY = 0;
+    
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+      clientY = e.changedTouches[0].clientY;
+    } else if (e.clientX !== undefined) {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    } else if (e.nativeEvent && e.nativeEvent.clientX !== undefined) {
+      clientX = e.nativeEvent.clientX;
+      clientY = e.nativeEvent.clientY;
+    }
+
     let x = (clientX - rect.left) / currentCellSize;
     let y = (clientY - rect.top) / currentCellSize;
     if (shouldSnap) { x = Math.round(x * 2) / 2; y = Math.round(y * 2) / 2; }
@@ -66,7 +83,7 @@ export default function MapDrawings({
 
   const handlePointerUp = () => {
     if (!isDrawingMode || !currentLine) return;
-    if (currentLine.points.length > 1 && onDrawEnd) onDrawEnd(currentLine);
+    if (currentLine.points.length > 0 && onDrawEnd) onDrawEnd(currentLine);
     setCurrentLine(null);
   };
 
@@ -76,8 +93,16 @@ export default function MapDrawings({
     const fillColor = isMask ? "black" : (line.color || '#ef4444');
     const shapeType = line.type || line.shape; 
 
+    // FIXED: Properly renders single clicks as dots so the pen tool doesn't vanish
     if (shapeType === 'freehand' || shapeType === 'reveal') {
-      const d = line.points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * currentCellSize} ${p.y * currentCellSize}`).join(' ');
+      if (line.points.length === 1) {
+        return <circle key={index} cx={line.points[0].x * currentCellSize} cy={line.points[0].y * currentCellSize} r={shapeType === 'reveal' ? 30 : 3} fill={strokeColor} opacity={isMask ? 1 : 0.85} />;
+      }
+      const d = line.points.map((p, i) => {
+        if (p == null || isNaN(p.x) || isNaN(p.y)) return '';
+        return `${i === 0 ? 'M' : 'L'} ${p.x * currentCellSize} ${p.y * currentCellSize}`;
+      }).join(' ');
+      if (!d.trim()) return null;
       return <path key={index} d={d} stroke={strokeColor} strokeWidth={shapeType === 'reveal' ? 60 : 4} fill="none" strokeLinecap="round" strokeLinejoin="round" opacity={isMask ? 1 : 0.85} />;
     }
 
@@ -144,19 +169,15 @@ export default function MapDrawings({
       );
     }
 
-    // NEW: Dynamic Light Shapes (Players see glowing gradient, DM sees faint dashed borders)
+    // UPDATED: Smooth, additive CSS animations for dynamic lights instead of clunky SVG anims
     if (shapeType === 'light_circle') {
       const radius = distance * currentCellSize;
       return (
-        <g key={index} className="mix-blend-screen pointer-events-none">
+        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: 'pulse-light 3s infinite alternate ease-in-out' }}>
           <defs>
             <radialGradient id={`glow-circ-${index}`} cx={x1} cy={y1} r={radius} gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.8">
-                <animate attributeName="stop-opacity" values="0.8;0.4;0.9;0.5;0.8" dur={`${2 + (index % 3) * 0.5}s`} repeatCount="indefinite" />
-              </stop>
-              <stop offset="50%" stopColor={strokeColor} stopOpacity="0.3">
-                <animate attributeName="stop-opacity" values="0.3;0.1;0.4;0.2;0.3" dur={`${2.5 + (index % 2) * 0.5}s`} repeatCount="indefinite" />
-              </stop>
+              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.85" />
+              <stop offset="50%" stopColor={strokeColor} stopOpacity="0.3" />
               <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
             </radialGradient>
           </defs>
@@ -176,15 +197,11 @@ export default function MapDrawings({
       const p3x = x1 + distPx * Math.cos(angle + halfAngle);
       const p3y = y1 + distPx * Math.sin(angle + halfAngle);
       return (
-        <g key={index} className="mix-blend-screen pointer-events-none">
+        <g key={index} className="pointer-events-none" style={{ mixBlendMode: 'screen', animation: 'pulse-light 3s infinite alternate ease-in-out' }}>
           <defs>
             <radialGradient id={`glow-cone-${index}`} cx={x1} cy={y1} r={distPx} gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.8">
-                <animate attributeName="stop-opacity" values="0.8;0.4;0.9;0.5;0.8" dur={`${2 + (index % 3) * 0.5}s`} repeatCount="indefinite" />
-              </stop>
-              <stop offset="50%" stopColor={strokeColor} stopOpacity="0.3">
-                <animate attributeName="stop-opacity" values="0.3;0.1;0.4;0.2;0.3" dur={`${2.5 + (index % 2) * 0.5}s`} repeatCount="indefinite" />
-              </stop>
+              <stop offset="0%" stopColor={strokeColor} stopOpacity="0.85" />
+              <stop offset="50%" stopColor={strokeColor} stopOpacity="0.3" />
               <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
             </radialGradient>
           </defs>
@@ -204,22 +221,25 @@ export default function MapDrawings({
   const currentReveals = currentLine && currentLine.type === 'reveal' ? currentLine : null;
 
   return (
-    <svg ref={svgRef} className={`absolute inset-0 z-[35] ${isDrawingMode ? 'cursor-crosshair pointer-events-auto touch-none' : 'pointer-events-none'}`} style={{ width: cols * currentCellSize, height: rows * currentCellSize }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}>
-      {fogOfWar && (
-        <defs>
-          <filter id="softRevealEdge" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="15" /></filter>
-          <mask id="fogMask">
-            <rect width="100%" height="100%" fill="white" />
-            <g filter="url(#softRevealEdge)">
-              {reveals.map((line, i) => renderShape(line, `rev-${i}`, true))}
-              {currentReveals && renderShape(currentReveals, 'curr-rev', true)}
-            </g>
-          </mask>
-        </defs>
-      )}
-      {fogOfWar && <rect width="100%" height="100%" fill="#020617" mask="url(#fogMask)" opacity={isDM ? "0.45" : "0.98"} />}
-      {paints.map((line, i) => renderShape(line, `paint-${line.id || i}`))}
-      {currentPaints && renderShape(currentPaints, 'curr-paint')}
-    </svg>
+    <>
+      <style>{`@keyframes pulse-light { 0% { opacity: 0.65; } 100% { opacity: 1; } }`}</style>
+      <svg ref={svgRef} className={`absolute inset-0 z-[35] ${isDrawingMode ? 'cursor-crosshair pointer-events-auto touch-none' : 'pointer-events-none'}`} style={{ width: cols * currentCellSize, height: rows * currentCellSize }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp} onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}>
+        {fogOfWar && (
+          <defs>
+            <filter id="softRevealEdge" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="15" /></filter>
+            <mask id="fogMask">
+              <rect width="100%" height="100%" fill="white" />
+              <g filter="url(#softRevealEdge)">
+                {reveals.map((line, i) => renderShape(line, `rev-${i}`, true))}
+                {currentReveals && renderShape(currentReveals, 'curr-rev', true)}
+              </g>
+            </mask>
+          </defs>
+        )}
+        {fogOfWar && <rect width="100%" height="100%" fill="#020617" mask="url(#fogMask)" opacity={isDM ? "0.45" : "0.98"} />}
+        {paints.map((line, i) => renderShape(line, `paint-${line.id || i}`))}
+        {currentPaints && renderShape(currentPaints, 'curr-paint')}
+      </svg>
+    </>
   );
 }
