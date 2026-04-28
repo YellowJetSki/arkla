@@ -9,9 +9,8 @@ import { calculateAC } from '../services/arklaEngine';
 export default function DMPlayerCard({ charId }) {
   const [char, setChar] = useState(null);
   
-  // FIXED: Restored BOTH views!
-  const [isEditing, setIsEditing] = useState(false); // The Full Character Sheet Modal
-  const [isExpanded, setIsExpanded] = useState(false); // The Quick Drop-down Rundown
+  const [isEditing, setIsEditing] = useState(false); 
+  const [isExpanded, setIsExpanded] = useState(false); 
   
   // Quick Edit States
   const [editMaxHp, setEditMaxHp] = useState('');
@@ -106,13 +105,21 @@ export default function DMPlayerCard({ charId }) {
   const acBuffTotal = (char.tempBuffs || []).filter(b => b.target === 'AC').reduce((sum, b) => sum + b.value, 0);
   const displayAc = autoAc + acBuffTotal;
 
-  const equippedWeapons = (char.inventory || []).filter(i => i.type === 'Weapon' && i.equipped);
+  // FIXED: Properly hunt for weapons across all possible DB structures
+  const getEquippedWeapons = () => {
+    if (char.weapons && char.weapons.length > 0) return char.weapons;
+    if (char.attacks && char.attacks.length > 0) return char.attacks;
+    if (char.inventory && char.inventory.length > 0) {
+      return char.inventory.filter(i => (i.type === 'Weapon' || i.isWeapon) && i.equipped);
+    }
+    return [];
+  };
+  const equippedWeapons = getEquippedWeapons();
 
   return (
     <div className="bg-slate-900 border-[3px] border-slate-950 rounded-2xl p-4 shadow-[6px_6px_0px_rgba(0,0,0,1)] relative overflow-hidden group transition-all">
       <DialogModal isOpen={dialog.isOpen} title={dialog.title} message={dialog.message} type={dialog.type} onConfirm={dialog.onConfirm} onCancel={closeDialog} />
       
-      {/* FIXED: Restored the full CharacterCard modal component */}
       {isEditing && (
         <CharacterCard 
           currentUser={{ charId }} 
@@ -145,7 +152,6 @@ export default function DMPlayerCard({ charId }) {
             <UserMinus className="w-4 h-4 font-black" />
           </button>
 
-          {/* OPEN FULL SHEET BUTTON */}
           <button 
             onClick={() => setIsEditing(true)} 
             className="text-slate-950 bg-indigo-500 hover:bg-indigo-400 transition-all p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" 
@@ -154,7 +160,6 @@ export default function DMPlayerCard({ charId }) {
             <Eye className="w-4 h-4 font-black" />
           </button>
 
-          {/* TOGGLE QUICK RUNDOWN BUTTON */}
           <button 
             onClick={() => setIsExpanded(!isExpanded)} 
             className="text-slate-950 bg-indigo-500 hover:bg-indigo-400 transition-all p-1.5 rounded-lg border-2 border-slate-950 shadow-[2px_2px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none" 
@@ -222,7 +227,7 @@ export default function DMPlayerCard({ charId }) {
         </div>
       </div>
 
-      {/* THE NEW RUNDOWN & QUICK EDITOR */}
+      {/* THE RUNDOWN & QUICK EDITOR */}
       {isExpanded && (
         <div className="pt-2 border-t-2 border-slate-800 mt-2 space-y-4 animate-in fade-in slide-in-from-top-2 relative z-10">
           
@@ -283,7 +288,7 @@ export default function DMPlayerCard({ charId }) {
               <div className="space-y-2">
                 {equippedWeapons.map((w, i) => (
                   <div key={i} className="bg-slate-950 p-2 rounded-lg border border-slate-800 text-xs">
-                    <p className="font-bold text-white mb-0.5">{w.itemName}</p>
+                    <p className="font-bold text-white mb-0.5">{w.name || w.itemName}</p>
                     <p className="text-slate-400 text-[10px]">
                       {w.damage ? `Dmg: ${w.damage} ${w.damageType || ''} ` : ''}
                       {w.properties ? `(${w.properties})` : ''}
