@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, setDoc, getDoc, writeBatch, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '../services/firebase';
-import { Skull, X, Shield, Heart, Wind, Swords, Search, Loader2, Plus, Wand2, Trash2 } from 'lucide-react';
+import { Skull, X, Shield, Heart, Wind, Swords, Search, Loader2, Plus, Wand2, Trash2, Check, ToggleLeft, ToggleRight } from 'lucide-react';
 import DialogModal from './shared/DialogModal';
 import ImageSelector from './shared/ImageSelector';
 import { applySanctuaryFilter } from '../services/arklaEngine';
@@ -12,6 +12,9 @@ export default function EnemyForge({ onClose, enemyToEdit }) {
   const [isSaving, setIsSaving] = useState(false);
   const [dialog, setDialog] = useState({ isOpen: false, title: '', message: '', type: 'alert', onConfirm: null });
   const closeDialog = () => setDialog(prev => ({ ...prev, isOpen: false }));
+
+  // NEW: Control whether this saves to the permanent bestiary
+  const [saveAsTemplate, setSaveAsTemplate] = useState(true);
 
   const [enemy, setEnemy] = useState({
     bestiaryId: null, 
@@ -38,12 +41,11 @@ export default function EnemyForge({ onClose, enemyToEdit }) {
     fetchAllSpells().then(setSrdSpells);
   }, []);
 
-  // LOAD ENEMY TO EDIT
   useEffect(() => {
     if (enemyToEdit) {
       setEnemy({
         ...enemyToEdit,
-        hp: enemyToEdit.maxHp || enemyToEdit.hp, // Form handles Max HP
+        hp: enemyToEdit.maxHp || enemyToEdit.hp, 
         imageUrl: enemyToEdit.img || '',
         tokenUrl: enemyToEdit.img || '',
         actions: enemyToEdit.actions?.[0]?.desc || '',
@@ -214,8 +216,13 @@ export default function EnemyForge({ onClose, enemyToEdit }) {
             isHomebrew: true
          };
 
-         const templateData = { ...enemy, bestiaryId: bId, isCustomTemplate: true };
-         batch.set(doc(db, 'bestiary', bId), templateData);
+         // ONLY save to the Bestiary Collection if the DM explicitly toggled it ON
+         if (saveAsTemplate) {
+           const templateData = { ...enemy, bestiaryId: bId, isCustomTemplate: true };
+           batch.set(doc(db, 'bestiary', bId), templateData);
+         }
+         
+         // Always deploy to the active battle
          batch.set(doc(db, 'active_enemies', newEnemyId), newEnemy);
 
          const mapRef = doc(db, 'campaign', 'battlemap');
@@ -253,6 +260,7 @@ export default function EnemyForge({ onClose, enemyToEdit }) {
     try {
       if (monster.isCustomTemplate) {
         setEnemy({ ...monster });
+        setSaveAsTemplate(true); // Re-save custom templates by default
         setActiveTab('custom');
         setIsSaving(false);
         return;
@@ -302,6 +310,7 @@ export default function EnemyForge({ onClose, enemyToEdit }) {
         tokenUrl: data.image ? `https://www.dnd5eapi.co${data.image}` : ''
       });
 
+      setSaveAsTemplate(false); // DEFAULT TO OFF FOR API MONSTERS SO WE AVOID DUPLICATES!
       setActiveTab('custom');
     } catch (err) {
       console.error(err);
@@ -471,9 +480,25 @@ export default function EnemyForge({ onClose, enemyToEdit }) {
                   />
                 </div>
                 
-                <button type="submit" disabled={isSaving} className="w-full bg-red-600 hover:bg-red-500 text-slate-950 font-black uppercase tracking-widest text-sm py-5 rounded-xl transition-all border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)] active:translate-y-[6px] active:shadow-none mt-4">
-                  {isSaving ? 'Processing...' : enemyToEdit ? 'Update Active Enemy' : 'Save to Bestiary & Deploy'}
-                </button>
+                <div className="flex flex-col gap-3 mt-4">
+                  {!enemyToEdit && (
+                    <button 
+                      type="button"
+                      onClick={() => setSaveAsTemplate(!saveAsTemplate)}
+                      className={`w-full flex items-center justify-between p-4 rounded-xl border-[3px] transition-all cursor-pointer ${saveAsTemplate ? 'bg-indigo-600 border-slate-950 shadow-[4px_4px_0px_rgba(0,0,0,1)]' : 'bg-slate-900 border-slate-800'}`}
+                    >
+                      <div className="flex flex-col text-left">
+                        <span className={`font-black text-sm uppercase tracking-widest ${saveAsTemplate ? 'text-white' : 'text-slate-400'}`}>Save as Reusable Template</span>
+                        <span className={`text-[10px] font-bold mt-1 ${saveAsTemplate ? 'text-indigo-200' : 'text-slate-500'}`}>Adds this monster permanently to your personal Bestiary.</span>
+                      </div>
+                      {saveAsTemplate ? <ToggleRight className="w-8 h-8 text-white" /> : <ToggleLeft className="w-8 h-8 text-slate-500" />}
+                    </button>
+                  )}
+                  
+                  <button type="submit" disabled={isSaving} className="w-full bg-red-600 hover:bg-red-500 text-slate-950 font-black uppercase tracking-widest text-sm py-5 rounded-xl transition-all border-[3px] border-slate-950 shadow-[6px_6px_0px_rgba(0,0,0,1)] active:translate-y-[6px] active:shadow-none">
+                    {isSaving ? 'Processing...' : enemyToEdit ? 'Update Active Enemy' : 'Deploy Threat to Board'}
+                  </button>
+                </div>
               </form>
             ) : (
               <div className="space-y-6 animate-in fade-in">
