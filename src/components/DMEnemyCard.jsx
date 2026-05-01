@@ -103,7 +103,6 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect, onEdit 
   const safeFeatures = normalizeArray(enemy.features, 'Traits');
   const safeParsedActions = normalizeArray(enemy.parsedActions, 'Actions');
 
-  // The Auto-Parser: Turns a glob of text into separated, beautiful 5e action cards
   const renderActionBlocks = (items, borderColor) => {
     return items.map((item, i) => {
       const lines = item.desc ? item.desc.split(/\n+/) : [];
@@ -117,14 +116,12 @@ export default function DMEnemyCard({ enemy, isSelected, onToggleSelect, onEdit 
               let actionName = "";
               let actionDesc = line.trim();
               
-              // Handle injected spells which use markdown (e.g. ***Fireball.***)
               const mdMatch = actionDesc.match(/^[*]+([^*]+)[*]+(.*)/);
               if (mdMatch) {
                 actionName = mdMatch[1].trim();
                 actionDesc = mdMatch[2].trim();
                 if (actionName.endsWith('.')) actionName = actionName.slice(0, -1);
               } else {
-                // Handle standard 5e formatting (Action Name followed by a period)
                 const firstPeriodIdx = actionDesc.indexOf('.');
                 if (firstPeriodIdx > 0 && firstPeriodIdx < 45) { 
                    actionName = actionDesc.substring(0, firstPeriodIdx).trim();
