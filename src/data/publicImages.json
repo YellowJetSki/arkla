@@ -4,6 +4,7 @@
     "urls": [
       "/boathouse_enc.png",
       "/chauzy_map.png",
+      "/prison_enc.png",
       "/scorpion_enc.png",
       "/screwbeard_cave_enc.png",
       "/tutorial_forest_enc.png"
@@ -14,7 +15,11 @@
     "urls": [
       "/bengo_bm.png",
       "/geepo_bm.png",
+      "/hansel_bm.png",
+      "/heago_bm.png",
+      "/jewl_bm.png",
       "/kehrfuffle_bm.png",
+      "/kort_bm.png",
       "/leeta_bm.png",
       "/pavel_bm.png",
       "/scant_bm.png",
